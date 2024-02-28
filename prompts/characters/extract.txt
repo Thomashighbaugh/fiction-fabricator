@@ -1,0 +1,16 @@
+Genre: [genre]
+Author Style: [author_style]
+Tone: [tone]
+Themes: [themes]
+Novel Description: [description]
+SUMMARY: [seed_summary]
+
+Based on the above provided context, identify and describe the characters mentioned in the summary. For each character, provide a paragraph that includes the following information:
+
+* Name
+* Physical description
+* Personality traits
+* Role in the story
+* Relationships with other characters
+
+Ensure that the descriptions are comprehensive and capture the character's essence as portrayed in the summary. Maintain a consistent tone and style throughout the descriptions.

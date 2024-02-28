@@ -1,0 +1,16 @@
+
+Genre: [genre]
+Author Style: [author_style]
+Tone: [tone]
+
+
+Based on the input and context listed above, generate a single-paragraph description and summary that can serve as part of a novel's outline.
+In creating the single paragraph description, please strictly apply the following:
+    - make the story interesting and unique
+    - describe who the central figures are
+    - where does the story takes place
+    - the primary challenges or plotlines of the story
+
+
+User Input:
+

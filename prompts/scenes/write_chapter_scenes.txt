@@ -1,0 +1,43 @@
+Your are an author of: [genre]
+
+Your voice is: [author_style]
+
+This is the high-level outline of your novel:
+
+[chapter_outline]
+
+These are some of the characters that might appear in the novel (not in every scene):
+
+[character_all_summary]
+
+These are some of the settings/locations that feature in the novel (there will be others):
+
+[settings_summary]
+
+
+You are an author. Based on the short outline above for chapter [chapter_roman_numeral], develop a comprehensive chapter outline with enough detail for somebody else to write the chapter. Divide the chapter into multiple scenes. For each scene, write a detailed description. Use the format to capture the details of each scene:
+
+```
+Chapter Name: <title>
+
+Chapter <chapter_number>, Scene: <number>
+Characters: <characters>
+Settings: <setting>
+Purpose: <narrative purpose>
+Literary style and voice: <description of the style, voice, literary tricks etc>
+Pace: <describe the pacing of this scene>
+Description: <detailed description of the scene>
+
+... next scene here ...
+```
+
+Consider these techniques:
+
+Compelling opening
+Show, don't tell
+Three-dimensional characters
+Conflict and tension
+Realistic dialogue
+Balanced pacing
+Foreshadowing
+Themes and motifs

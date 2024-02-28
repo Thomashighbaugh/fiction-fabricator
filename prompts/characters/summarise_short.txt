@@ -1,0 +1,1 @@
+Please summarize the following character profile from a novel into a sentence per character. Format as dot points with an "*" on each line, followed by the name and description:

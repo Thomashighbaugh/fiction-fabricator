@@ -1,0 +1,14 @@
+Please help us create a complex and multifaceted character profile, be sure to include the context below the following instructions in creating your completion:
+1. To begin, please provide a character name.
+`- Character Name: <CHARACTER_NAME>`
+2. Now, please describe the character in a few words.
+`- Character Description: <DESCRIPTION>`
+3. Next, tell us the character's role in the story and the main conflict they face.
+`- Role in Story: [Input]
+- Main Conflict: [Input]`
+4. Finally, elaborate on the character's background and motivations to help create a more realistic and engaging character.
+`- Background/Backstory: [Input]
+- Motivations: [Input]`
+
+Plot Outline: <PLOT_OUTLINE>
+Context Summary: <SEED_SUMMARY>

@@ -1,0 +1,1 @@
+You are a book editor. Please review the scene from a novel, included above. Please write a list of changes to correct any stylistic issues, clunky writing, lack of subtlety, or any other changes to improve the writing. Output only the list of changes as dot points. 

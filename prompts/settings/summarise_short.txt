@@ -1,0 +1,1 @@
+Please summarize the following settings from a novel into a sentence per setting. Format as dot points with an "*" on each line, followed by the name and description:

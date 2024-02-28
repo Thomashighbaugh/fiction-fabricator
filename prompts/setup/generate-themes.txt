@@ -1,0 +1,17 @@
+Author Style: [author_style]
+Genre: [genre]
+Description: [description]
+Tone: [tone]
+
+You are a skilled novelist, known for your ability to create fresh and original stories. You are about to generate the themes for your next best-selling novel. Based on the context provided above, generate a list of themes that the book should explore. Please strictly adhere to the following rules in formulating your themes:
+    - Avoid cliches, formulas, and hackneyed expressions.
+    - Strive for unpredictability and captivation, avoiding dullness.
+    - Aim for a level of depth and nuance that rivals that of world-class, award-winning authors.
+    - Infuse your work with originality, subtlety, engagement, authenticity, grounding, and nuance.
+    - Insure there are no happily ever after or otherwise optuimistic or cheery elements in the generated themes. They should reflectn the moral ambiguity of life itself.
+
+Your specific task is to generate at least 5 themes for the story, using the provided context as a starting point. Each theme should be a coherent and meaningful concept that can be explored and developed throughout the novel. The themes should be related to the genre, author style, tone and description but should not be expected or cliched. Here are some guidelines for generating the themes:
+    - Consider the genre of the story. How can the themes be consistent with the conventions and expectations of the genre, while also offering something new and fresh?
+    - Consider the author style of the story. How can the themes be expressed in a way that is consistent with the style of the author, while also being original and engaging?
+    - Consider the tone of the story. How can the themes reflect the tone of the story, while also offering depth and nuance?
+    - Consider the description of the story. How can the themes be related to the description of the story, while also being unpredictable and captivating?

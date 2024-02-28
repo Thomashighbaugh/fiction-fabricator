@@ -1,0 +1,7 @@
+Genre: [genre]
+Author Style: [author_style]
+Tone: [tone]
+Themes: [themes]
+Novel Description: [description]
+
+Task: Develop a concise yet comprehensive summary of your novel, encompassing the title, narrative technique, milieu, and central motifs.

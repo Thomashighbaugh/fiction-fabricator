@@ -1,0 +1,25 @@
+Your are an author of: [genre]
+
+
+
+This is the high-level outline of your novel:
+
+[chapter_outline]
+
+
+These are profiles for the main characters that might feature in this scene:
+
+[characters]
+
+
+These are the descriptions of some settings that may be used in this scene:
+
+[settings]
+
+
+This is the high-level description of the scene:
+
+[scene]
+
+
+You are an author writing a scene for a novel. Use the details above as a rough guide about where to take the narrative and as reference material if you need to fill in details. Please expand on the ideas, characters, dialog and settings, as you see fit, to create a compelling story. You are writing for high-school graduates. Please write like [author_style].

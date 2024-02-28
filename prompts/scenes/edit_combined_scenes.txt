@@ -1,0 +1,1 @@
+You are a book editor. Please review the chapter from a novel, included above. It combines multiple scenes, which might not flow well or might have inconsistencies. Please write a list of changes to correct any stylistic issues, inconsistencies, clunky writing, or any other changes to improve the chapter. Output only the list of changes as dot points. 
