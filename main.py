@@ -20,6 +20,7 @@ chapter_selector = ChapterSelector()
 
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def exit_app():
     """
     Function to exit the application.
@@ -27,24 +28,32 @@ def exit_app():
     print_formatted_text("See You Next Time!")
     exit()
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Menu items with corresponding actions
 menu_items = {
-    "1": {"name": "Novel config: voice, style, genre", "action": lambda: book_config.menu()},
+    "1": {
+        "name": "Novel config: voice, style, genre",
+        "action": lambda: book_config.menu(),
+    },
     "2": {"name": "Novel outline", "action": lambda: outline.menu()},
     "3": {"name": "Develop Settings/location", "action": lambda: settings.menu()},
     "4": {"name": "Develop Characters", "action": lambda: characters.menu()},
     "5": {"name": "Work on chapter", "action": lambda: chapter_selector.menu()},
-    "6":{"name": "Clear the files generated and start again from scratch.", "action": lambda:backup_and_clear_settings()},
+    "6": {
+        "name": "Clear the files generated and start again from scratch.",
+        "action": lambda: backup_and_clear_settings(),
+    },
     "9": {"name": "Exit", "action": exit_app},
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-DEVELOPMENT_DIR = 'development/'
-TEMPLATE_DIR = 'template/'
+DEVELOPMENT_DIR = "development/"
+TEMPLATE_DIR = "template/"
+
 
 def backup_and_clear_settings():
     """
@@ -64,7 +73,7 @@ def backup_and_clear_settings():
             # Back up the file
             shutil.copy(item_path, backup_item_path)
             # Replace the original file with a blank file
-            open(item_path, 'w').close()
+            open(item_path, "w").close()
         elif os.path.isdir(item_path):
             # Back up the directory recursively
             shutil.copytree(item_path, backup_item_path)
@@ -72,17 +81,23 @@ def backup_and_clear_settings():
             for root, dirs, files in os.walk(item_path):
                 for file in files:
                     file_path = os.path.join(root, file)
-                    open(file_path, 'w').close()
-        print_formatted_text("Work products have been backed up, and original files have been replaced with blank files.")
+                    open(file_path, "w").close()
+        print_formatted_text(
+            "Work products have been backed up, and original files have been replaced with blank files."
+        )
+
 
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def main():
     """
     Main function to run the application.
     """
     while True:
-        print_formatted_text("\nHello! \n We Have Plenty We Can Work On Together! \n\nWhat would you like to do?")
+        print_formatted_text(
+            "\nHello! \n We Have Plenty We Can Work On Together! \n\nWhat would you like to do?"
+        )
         for item in menu_items:
             print_formatted_text(f"{item}. {menu_items[item]['name']}")
 
@@ -92,6 +107,7 @@ def main():
             menu_items[user_input]["action"]()
         else:
             print("Invalid option. Please try again.")
+
 
 if __name__ == "__main__":
     main()

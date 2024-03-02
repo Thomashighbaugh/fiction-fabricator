@@ -1,0 +1,592 @@
+[
+    {
+        "label": "fnmatch",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "fnmatch",
+        "description": "fnmatch",
+        "detail": "fnmatch",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "retrying",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "retrying",
+        "description": "retrying",
+        "detail": "retrying",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "prompt",
+        "importPath": "prompt_toolkit",
+        "description": "prompt_toolkit",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "print_formatted_text",
+        "importPath": "prompt_toolkit.shortcuts",
+        "description": "prompt_toolkit.shortcuts",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "KeyBindings",
+        "importPath": "prompt_toolkit.key_binding",
+        "description": "prompt_toolkit.key_binding",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.key_binding",
+        "documentation": {}
+    },
+    {
+        "label": "Keys",
+        "importPath": "prompt_toolkit.keys",
+        "description": "prompt_toolkit.keys",
+        "isExtraImport": true,
+        "detail": "prompt_toolkit.keys",
+        "documentation": {}
+    },
+    {
+        "label": "openai",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "openai",
+        "description": "openai",
+        "detail": "openai",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAI",
+        "importPath": "openai",
+        "description": "openai",
+        "isExtraImport": true,
+        "detail": "openai",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAI",
+        "importPath": "openai",
+        "description": "openai",
+        "isExtraImport": true,
+        "detail": "openai",
+        "documentation": {}
+    },
+    {
+        "label": "g4f",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "g4f",
+        "description": "g4f",
+        "detail": "g4f",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "importPath": "src.base",
+        "description": "src.base",
+        "isExtraImport": true,
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "Chapter",
+        "importPath": "src.chapter",
+        "description": "src.chapter",
+        "isExtraImport": true,
+        "detail": "src.chapter",
+        "documentation": {}
+    },
+    {
+        "label": "shutil",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "shutil",
+        "description": "shutil",
+        "detail": "shutil",
+        "documentation": {}
+    },
+    {
+        "label": "Book_Config",
+        "importPath": "src.book_setup",
+        "description": "src.book_setup",
+        "isExtraImport": true,
+        "detail": "src.book_setup",
+        "documentation": {}
+    },
+    {
+        "label": "Outline",
+        "importPath": "src.outline",
+        "description": "src.outline",
+        "isExtraImport": true,
+        "detail": "src.outline",
+        "documentation": {}
+    },
+    {
+        "label": "Settings",
+        "importPath": "src.settings",
+        "description": "src.settings",
+        "isExtraImport": true,
+        "detail": "src.settings",
+        "documentation": {}
+    },
+    {
+        "label": "Characters",
+        "importPath": "src.characters",
+        "description": "src.characters",
+        "isExtraImport": true,
+        "detail": "src.characters",
+        "documentation": {}
+    },
+    {
+        "label": "ChapterSelector",
+        "importPath": "src.chapter_selector",
+        "description": "src.chapter_selector",
+        "isExtraImport": true,
+        "detail": "src.chapter_selector",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "kind": 6,
+        "importPath": "src.base",
+        "description": "src.base",
+        "peekOfCode": "class style:\n    BLACK = \"\\033[30m\"\n    RED = \"\\033[31m\"\n    GREEN = \"\\033[32m\"\n    YELLOW = \"\\033[33m\"\n    BLUE = \"\\033[34m\"\n    MAGENTA = \"\\033[35m\"\n    CYAN = \"\\033[36m\"\n    WHITE = \"\\033[37m\"\n    UNDERLINE = \"\\033[4m\"",
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "kind": 6,
+        "importPath": "src.base",
+        "description": "src.base",
+        "peekOfCode": "class Base:\n    def __init__(self):\n        # Set the root directory to the parent directory of the current file\n        self.root_dir = os.path.dirname(os.path.abspath(__file__)) + \"/..\"\n        # Set the model prompt and response styles using color codes\n        self.MODEL_PROMPT_STYLE = \"#44ffcc italic\"\n        self.MODEL_RESPONSE_STYLE = \"#44ff44 bold\"\n    # Method to get the configuration settings\n    def get_config(self):\n        return {",
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "client",
+        "kind": 5,
+        "importPath": "src.base",
+        "description": "src.base",
+        "peekOfCode": "client = OpenAI(api_key=os.getenv(\"OPENAI_API_KEY\"), base_url=\"http://0.0.0.0:1337/v1\")\n# Define a class to store ANSI escape codes for text color and style\nclass style:\n    BLACK = \"\\033[30m\"\n    RED = \"\\033[31m\"\n    GREEN = \"\\033[32m\"\n    YELLOW = \"\\033[33m\"\n    BLUE = \"\\033[34m\"\n    MAGENTA = \"\\033[35m\"\n    CYAN = \"\\033[36m\"",
+        "detail": "src.base",
+        "documentation": {}
+    },
+    {
+        "label": "Book_Config",
+        "kind": 6,
+        "importPath": "src.book_setup",
+        "description": "src.book_setup",
+        "peekOfCode": "class Book_Config(Base):\n    def __init__(self):\n        super().__init__()\n        self.GENRE_FILE = \"development/config/genre.txt\"\n        self.AUTHOR_STYLE_FILE = \"development/config/author_style.txt\"\n        self.THEMES_FILE = \"development/config/themes.txt\"\n        self.TONE_FILE = \"development/config/tone.txt\"\n        self.DESCRIPTION_FILE = \"development/config/description.txt\"\n    # ──────────────────────────────────────────────────────────────────────────────\n    def menu(self):",
+        "detail": "src.book_setup",
+        "documentation": {}
+    },
+    {
+        "label": "Chapter",
+        "kind": 6,
+        "importPath": "src.chapter",
+        "description": "src.chapter",
+        "peekOfCode": "class Chapter(Base):\n    def __init__(self, chapter_folder_name):\n        super().__init__()\n        self.chapter_folder_name = chapter_folder_name\n        self.book_folder = self.path(\"book\")\n        self.chapter_outline = self.get_text(f\"development/outline/chapter_outline.txt\")\n        self.working_chapter_folder = self.path(\"book\") + \"/\" + chapter_folder_name\n        self.WRITE_SCENE_PROMPT = self.get_text(\"prompts/scenes/write_scene.txt\")\n    def menu(self):\n        print_formatted_text(\"\\nSelect a chapter to work on:\")",
+        "detail": "src.chapter",
+        "documentation": {}
+    },
+    {
+        "label": "ChapterSelector",
+        "kind": 6,
+        "importPath": "src.chapter_selector",
+        "description": "src.chapter_selector",
+        "peekOfCode": "class ChapterSelector(Base):\n    def __init__(self):\n        super().__init__()\n        self.book_folder = self.path(\"book\")\n    def menu(self):\n        print_formatted_text(\"\\nSelect a chapter to work on:\")\n        menu = self.get_menu_from_folder(self.book_folder, \"chapter_*\")\n        menu[\"write\"] = {\"name\": \"Auto write chapters 11-13\"}\n        while True:\n            user_input = self.output_menu_with_prompt(menu)",
+        "detail": "src.chapter_selector",
+        "documentation": {}
+    },
+    {
+        "label": "Characters",
+        "kind": 6,
+        "importPath": "src.characters",
+        "description": "src.characters",
+        "peekOfCode": "class Characters(Base):\n    def __init__(self):\n        super().__init__()\n        self.main_folder = self.path(\"development/characters\")\n        self.GENERATE_SNIPPET_PROMPT = self.get_text(\"prompts/characters/summarise.txt\")\n        self.GENERATE_SHORT_PROMPT = self.get_text(\n            \"prompts/characters/summarise_short.txt\"\n        )\n        self.SEED_SUMMARY_PATH = self.path(\"development/outline/seed_summary.txt\")\n        self.PLOT_OUTLINE_PATH = self.path(\"development/outline/plot_outline.txt\")",
+        "detail": "src.characters",
+        "documentation": {}
+    },
+    {
+        "label": "Outline",
+        "kind": 6,
+        "importPath": "src.outline",
+        "description": "src.outline",
+        "peekOfCode": "class Outline(Base):\n    def __init__(self):\n        super().__init__()\n        self.main_folder = self.path(\"development/scenes\")\n        self.GENERATE_SCENES_PROMPT = self.get_text(\n            \"prompts/scenes/write_chapter_scenes.txt\"\n        )\n        self.GENERATE_SHORT_PROMPT = self.get_text(\"prompts/outline/short_summary.txt\")\n    def get_setting_from_file(self, file_path):\n        setting_content = self.get_text(file_path)",
+        "detail": "src.outline",
+        "documentation": {}
+    },
+    {
+        "label": "define_scenes_for_chapter",
+        "kind": 2,
+        "importPath": "src.outline",
+        "description": "src.outline",
+        "peekOfCode": "def define_scenes_for_chapter(self):\n    \"\"\"\n    Define scenes for a specific chapter based on the chapter outline.\n    \"\"\"\n    chapter_summaries = self.get_text(\"development/outline/chapter_summary.txt\")\n    print(\"Choose which chapter to define scenes for:\")\n    print(chapter_summaries)\n    prompts = self.get_config()\n    prompts[\"chapter_outline\"] = {}\n    user_input = prompt(\"Chapter roman numeral/name (or 9 to exit): \")",
+        "detail": "src.outline",
+        "documentation": {}
+    },
+    {
+        "label": "generate_chapter_summary",
+        "kind": 2,
+        "importPath": "src.outline",
+        "description": "src.outline",
+        "peekOfCode": "def generate_chapter_summary(self):\n    \"\"\"\n    Generate chapter_summary.txt from full chapter_outline.txt.\n    \"\"\"\n    chapter_number = prompt(\"Chapter number (or x to exit): \")\n    if chapter_number == \"x\":\n        return\n    chapter_dir = f\"development/outline/chapter_{chapter_number:03}\"\n    full_text = self.get_text(f\"{chapter_dir}/chapter_outline.txt\")\n    prompt_full = self.GENERATE_SHORT_PROMPT + \"\\n\\n\" + full_text",
+        "detail": "src.outline",
+        "documentation": {}
+    },
+    {
+        "label": "Settings",
+        "kind": 6,
+        "importPath": "src.settings",
+        "description": "src.settings",
+        "peekOfCode": "class Settings(Base):\n    def __init__(self):\n        super().__init__()\n        self.main_folder = self.path(\"development/settings\")\n        self.GENERATE_SNIPPET_PROMPT = self.get_text(\"prompts/settings/summarise.txt\")\n        self.GENERATE_SHORT_PROMPT = self.get_text(\"prompts/settings/summarise_short.txt\")\n        self.GENERATE_SETTING_PROMPT = self.get_text(\"prompts/settings/write_setting.txt\")\n    def menu(self):\n        print_formatted_text(\"\\nSettings/Locations - Select an option:\")\n        submenu_items = {",
+        "detail": "src.settings",
+        "documentation": {}
+    },
+    {
+        "label": "exit_app",
+        "kind": 2,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "def exit_app():\n    \"\"\"\n    Function to exit the application.\n    \"\"\"\n    print_formatted_text(\"See You Next Time!\")\n    exit()\n# ──────────────────────────────────────────────────────────────────────────────\n# Menu items with corresponding actions\nmenu_items = {\n    \"1\": {\"name\": \"Novel config: voice, style, genre\", \"action\": lambda: book_config.menu()},",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "backup_and_clear_settings",
+        "kind": 2,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "def backup_and_clear_settings():\n    \"\"\"\n    Back up the current settings files and directories to a user-specified directory\n    and replace the original files with blank files, keeping the directory structure intact.\n    \"\"\"\n    backup_dir = prompt(\"Enter the directory name for backup: \")\n    if not os.path.exists(backup_dir):\n        os.makedirs(backup_dir)\n    # Back up each file and directory in the development directory\n    for item in os.listdir(DEVELOPMENT_DIR):",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "def main():\n    \"\"\"\n    Main function to run the application.\n    \"\"\"\n    while True:\n        print_formatted_text(\"\\nHello! \\n We Have Plenty We Can Work On Together! \\n\\nWhat would you like to do?\")\n        for item in menu_items:\n            print_formatted_text(f\"{item}. {menu_items[item]['name']}\")\n        user_input = prompt(\"> \")\n        if user_input in menu_items:",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "book_config",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "book_config = Book_Config()\noutline = Outline()\nsettings = Settings()\ncharacters = Characters()\nchapter_selector = ChapterSelector()\n# ──────────────────────────────────────────────────────────────────────────────\ndef exit_app():\n    \"\"\"\n    Function to exit the application.\n    \"\"\"",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "outline",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "outline = Outline()\nsettings = Settings()\ncharacters = Characters()\nchapter_selector = ChapterSelector()\n# ──────────────────────────────────────────────────────────────────────────────\ndef exit_app():\n    \"\"\"\n    Function to exit the application.\n    \"\"\"\n    print_formatted_text(\"See You Next Time!\")",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "settings = Settings()\ncharacters = Characters()\nchapter_selector = ChapterSelector()\n# ──────────────────────────────────────────────────────────────────────────────\ndef exit_app():\n    \"\"\"\n    Function to exit the application.\n    \"\"\"\n    print_formatted_text(\"See You Next Time!\")\n    exit()",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "characters",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "characters = Characters()\nchapter_selector = ChapterSelector()\n# ──────────────────────────────────────────────────────────────────────────────\ndef exit_app():\n    \"\"\"\n    Function to exit the application.\n    \"\"\"\n    print_formatted_text(\"See You Next Time!\")\n    exit()\n# ──────────────────────────────────────────────────────────────────────────────",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "chapter_selector",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "chapter_selector = ChapterSelector()\n# ──────────────────────────────────────────────────────────────────────────────\ndef exit_app():\n    \"\"\"\n    Function to exit the application.\n    \"\"\"\n    print_formatted_text(\"See You Next Time!\")\n    exit()\n# ──────────────────────────────────────────────────────────────────────────────\n# Menu items with corresponding actions",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "menu_items",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "menu_items = {\n    \"1\": {\"name\": \"Novel config: voice, style, genre\", \"action\": lambda: book_config.menu()},\n    \"2\": {\"name\": \"Novel outline\", \"action\": lambda: outline.menu()},\n    \"3\": {\"name\": \"Develop Settings/location\", \"action\": lambda: settings.menu()},\n    \"4\": {\"name\": \"Develop Characters\", \"action\": lambda: characters.menu()},\n    \"5\": {\"name\": \"Work on chapter\", \"action\": lambda: chapter_selector.menu()},\n    \"6\":{\"name\": \"Clear the files generated and start again from scratch.\", \"action\": lambda:backup_and_clear_settings()},\n    \"9\": {\"name\": \"Exit\", \"action\": exit_app},\n}\n# ──────────────────────────────────────────────────────────────────────────────",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "DEVELOPMENT_DIR",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "DEVELOPMENT_DIR = 'development/'\nTEMPLATE_DIR = 'template/'\ndef backup_and_clear_settings():\n    \"\"\"\n    Back up the current settings files and directories to a user-specified directory\n    and replace the original files with blank files, keeping the directory structure intact.\n    \"\"\"\n    backup_dir = prompt(\"Enter the directory name for backup: \")\n    if not os.path.exists(backup_dir):\n        os.makedirs(backup_dir)",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "TEMPLATE_DIR",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "TEMPLATE_DIR = 'template/'\ndef backup_and_clear_settings():\n    \"\"\"\n    Back up the current settings files and directories to a user-specified directory\n    and replace the original files with blank files, keeping the directory structure intact.\n    \"\"\"\n    backup_dir = prompt(\"Enter the directory name for backup: \")\n    if not os.path.exists(backup_dir):\n        os.makedirs(backup_dir)\n    # Back up each file and directory in the development directory",
+        "detail": "main",
+        "documentation": {}
+    }
+]

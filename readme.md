@@ -52,7 +52,8 @@ To begin, set the style, genre, and themes in the text files located in the `/de
 
 ### Running the Application
 
-This application is a command-line tool for the time being as my interest is in generating text files with it, not reading them in an application window as I can do that with programs I don't have to maintain.
+> Note:
+> This application is a command-line tool for the time being as my interest is in generating text files with it, not reading them in an application window as I can do that with programs I don't have to maintain.
 
 Initiate it using:
 
@@ -71,7 +72,7 @@ The commands should be executed in sequence as they gradually define the novel a
 > Note:
 > If a dependency is necessary but I did not list it in the requirements.txt file, please let me know by filing an issue on the repository and I will update the file.
 
-### Terminology0
+### Terminology
 
 The following terms are used in the menus and to organize prompts and development material:
 
