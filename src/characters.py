@@ -71,28 +71,31 @@ class Characters(Base):
                 print("Invalid option. Please try again.")
 
     # ─────────────────────────────────────────────────────────────────
-    def create_character(self):
-        character_name = prompt("Enter a name for the new character: ")
-
+    def create_character(
+        self, input_character_name=None, input_character_description=None
+    ):
+        character_name = input_character_name or prompt(
+            "Enter a name for the new character: "
+        )
         character_directory = Path(self.main_folder) / character_name
         character_directory.mkdir(parents=True, exist_ok=True)
 
-        character_description = prompt(
+        character_description = input_character_description or prompt(
             "Enter a description for the new character (optional): "
         )
 
         seed_summary = ""
-        if self.SEED_SUMMARY_PATH.exists():
+        if Path(self.SEED_SUMMARY_PATH).exists():
             with open(self.SEED_SUMMARY_PATH, "r") as seed_summary_file:
                 seed_summary = seed_summary_file.read()
 
         plot_outline = ""
-        if self.PLOT_OUTLINE_PATH.exists():
+        if Path(self.PLOT_OUTLINE_PATH).exists():
             with open(self.PLOT_OUTLINE_PATH, "r") as plot_outline_file:
                 plot_outline = plot_outline_file.read()
 
         long_profile_prompt = (
-            self.get_text("prompts/character/long_profile.txt")
+            self.get_text("prompts/characters/long_profile.txt")
             .replace("<CHARACTER_NAME>", character_name)
             .replace("<DESCRIPTION>", character_description)
             .replace("<SEED_SUMMARY>", seed_summary)
@@ -204,7 +207,7 @@ class Characters(Base):
         with open(settings_all_names_path, "w") as names_file, open(
             settings_all_snippets_path, "w"
         ) as snippets_file:
-            character_names = get_character_names(
+            character_names = os.listdir(
                 self.main_folder
             )  # Modified this line to use the get_character_names function
             for (
@@ -255,28 +258,6 @@ class Characters(Base):
             long_profile_file.write(character_description)
 
     # ──────────────────────────────────────────────────────────────────────────────
-
-    def extract_and_create_character_entries(self):
-        # Load the prompt from the file
-        extract_prompt = self.get_text("prompts/characters/extract.txt")
-        settings = self.get_config()
-        extract_prompt = self.replace_prompts_in_template(extract_prompt, settings)
-
-        # Get the seed summary and plot outline texts
-        seed_summary = self.get_text(self.SEED_SUMMARY_PATH)
-        plot_outline = self.get_text(self.PLOT_OUTLINE_PATH)
-
-        # Use the LLM to extract character entries from the prompt
-        full_text = f"{extract_prompt}\n\n{seed_summary}\n{plot_outline}"
-        character_entries = self.call_llm(full_text)
-
-        # Parse the character entries into a dictionary of name and description
-        character_dict = self.parse_character_entries(character_entries)
-
-        # Create new character entries based on the extracted information
-        for character_name, character_description in character_dict.items():
-            self.create_character_folder_and_file(character_name, character_description)
-
     def parse_character_entries(self, character_entries: str) -> dict[str, str]:
         # Implement the parsing logic here.
         # You can use regular expressions or other text processing techniques
@@ -287,3 +268,20 @@ class Characters(Base):
         matches = re.findall(pattern, character_entries)
         character_dict = dict(matches)
         return character_dict
+
+    # ─────────────────────────────────────────────────────────────────
+    def extract_and_create_character_entries(self):
+        extract_prompt = self.get_text("prompts/characters/extract.txt")
+        settings = self.get_config()
+        extract_prompt = self.replace_prompts_in_template(extract_prompt, settings)
+
+        seed_summary = self.get_text(self.SEED_SUMMARY_PATH) or ""
+        plot_outline = self.get_text(self.PLOT_OUTLINE_PATH) or ""
+
+        full_text = f"{extract_prompt}\n\n{seed_summary}\n{plot_outline}"
+        character_entries = self.call_llm(full_text)
+
+        character_dict = self.parse_character_entries(character_entries)
+
+        for character_name, character_description in character_dict.items():
+            self.create_character(character_name, character_description)

@@ -50,14 +50,18 @@ class Outline(Base):
                 "action": lambda: self.generate_plot_outline(),
             },
             "3": {
+                "name": "Generate the context.json file for your novel",
+                "action": lambda: self.feed_outline_and_context(),
+            },
+            "4": {
                 "name": "Split the Plot Outline into Individual Chapter Files",
                 "action": lambda: self.split_plot_outline_into_chapters(),
             },
-            "4": {
+            "5": {
                 "name": "Generate chapter_summary.txt from a chapter_outline.txt",
                 "action": lambda: self.generate_chapter_summary(),
             },
-            "5": {
+            "6": {
                 "name": "Generate scenes (chapter_seed.txt) for a chapter in chapter_outline.txt",
                 "action": lambda: self.define_scenes_for_chapter(),
             },
@@ -116,7 +120,9 @@ class Outline(Base):
         Generate a plot outline from the seed based on the config settings.
         """
 
-        settings = self.get_setting_from_file("development/settings/settings_summary.txt")
+        settings = self.get_setting_from_file(
+            "development/settings/settings_summary.txt"
+        )
         characters = self.get_characters()
         plot_outline_prompt = self.get_text("prompts/outline/outline.txt")
         settings = self.get_config()
@@ -209,78 +215,106 @@ class Outline(Base):
         result = self.call_llm(prompt_full)
         self.set_text("development/outline/chapter_summary.txt", result)
 
+    # ──────────────────────────────────────────────────────────────────────────────
 
-# ──────────────────────────────────────────────────────────────────────────────
+    def define_scenes_for_chapter(self):
+        """
+        Define scenes for a specific chapter based on the chapter outline.
+        """
+        chapter_summaries = self.get_text("development/outline/chapter_summary.txt")
+        print("Choose which chapter to define scenes for:")
+        print(chapter_summaries)
 
+        prompts = self.get_config()
+        prompts["chapter_outline"] = {}
 
-def define_scenes_for_chapter(self):
-    """
-    Define scenes for a specific chapter based on the chapter outline.
-    """
-    chapter_summaries = self.get_text("development/outline/chapter_summary.txt")
-    print("Choose which chapter to define scenes for:")
-    print(chapter_summaries)
+        user_input = prompt("Chapter roman numeral/name (or 9 to exit): ")
+        chapter_index = int(user_input) - 1
+        chapter_key = list(
+            self.get_text("development/outline/".format(chapter_index + 1)).keys()
+        )[0]
 
-    prompts = self.get_config()
-    prompts["chapter_outline"] = {}
+        if chapter_index >= len(chapter_summaries) or chapter_index < 0:
+            print("Invalid chapter index.")
+            return
 
-    user_input = prompt("Chapter roman numeral/name (or 9 to exit): ")
-    chapter_index = int(user_input) - 1
-    chapter_key = list(
-        self.get_text("development/outline/".format(chapter_index + 1)).keys()
-    )[0]
-
-    if chapter_index >= len(chapter_summaries) or chapter_index < 0:
-        print("Invalid chapter index.")
-        return
-
-    chapter_data = self.get_text(
-        "development/outline/{}/{}".format(chapter_index + 1, chapter_key)
-    )
-    chapter_title = chapter_data[: -len(chapter_key) - len(".txt")]
-
-    self.set_config({"current_chapter": chapter_index})
-    self.print_message(f"\nDefining scenes for Chapter {chapter_title}")
-
-    scene_count = prompt("How many scenes would you like to write for this chapter? ")
-
-    for _ in range(int(scene_count)):
-        scene_number = prompt(
-            "Scene number (or 'next' to move to next scene without writing): "
+        chapter_data = self.get_text(
+            "development/outline/{}/{}".format(chapter_index + 1, chapter_key)
         )
-        if scene_number != "next":
-            scene_prompt = self.get_text("prompts/scenes/write_single_scene.txt")
-            self.set_config({"current_scene": scene_number})
-            self.run_interactive_generation(scene_prompt, chapter_data)
-        else:
-            break
+        chapter_title = chapter_data[: -len(chapter_key) - len(".txt")]
 
+        self.set_config({"current_chapter": chapter_index})
+        self.print_message(f"\nDefining scenes for Chapter {chapter_title}")
 
-# ──────────────────────────────────────────────────────────────────────────────
+        scene_count = prompt(
+            "How many scenes would you like to write for this chapter? "
+        )
 
+        for _ in range(int(scene_count)):
+            scene_number = prompt(
+                "Scene number (or 'next' to move to next scene without writing): "
+            )
+            if scene_number != "next":
+                scene_prompt = self.get_text("prompts/scenes/write_single_scene.txt")
+                self.set_config({"current_scene": scene_number})
+                self.run_interactive_generation(scene_prompt, chapter_data)
+            else:
+                break
 
-def generate_chapter_summary(self):
-    """
-    Generate chapter_summary.txt from full chapter_outline.txt.
-    """
-    chapter_number = prompt("Chapter number (or x to exit): ")
-    if chapter_number == "x":
-        return
+        # ──────────────────────────────────────────────────────────────────────────────
 
-    chapter_dir = f"development/outline/chapter_{chapter_number:03}"
-    full_text = self.get_text(f"{chapter_dir}/chapter_outline.txt")
-    prompt_full = self.GENERATE_SHORT_PROMPT + "\n\n" + full_text
-    result = self.call_llm(prompt_full)
+    def generate_chapter_summary(self):
+        """
+        Generate chapter_summary.txt from full chapter_outline.txt.
+        """
+        chapter_number = prompt("Chapter number (or x to exit): ")
+        if chapter_number == "x":
+            return
 
-    # Create the directory if it doesn't exist yet
-    if not os.path.exists(chapter_dir):
-        os.mkdir(chapter_dir)
+        chapter_dir = f"development/outline/chapter_{chapter_number:03}"
+        full_text = self.get_text(f"{chapter_dir}/chapter_outline.txt")
+        prompt_full = self.GENERATE_SHORT_PROMPT + "\n\n" + full_text
+        result = self.call_llm(prompt_full)
 
-    # Save the generated chapter summary in the corresponding chapter directory
-    chapter_summary_file = f"{chapter_dir}/chapter_summary.txt"
-    with open(chapter_summary_file, "w") as f:
-        f.write(result)
+        # Create the directory if it doesn't exist yet
+        if not os.path.exists(chapter_dir):
+            os.mkdir(chapter_dir)
 
-    print(
-        f"Chapter {chapter_number} summary generated and saved at {chapter_summary_file}"
-    )
+        # Save the generated chapter summary in the corresponding chapter directory
+        chapter_summary_file = f"{chapter_dir}/chapter_summary.txt"
+        with open(chapter_summary_file, "w") as f:
+            f.write(result)
+
+        print(
+            f"Chapter {chapter_number} summary generated and saved at {chapter_summary_file}"
+        )
+
+    # ─────────────────────────────────────────────────────────────────
+    def feed_outline_and_context(self):
+        # Load the outline and context information from the files
+        outline = self.get_text("development/outline/plot_outline.txt")
+        context = self.get_text("context-template.json")
+
+        # Convert the context from JSON to a Python dictionary
+        context = json.loads(context)
+
+        # Add the outline and context information to the settings dictionary
+        settings = self.get_config()
+        settings["outline"] = outline
+        settings["context"] = context
+
+        # Load the prompt template from the file
+        prompt_template = self.get_text("prompts/outline/context-json.txt")
+
+        # Replace the placeholders in the prompt template with the settings values
+        llm_prompt = self.replace_prompts_in_template(prompt_template, settings)
+
+        # Call the LLM with the prompt
+        response = self.call_llm(llm_prompt)
+
+        # Store the response in development/outline/context.json
+        with open("development/outline/context.json", "w") as file:
+            file.write(response)
+
+        # Print a confirmation message
+        print("Response stored in development/outline/context.json")
