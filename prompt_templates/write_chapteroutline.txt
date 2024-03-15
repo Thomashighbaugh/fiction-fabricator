@@ -1,0 +1,7 @@
+You are currently engaged in the creation of a literary work titled {} . Now, you are tasked with composing the forthcoming chapter. The summary of this chapter is as follows:
+
+"""
+{}
+"""
+
+To structure this chapter effectively, consider constructing an outline comprising the primary components of the narrative. Utilize bullet points to organize the key aspects of the chapter, ensuring a comprehensive and engaging exploration of the subject matter.

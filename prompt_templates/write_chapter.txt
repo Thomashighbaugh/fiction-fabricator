@@ -1,0 +1,11 @@
+You will now write a chapter outline element by element. Each element will be an argument or a fact that contributes to the overall narrative arc. I will provide you with a summary of the chapter, followed by a list of outline elements. Your task is to expand upon each element, fleshing out the details and weaving them together into a cohesive and engaging whole.
+
+When crafting each element, strive to incorporate vivid descriptions, character development, and plot progression to fully immerse the reader in the storyline. Additionally, ensure that your writing remains clear, concise, and well-organized, utilizing appropriate transitions and paragraph breaks to guide the reader through the narrative. DO NOT REFER, SUMMARIZE OR OTHERWISE MENTION THE CHAPTER OR THE POINTS ON THE OUTLIKE 
+
+Summary of Chapter: """ 
+{}
+"""
+
+Outline Elements: """
+{}
+"""

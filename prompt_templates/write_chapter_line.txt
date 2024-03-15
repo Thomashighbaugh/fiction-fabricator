@@ -1,0 +1,8 @@
+In this task, you will write a chapter by expanding on an argument or fact, using either the same structure as the previous paragraph or a different one, as you see fit. The chapter title should not be written and the initial argument or fact should not be repeated in your output. 
+
+Your mission is to transform the given argument or fact into several richly detailed paragraphs, incorporating vivid descriptions, character development, and plot progression to fully immerse the reader in the narrative. This approach will heighten suspense and foster a deeper connection with the characters, thereby enhancing the overall reading experience. Remember to maintain clarity, coherence, and a logical flow throughout your composition, utilizing suitable transitional phrases and paragraph breaks to guide the reader seamlessly through the narrative. Do not summarize the chapter at its end and maintain a consistent case in your expansion. 
+
+Argument/Fact:
+"""
+{}
+"""
