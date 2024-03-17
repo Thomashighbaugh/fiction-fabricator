@@ -1,0 +1,572 @@
+[
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "glob",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "glob",
+        "description": "glob",
+        "detail": "glob",
+        "documentation": {}
+    },
+    {
+        "label": "BaseChainElement",
+        "importPath": "source.chain",
+        "description": "source.chain",
+        "isExtraImport": true,
+        "detail": "source.chain",
+        "documentation": {}
+    },
+    {
+        "label": "ChainExecutor",
+        "importPath": "source.chain",
+        "description": "source.chain",
+        "isExtraImport": true,
+        "detail": "source.chain",
+        "documentation": {}
+    },
+    {
+        "label": "Enum",
+        "importPath": "enum",
+        "description": "enum",
+        "isExtraImport": true,
+        "detail": "enum",
+        "documentation": {}
+    },
+    {
+        "label": "Enum",
+        "importPath": "enum",
+        "description": "enum",
+        "isExtraImport": true,
+        "detail": "enum",
+        "documentation": {}
+    },
+    {
+        "label": "Enum",
+        "importPath": "enum",
+        "description": "enum",
+        "isExtraImport": true,
+        "detail": "enum",
+        "documentation": {}
+    },
+    {
+        "label": "Enum",
+        "importPath": "enum",
+        "description": "enum",
+        "isExtraImport": true,
+        "detail": "enum",
+        "documentation": {}
+    },
+    {
+        "label": "Enum",
+        "importPath": "enum",
+        "description": "enum",
+        "isExtraImport": true,
+        "detail": "enum",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "PromptTemplate",
+        "importPath": "source.prompttemplate",
+        "description": "source.prompttemplate",
+        "isExtraImport": true,
+        "detail": "source.prompttemplate",
+        "documentation": {}
+    },
+    {
+        "label": "PromptTemplate",
+        "importPath": "source.prompttemplate",
+        "description": "source.prompttemplate",
+        "isExtraImport": true,
+        "detail": "source.prompttemplate",
+        "documentation": {}
+    },
+    {
+        "label": "PromptTemplate",
+        "importPath": "source.prompttemplate",
+        "description": "source.prompttemplate",
+        "isExtraImport": true,
+        "detail": "source.prompttemplate",
+        "documentation": {}
+    },
+    {
+        "label": "PromptTemplate",
+        "importPath": "source.prompttemplate",
+        "description": "source.prompttemplate",
+        "isExtraImport": true,
+        "detail": "source.prompttemplate",
+        "documentation": {}
+    },
+    {
+        "label": "PromptTemplate",
+        "importPath": "source.prompttemplate",
+        "description": "source.prompttemplate",
+        "isExtraImport": true,
+        "detail": "source.prompttemplate",
+        "documentation": {}
+    },
+    {
+        "label": "logging",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "logging",
+        "description": "logging",
+        "detail": "logging",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "sys",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sys",
+        "description": "sys",
+        "detail": "sys",
+        "documentation": {}
+    },
+    {
+        "label": "openai",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "openai",
+        "description": "openai",
+        "detail": "openai",
+        "documentation": {}
+    },
+    {
+        "label": "retry",
+        "importPath": "retry",
+        "description": "retry",
+        "isExtraImport": true,
+        "detail": "retry",
+        "documentation": {}
+    },
+    {
+        "label": "num_tokens_from_messages",
+        "importPath": "source.tokencounter",
+        "description": "source.tokencounter",
+        "isExtraImport": true,
+        "detail": "source.tokencounter",
+        "documentation": {}
+    },
+    {
+        "label": "tiktoken",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tiktoken",
+        "description": "tiktoken",
+        "detail": "tiktoken",
+        "documentation": {}
+    },
+    {
+        "label": "pytest",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pytest",
+        "description": "pytest",
+        "detail": "pytest",
+        "documentation": {}
+    },
+    {
+        "label": "fire",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "fire",
+        "description": "fire",
+        "detail": "fire",
+        "documentation": {}
+    },
+    {
+        "label": "dotenv",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "traceback",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "traceback",
+        "description": "traceback",
+        "detail": "traceback",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "datetime",
+        "description": "datetime",
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIConnection",
+        "importPath": "source.openaiconnection",
+        "description": "source.openaiconnection",
+        "isExtraImport": true,
+        "detail": "source.openaiconnection",
+        "documentation": {}
+    },
+    {
+        "label": "WriteLogs",
+        "importPath": "source.writelogs",
+        "description": "source.writelogs",
+        "isExtraImport": true,
+        "detail": "source.writelogs",
+        "documentation": {}
+    },
+    {
+        "label": "FindBookTitle",
+        "importPath": "source.bookchainelements",
+        "description": "source.bookchainelements",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements",
+        "documentation": {}
+    },
+    {
+        "label": "WriteTableOfContents",
+        "importPath": "source.bookchainelements",
+        "description": "source.bookchainelements",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapterSummaries",
+        "importPath": "source.bookchainelements",
+        "description": "source.bookchainelements",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapterOutlines",
+        "importPath": "source.bookchainelements",
+        "description": "source.bookchainelements",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapters",
+        "importPath": "source.bookchainelements",
+        "description": "source.bookchainelements",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements",
+        "documentation": {}
+    },
+    {
+        "label": "JoinBook",
+        "importPath": "source.bookchainelements",
+        "description": "source.bookchainelements",
+        "isExtraImport": true,
+        "detail": "source.bookchainelements",
+        "documentation": {}
+    },
+    {
+        "label": "BaseBookChainElement",
+        "kind": 6,
+        "importPath": "source.bookchainelements.basebookchainelement",
+        "description": "source.bookchainelements.basebookchainelement",
+        "peekOfCode": "class BaseBookChainElement(BaseChainElement):\n    def __init__(self, book_path: str):\n        \"\"\"\n        Initialize the BaseBookChainElement with the book path and set up necessary file paths.\n        Args:\n        - book_path (str): The path to the book directory.\n        \"\"\"\n        self.book_path = book_path\n        self.description_path = os.path.join(self.book_path, \"description.txt\")\n        self.title_path = os.path.join(self.book_path, \"output\", \"book_titles.txt\")",
+        "detail": "source.bookchainelements.basebookchainelement",
+        "documentation": {}
+    },
+    {
+        "label": "FindBookTitleSteps",
+        "kind": 6,
+        "importPath": "source.bookchainelements.findbooktitle",
+        "description": "source.bookchainelements.findbooktitle",
+        "peekOfCode": "class FindBookTitleSteps(str, Enum):\n    set_system_message = \"set system message\"\n    suggest_book_titles = \"suggest book titles\"\n    rank_book_titles = \"rank book titles\"\nclass FindBookTitle(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step = FindBookTitleSteps.set_system_message\n        self.done = False\n        self.messages = []",
+        "detail": "source.bookchainelements.findbooktitle",
+        "documentation": {}
+    },
+    {
+        "label": "FindBookTitle",
+        "kind": 6,
+        "importPath": "source.bookchainelements.findbooktitle",
+        "description": "source.bookchainelements.findbooktitle",
+        "peekOfCode": "class FindBookTitle(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step = FindBookTitleSteps.set_system_message\n        self.done = False\n        self.messages = []\n    def is_done(self) -> bool:\n        return self.done\n    def step(self, llm_connection):\n        # If the book titles file already exists, then we are done.",
+        "detail": "source.bookchainelements.findbooktitle",
+        "documentation": {}
+    },
+    {
+        "label": "JoinBook",
+        "kind": 6,
+        "importPath": "source.bookchainelements.joinbook",
+        "description": "source.bookchainelements.joinbook",
+        "peekOfCode": "class JoinBook(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.done: bool = False  # Indicates if the book joining process is complete\n    def is_done(self) -> bool:  # Method to check if the book joining process is complete\n        return self.done\n    def step(self, llm_connection):  # Method to execute the book joining process\n        # Define the path for the full book file.\n        fullbook_path: str = os.path.join(self.book_path, \"output\", \"fullbook.md\")\n        # Check if the full book file already exists.",
+        "detail": "source.bookchainelements.joinbook",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapterOutlinesSteps",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writechapteroutlines",
+        "description": "source.bookchainelements.writechapteroutlines",
+        "peekOfCode": "class WriteChapterOutlinesSteps(str, Enum):\n    set_system_message = \"set system message\"\n    write_outlines = \"write outlines\"\nclass WriteChapterOutlines(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step: WriteChapterOutlinesSteps = WriteChapterOutlinesSteps.set_system_message\n        self.done: bool = False\n        self.messages: List[dict] = []\n    def is_done(self) -> bool:",
+        "detail": "source.bookchainelements.writechapteroutlines",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapterOutlines",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writechapteroutlines",
+        "description": "source.bookchainelements.writechapteroutlines",
+        "peekOfCode": "class WriteChapterOutlines(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step: WriteChapterOutlinesSteps = WriteChapterOutlinesSteps.set_system_message\n        self.done: bool = False\n        self.messages: List[dict] = []\n    def is_done(self) -> bool:\n        return self.done\n    def step(self, llm_connection):\n        logging.info(f\"WriteChapterOutlines step: \\\"{self.current_step}\\\"\")",
+        "detail": "source.bookchainelements.writechapteroutlines",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChaptersSteps",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writechapters",
+        "description": "source.bookchainelements.writechapters",
+        "peekOfCode": "class WriteChaptersSteps(str, Enum):\n    set_system_message = \"set system message\"\n    write_chapters = \"write chapters\"\nclass WriteChapters(BaseBookChainElement):\n    def __init__(self, book_path: str) -> None:\n        super().__init__(book_path)\n        self.current_step: WriteChaptersSteps = WriteChaptersSteps.set_system_message\n        self.done: bool = False\n        self.messages: List[Dict[str, Any]] = []\n    def is_done(self) -> bool:",
+        "detail": "source.bookchainelements.writechapters",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapters",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writechapters",
+        "description": "source.bookchainelements.writechapters",
+        "peekOfCode": "class WriteChapters(BaseBookChainElement):\n    def __init__(self, book_path: str) -> None:\n        super().__init__(book_path)\n        self.current_step: WriteChaptersSteps = WriteChaptersSteps.set_system_message\n        self.done: bool = False\n        self.messages: List[Dict[str, Any]] = []\n    def is_done(self) -> bool:\n        return self.done\n    def step(self, llm_connection: Any) -> None:\n        # Set the system message.",
+        "detail": "source.bookchainelements.writechapters",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapterSummariesSteps",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writechaptersummaries",
+        "description": "source.bookchainelements.writechaptersummaries",
+        "peekOfCode": "class WriteChapterSummariesSteps(str, Enum):\n    set_system_message = \"set system message\"\n    write_summaries = \"write summaries\"\nclass WriteChapterSummaries(BaseBookChainElement):\n    \"\"\"Class for writing chapter summaries of a book.\"\"\"\n    def __init__(self, book_path: str):\n        \"\"\"\n        Initialize the WriteChapterSummaries object.\n        Args:\n            book_path (str): The path to the book.",
+        "detail": "source.bookchainelements.writechaptersummaries",
+        "documentation": {}
+    },
+    {
+        "label": "WriteChapterSummaries",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writechaptersummaries",
+        "description": "source.bookchainelements.writechaptersummaries",
+        "peekOfCode": "class WriteChapterSummaries(BaseBookChainElement):\n    \"\"\"Class for writing chapter summaries of a book.\"\"\"\n    def __init__(self, book_path: str):\n        \"\"\"\n        Initialize the WriteChapterSummaries object.\n        Args:\n            book_path (str): The path to the book.\n        \"\"\"\n        super().__init__(book_path)\n        self.current_step = WriteChapterSummariesSteps.set_system_message",
+        "detail": "source.bookchainelements.writechaptersummaries",
+        "documentation": {}
+    },
+    {
+        "label": "WriteTableOfContentsSteps",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writetableofcontents",
+        "description": "source.bookchainelements.writetableofcontents",
+        "peekOfCode": "class WriteTableOfContentsSteps(str, Enum):\n    set_system_message = \"set system message\"\n    write_toc_draft = \"write toc draft\"\n    review_toc_draft = \"review toc draft\"\nclass WriteTableOfContents(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step = WriteTableOfContentsSteps.set_system_message\n        self.done = False\n        self.messages = []",
+        "detail": "source.bookchainelements.writetableofcontents",
+        "documentation": {}
+    },
+    {
+        "label": "WriteTableOfContents",
+        "kind": 6,
+        "importPath": "source.bookchainelements.writetableofcontents",
+        "description": "source.bookchainelements.writetableofcontents",
+        "peekOfCode": "class WriteTableOfContents(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step = WriteTableOfContentsSteps.set_system_message\n        self.done = False\n        self.messages = []\n    def is_done(self) -> bool:\n        return self.done\n    def step(self, llm_connection):\n        if os.path.exists(self.toc_path):",
+        "detail": "source.bookchainelements.writetableofcontents",
+        "documentation": {}
+    },
+    {
+        "label": "ChainExecutor",
+        "kind": 6,
+        "importPath": "source.chain",
+        "description": "source.chain",
+        "peekOfCode": "class ChainExecutor:\n    def __init__(self, llm_connection):\n        self.elements = []\n        self.llm_connection = llm_connection\n    def add_element(self, element: 'BaseChainElement') -> None:\n        self.elements.append(element)\n    def run(self) -> None:\n        elements_to_execute = self.elements[::]\n        while len(elements_to_execute) > 0:\n            current_element = elements_to_execute.pop(0)",
+        "detail": "source.chain",
+        "documentation": {}
+    },
+    {
+        "label": "BaseChainElement",
+        "kind": 6,
+        "importPath": "source.chain",
+        "description": "source.chain",
+        "peekOfCode": "class BaseChainElement:\n    def is_done(self) -> bool:\n        raise NotImplementedError\n    def step(self, llm_connection) -> None:\n        raise NotImplementedError",
+        "detail": "source.chain",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAIConnection",
+        "kind": 6,
+        "importPath": "source.openaiconnection",
+        "description": "source.openaiconnection",
+        "peekOfCode": "class OpenAIConnection:\n    def __init__(self, logger):\n        # Raise an exception if the OpenAI API key is not set.\n        # Else set the API key.\n        api_key = \"\"\n        if api_key is None:\n            raise ValueError(\"OPENAI_API_KEY environment variable is not set.\")\n        openai.api_key = api_key\n        openai.api_base = \"http://0.0.0.0:1337/v1\"\n        self.logger = logger",
+        "detail": "source.openaiconnection",
+        "documentation": {}
+    },
+    {
+        "label": "PromptTemplate",
+        "kind": 6,
+        "importPath": "source.prompttemplate",
+        "description": "source.prompttemplate",
+        "peekOfCode": "class PromptTemplate:\n    def get_template(template_id: str) -> str:\n        \"\"\"\n        Get the prompt template based on the template ID.\n        Args:\n            template_id (str): The ID of the template to retrieve.\n        Returns:\n            str: The content of the template file.\n        \"\"\"\n        template_path = os.path.join(\"prompt_templates\", template_id + \".txt\")",
+        "detail": "source.prompttemplate",
+        "documentation": {}
+    },
+    {
+        "label": "num_tokens_from_string",
+        "kind": 2,
+        "importPath": "source.tokencounter",
+        "description": "source.tokencounter",
+        "peekOfCode": "def num_tokens_from_string(string: str, encoding_name: str) -> int:\n    \"\"\"Returns the number of tokens in a text string.\"\"\"\n    encoding = tiktoken.encoding_for_model(encoding_name)\n    num_tokens = len(encoding.encode(string))\n    return num_tokens\ndef num_tokens_from_messages(messages: list, model: str) -> int:\n    \"\"\"Return the number of tokens used by a list of messages.\"\"\"\n    try:\n        encoding = tiktoken.encoding_for_model(model)\n    except KeyError:",
+        "detail": "source.tokencounter",
+        "documentation": {}
+    },
+    {
+        "label": "num_tokens_from_messages",
+        "kind": 2,
+        "importPath": "source.tokencounter",
+        "description": "source.tokencounter",
+        "peekOfCode": "def num_tokens_from_messages(messages: list, model: str) -> int:\n    \"\"\"Return the number of tokens used by a list of messages.\"\"\"\n    try:\n        encoding = tiktoken.encoding_for_model(model)\n    except KeyError:\n        print(\"Warning: model not found. Using cl100k_base encoding.\")\n        encoding = tiktoken.get_encoding(\"cl100k_base\")\n    if model in {\n        \"gpt-3.5-turbo-0613\",\n        \"gpt-3.5-turbo-16k-0613\",",
+        "detail": "source.tokencounter",
+        "documentation": {}
+    },
+    {
+        "label": "WriteLogs",
+        "kind": 6,
+        "importPath": "source.writelogs",
+        "description": "source.writelogs",
+        "peekOfCode": "class WriteLogs:\n    \"\"\"Logs errors to a file.\"\"\"\n    def __init__(self, log_path: str, log: bool = False, log_persistent: bool = False) -> None:\n        \"\"\"Initialize the WriteLogs class.\"\"\"\n        self.log_path = log_path\n        self.message_log_file = os.path.join(self.log_path, \"messages.txt\")\n        self.log = log\n        self.log_persistent = log_persistent\n        if self.log_persistent:\n            self.log = True",
+        "detail": "source.writelogs",
+        "documentation": {}
+    },
+    {
+        "label": "test_1",
+        "kind": 2,
+        "importPath": "tests.test_openaiconnection",
+        "description": "tests.test_openaiconnection",
+        "peekOfCode": "def test_1():\n    messages = \n    [\n        {\"role\": \"system\", \"content\": \"You are a helpful assistant.\"},\n        {\"role\": \"user\", \"content\": \"Who won the world series in 2020?\"},\n        {\"role\": \"assistant\", \"content\": \"The Los Angeles Dodgers won the World Series in 2020.\"},\n        {\"role\": \"user\", \"content\": \"Where was it played?\"}\n    ]",
+        "detail": "tests.test_openaiconnection",
+        "documentation": {}
+    },
+    {
+        "label": "ExitException",
+        "kind": 6,
+        "importPath": "writebook",
+        "description": "writebook",
+        "peekOfCode": "class ExitException(Exception):\n    pass\ndef writebook(book_path: str, log: bool = True, log_persistent: bool = True) -> None:\n    \"\"\"\n    Function to write a book using OpenAI API.\n    Args:\n    - book_path (str): Path to the book directory.\n    - log (bool): Flag to enable logging.\n    - log_persistent (bool): Flag to enable persistent logging.\n    Returns:",
+        "detail": "writebook",
+        "documentation": {}
+    },
+    {
+        "label": "writebook",
+        "kind": 2,
+        "importPath": "writebook",
+        "description": "writebook",
+        "peekOfCode": "def writebook(book_path: str, log: bool = True, log_persistent: bool = True) -> None:\n    \"\"\"\n    Function to write a book using OpenAI API.\n    Args:\n    - book_path (str): Path to the book directory.\n    - log (bool): Flag to enable logging.\n    - log_persistent (bool): Flag to enable persistent logging.\n    Returns:\n    - None\n    \"\"\"",
+        "detail": "writebook",
+        "documentation": {}
+    }
+]

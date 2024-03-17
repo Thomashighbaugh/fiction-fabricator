@@ -1,4 +1,4 @@
-
+import os 
 
 class ChainExecutor:
 
@@ -6,10 +6,10 @@ class ChainExecutor:
         self.elements = []
         self.llm_connection = llm_connection
 
-    def add_element(self, element):
+    def add_element(self, element: 'BaseChainElement') -> None:
         self.elements.append(element)
 
-    def run(self):
+    def run(self) -> None:
 
         elements_to_execute = self.elements[::]
 
@@ -22,15 +22,11 @@ class ChainExecutor:
 
                 current_element.step(self.llm_connection)
 
-        current_element = self.elements[0]
-
-    
-
 # Abstract class chain element.
 class BaseChainElement:
 
-    def is_done(self):
+    def is_done(self) -> bool:
         raise NotImplementedError
     
-    def step():
+    def step(self, llm_connection) -> None:
         raise NotImplementedError

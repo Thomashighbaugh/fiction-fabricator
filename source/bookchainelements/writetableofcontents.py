@@ -1,11 +1,10 @@
 import os
 import sys
+from enum import Enum
 
 from source.bookchainelements.basebookchainelement import BaseBookChainElement
 from source.prompttemplate import PromptTemplate
 
-
-from enum import Enum
 
 class WriteTableOfContentsSteps(str, Enum):
     set_system_message = "set system message"
@@ -14,19 +13,16 @@ class WriteTableOfContentsSteps(str, Enum):
 
 
 class WriteTableOfContents(BaseBookChainElement):
-
-    def __init__(self, book_path):
+    def __init__(self, book_path: str):
         super().__init__(book_path)
-
         self.current_step = WriteTableOfContentsSteps.set_system_message
         self.done = False
         self.messages = []
 
-    def is_done(self):
+    def is_done(self) -> bool:
         return self.done
 
     def step(self, llm_connection):
-
         if os.path.exists(self.toc_path):
             print("Table of contents already exists. Skipping.")
             self.done = True
@@ -39,29 +35,26 @@ class WriteTableOfContents(BaseBookChainElement):
 
         # Set the system message.
         if current_step == WriteTableOfContentsSteps.set_system_message:
-            system_message = PromptTemplate.get("write_toc_system_message")
+            system_message = PromptTemplate.get_template("write_toc_system_message")
             self.messages += [{"role": "system", "content": system_message}]
             self.current_step = WriteTableOfContentsSteps.write_toc_draft
-        
+
         # Suggest initial table of contents.
         elif current_step == WriteTableOfContentsSteps.write_toc_draft:
-
             title = self.get_book_title()
             description = self.get_book_description()
-
-            prompt = PromptTemplate.get("write_toc_firstdraft").format(title, description)
+            prompt = PromptTemplate.get_template("write_toc_firstdraft").format(title, description)
             print(prompt)
-
             self.messages += [{"role": "user", "content": prompt}]
-            response_message = llm_connection.chat(self.messages, version4=False)
+            response_message = llm_connection.chat(self.messages, version4=True)
             self.messages += [response_message]
             self.current_step = WriteTableOfContentsSteps.review_toc_draft
 
         # Review the table of contents.
-        elif current_step is WriteTableOfContentsSteps.review_toc_draft:
-            prompt = PromptTemplate.get("write_toc_review_draft")
+        elif current_step == WriteTableOfContentsSteps.review_toc_draft:
+            prompt = PromptTemplate.get_template("write_toc_review_draft")
             self.messages += [{"role": "user", "content": prompt}]
-            response_message = llm_connection.chat(self.messages, version4=False)
+            response_message = llm_connection.chat(self.messages, version4=True)
             self.messages += [response_message]
 
             # Write the book titles to a file.
@@ -73,5 +66,3 @@ class WriteTableOfContents(BaseBookChainElement):
 
         elif current_step is None:
             raise ValueError("current_step is None. This should not happen.")
-        
-            

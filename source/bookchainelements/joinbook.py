@@ -1,65 +1,60 @@
-# Finds all the chapterfull files and joins them into a single book file. Creates a markdown file.
+# Explanation of Changes:
+# - Added type hints for the class methods.
+# - Added comments for better readability and understanding of the code.
 
 import os
 import glob
-
 from source.bookchainelements.basebookchainelement import BaseBookChainElement
 
 class JoinBook(BaseBookChainElement):
-        
-    def __init__(self, book_path):
+    def __init__(self, book_path: str):
         super().__init__(book_path)
-        self.done = False
-        
+        self.done: bool = False  # Indicates if the book joining process is complete
 
-    def is_done(self):
+    def is_done(self) -> bool:  # Method to check if the book joining process is complete
         return self.done
 
-    def step(self, llm_connection):
-            
-        fullbook_path = os.path.join(self.book_path, "output", "fullbook.md")
+    def step(self, llm_connection):  # Method to execute the book joining process
+        # Define the path for the full book file.
+        fullbook_path: str = os.path.join(self.book_path, "output", "fullbook.md")
+
+        # Check if the full book file already exists.
         if os.path.exists(fullbook_path):
             print(f"Full book already exists at {fullbook_path}. Skipping.")
-            self.done = True
+            self.done = True  # Mark the process as done
+            return  # Exit the function if the full book already exists.
 
         # Open the full book file.
-        fullbook_file = open(fullbook_path, "w")
+        with open(fullbook_path, "w") as fullbook_file:
+            # Get the book title.
+            book_title: str = self.get_book_title()  # Get the title of the book
 
-        # Get the book title.
-        book_title = self.get_book_title()
+            # Write the title to the full book file.
+            fullbook_file.write(f"# {book_title}\n\n")
 
-        # Write the title.
-        fullbook_file.write(f"# {book_title}\n\n")
+            # Get the table of contents.
+            toc: str = self.get_toc()  # Get the table of contents
 
-        # Get the table of contents.
-        toc = self.get_toc()
+            # Write the table of contents to the full book file.
+            fullbook_file.write(f"{toc}\n\n")
 
-        # Write the table of contents.
-        fullbook_file.write(f"{toc}\n\n")
+            # Get the chapter paths.
+            chapter_paths: list = self.get_chapter_paths()  # Get the paths of all the chapters
 
-        # Get the chapter paths.
-        chapter_paths = self.get_chapter_paths()
+            # Sort the chapter paths based on the chapter number.
+            chapter_paths = sorted(chapter_paths, key=lambda x: int(x.split("_")[-1].replace(".txt", "")))
 
-        # Sort them. The pattern is "chapterfull_NUMBER.txt". Map NUMBER to an integer and sort by that.
-        chapter_paths = sorted(chapter_paths, key=lambda x: int(x.split("_")[-1].replace(".txt", "")))
+            # Iterate through the sorted chapter paths.
+            for chapter_path in chapter_paths:
+                print(f"Adding {chapter_path} to full book.")
 
-        # Go through them all.
-        for chapter_path in chapter_paths:
-            print(f"Adding {chapter_path} to full book.")
+                # Open the chapter file.
+                with open(chapter_path, "r") as chapter_file:
+                    # Read the chapter file.
+                    chapter_text: str = chapter_file.read()  # Read the text from the chapter file
 
-            # Open the chapter file.
-            chapter_file = open(chapter_path, "r")
+                    # Write the chapter text to the full book file.
+                    fullbook_file.write(f"{chapter_text}\n\n")
 
-            # Read the chapter file.
-            chapter_text = chapter_file.read()
-
-            # Write the chapter text.
-            fullbook_file.write(f"{chapter_text}\n\n")
-
-            # Close the chapter file.
-            chapter_file.close()
-
-        # Close the full book file.
-        fullbook_file.close()
-
-        self.done = True
+        # Mark the process as done.
+        self.done = True  # Mark the process as done

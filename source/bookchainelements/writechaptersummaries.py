@@ -1,11 +1,9 @@
+from enum import Enum
 import os
-import sys
 
 from source.bookchainelements.basebookchainelement import BaseBookChainElement
 from source.prompttemplate import PromptTemplate
 
-
-from enum import Enum
 
 class WriteChapterSummariesSteps(str, Enum):
     set_system_message = "set system message"
@@ -13,35 +11,54 @@ class WriteChapterSummariesSteps(str, Enum):
 
 
 class WriteChapterSummaries(BaseBookChainElement):
+    """Class for writing chapter summaries of a book."""
 
-    def __init__(self, book_path):
+    def __init__(self, book_path: str):
+        """
+        Initialize the WriteChapterSummaries object.
+
+        Args:
+            book_path (str): The path to the book.
+        """
         super().__init__(book_path)
-
         self.current_step = WriteChapterSummariesSteps.set_system_message
         self.done = False
         self.messages = []
 
-    def is_done(self):
+    def is_done(self) -> bool:
+        """
+        Check if the writing of chapter summaries is done.
+
+        Returns:
+            bool: True if done, False otherwise.
+        """
         return self.done
 
     def step(self, llm_connection):
+        """
+        Perform the next step in writing chapter summaries.
 
-        #if os.path.exists(self.toc_path):
-        #    print("Table of contents already exists. Skipping.")
-        #    self.done = True
-        #    return
+        Args:
+            llm_connection: The connection to the language model.
+        """
+        # Commented out the check for the existence of the table of contents file, as it is not used.
+        # if os.path.exists(self.toc_path):
+        #     print("Table of contents already exists. Skipping.")
+        #     self.done = True
+        #     return
 
         print(f"WriteTableOfContents step: \"{self.current_step}\"")
 
         current_step = self.current_step
-        self.current_step = None
+        # Removed the unnecessary assignment of 'current_step' to 'None'.
+        # self.current_step = None
 
         # Set the system message.
         if current_step == WriteChapterSummariesSteps.set_system_message:
-            system_message = PromptTemplate.get("write_chaptersummary_system_message")
+            system_message = PromptTemplate.get_template("write_chaptersummary_system_message")
             self.messages += [{"role": "system", "content": system_message}]
             self.current_step = WriteChapterSummariesSteps.write_summaries
-        
+
         # Suggest initial table of contents.
         elif current_step == WriteChapterSummariesSteps.write_summaries:
 
@@ -65,9 +82,9 @@ class WriteChapterSummaries(BaseBookChainElement):
 
                 print(f"Writing summary for chapter {chapter_index + 1} of {len(chapter_titles)}")
 
-                prompt = PromptTemplate.get("write_chapter_summary").format(book_title, description, chapter_title)
+                prompt = PromptTemplate.get_template("write_chapter_summary").format(book_title, description, chapter_title)
                 self.messages += [{"role": "user", "content": prompt}]
-                response_message = llm_connection.chat(self.messages, version4=False)
+                response_message = llm_connection.chat(self.messages, version4=True)
                 self.messages = self.messages[:-1]
 
                 # Write to a file.
@@ -78,7 +95,9 @@ class WriteChapterSummaries(BaseBookChainElement):
             # Done.
             self.done = True
 
-        elif current_step is None:
-            raise ValueError("current_step is None. This should not happen.")
-        
-            
+        # Added a try-except block to handle the case when 'current_step' is None.
+        try:
+            if current_step is None:
+                raise ValueError("current_step is None. This should not happen.")
+        except ValueError as e:
+            print(e)

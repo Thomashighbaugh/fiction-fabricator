@@ -1,9 +1,9 @@
 import os
-import sys
+import logging
+from typing import List
 
 from source.bookchainelements.basebookchainelement import BaseBookChainElement
 from source.prompttemplate import PromptTemplate
-
 
 from enum import Enum
 
@@ -14,29 +14,27 @@ class WriteChapterOutlinesSteps(str, Enum):
 
 class WriteChapterOutlines(BaseBookChainElement):
 
-    def __init__(self, book_path):
+    def __init__(self, book_path: str):
         super().__init__(book_path)
+        self.current_step: WriteChapterOutlinesSteps = WriteChapterOutlinesSteps.set_system_message
+        self.done: bool = False
+        self.messages: List[dict] = []
 
-        self.current_step = WriteChapterOutlinesSteps.set_system_message
-        self.done = False
-        self.messages = []
-
-    def is_done(self):
+    def is_done(self) -> bool:
         return self.done
 
     def step(self, llm_connection):
-
-        print(f"WriteChapterOutlines step: \"{self.current_step}\"")
+        logging.info(f"WriteChapterOutlines step: \"{self.current_step}\"")
 
         current_step = self.current_step
         self.current_step = None
 
         # Set the system message.
         if current_step == WriteChapterOutlinesSteps.set_system_message:
-            system_message = PromptTemplate.get("write_chapteroutline_system_message")
+            system_message = PromptTemplate.get_template("write_chapteroutline_system_message")
             self.messages += [{"role": "system", "content": system_message}]
             self.current_step = WriteChapterOutlinesSteps.write_outlines
-        
+
         # Suggest initial table of contents.
         elif current_step == WriteChapterOutlinesSteps.write_outlines:
 
@@ -50,7 +48,7 @@ class WriteChapterOutlines(BaseBookChainElement):
 
                 chapter_outline_path = chapter_summary_path.replace("chapter_", "chapteroutline_")
                 if os.path.exists(chapter_outline_path):
-                    print(f"Chapter outline {chapter_outline_path} already exists. Skipping.")
+                    logging.info(f"Chapter outline {chapter_outline_path} already exists. Skipping.")
                     continue
 
                 # Get the chapter summary.
@@ -58,7 +56,7 @@ class WriteChapterOutlines(BaseBookChainElement):
                     chapter_summary = f.read()
 
                 # Create the prompt.
-                prompt = PromptTemplate.get("write_chapteroutline").format(book_title, chapter_summary)
+                prompt = PromptTemplate.get_template("write_chapteroutline").format(book_title, chapter_summary)
 
                 # Send the prompt.
                 self.messages += [{"role": "user", "content": prompt}]
@@ -75,7 +73,5 @@ class WriteChapterOutlines(BaseBookChainElement):
             # Done.
             self.done = True
 
-        elif current_step is None:
+        else:
             raise ValueError("current_step is None. This should not happen.")
-        
-            
