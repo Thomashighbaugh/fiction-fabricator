@@ -18,4 +18,5 @@ The chapter title is:
 {}
 """
 
-Write the chapter summary in a way that will make it very easy to extend the summary to a full chapter. Only reply with the summary. Start with the chapter title. Do not mention the summary or how you created it in your response, simply provide the summary without editorial remarks. Do not describe what will or was discussed in the chapter, skip the editorial remarks and get straight to what is in the chapter!
+Write the chapter summary in a way that will make it very easy to extend the summary to a full chapter. Only reply with the summary. Start with the chapter title. Do not mention the summary or how you created it in your response, simply provide the summary without editorial remarks. Do not describe what will or was discussed in the chapter, skip the editorial remarks and get straight to what is in the chapter! Do not get ahead of the scope of the chapter, but work the narrative out in a step by step process. 
+

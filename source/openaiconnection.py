@@ -2,6 +2,7 @@ import os
 import openai
 from retry import retry
 
+
 class OpenAIConnection:
 
     def __init__(self, logger):
@@ -14,11 +15,11 @@ class OpenAIConnection:
         self.logger = logger
 
         # For 3.5 use only the 16k model.
-        self.chatbot_model_long = "mistral-7b"
+        self.chatbot_model_long = "gemini-pro"
         self.chatbot_contextmax_long = 32768
 
         self.chatbot_model_4 = "mixtral-8x7b"
-        self.chatbot_model_4_long = "mistral-7b"
+        self.chatbot_model_4_long = "gemini-pro"
         self.chatbot_contextmax_4 = 8192
         self.chatbot_contextmax_4_long = 32768
 

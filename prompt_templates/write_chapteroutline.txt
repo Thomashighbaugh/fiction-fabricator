@@ -4,4 +4,4 @@ You are currently engaged in the creation of a literary work titled {} . Now, yo
 {}
 """
 
-To structure this chapter effectively, consider constructing an outline comprising the primary components of the narrative. Utilize bullet points to organize the key aspects of the chapter, ensuring a comprehensive and engaging exploration of the subject matter. You must reason out the bullet points for the narrative step by step. Do not out any blank lines in your response (!IMPORTANT)
+To structure this chapter effectively, consider constructing an outline comprising the primary components of the narrative. Utilize bullet points to organize the key aspects of the chapter, ensuring a comprehensive and engaging exploration of the subject matter. You must reason out the bullet points for the narrative step by step without getting ahead of yourself or jumping ahead of what is contained within the summary. Do not out any blank lines in your response whatsoever, even for formatting (!IMPORTANT)
