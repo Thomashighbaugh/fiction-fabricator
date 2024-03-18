@@ -179,30 +179,6 @@
         "documentation": {}
     },
     {
-        "label": "List",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "Dict",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "Any",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "Optional",
         "importPath": "typing",
         "description": "typing",
@@ -234,14 +210,6 @@
         "description": "retry",
         "isExtraImport": true,
         "detail": "retry",
-        "documentation": {}
-    },
-    {
-        "label": "num_tokens_from_messages",
-        "importPath": "source.tokencounter",
-        "description": "source.tokencounter",
-        "isExtraImport": true,
-        "detail": "source.tokencounter",
         "documentation": {}
     },
     {
@@ -430,7 +398,7 @@
         "kind": 6,
         "importPath": "source.bookchainelements.writechapters",
         "description": "source.bookchainelements.writechapters",
-        "peekOfCode": "class WriteChaptersSteps(str, Enum):\n    set_system_message = \"set system message\"\n    write_chapters = \"write chapters\"\nclass WriteChapters(BaseBookChainElement):\n    def __init__(self, book_path: str) -> None:\n        super().__init__(book_path)\n        self.current_step: WriteChaptersSteps = WriteChaptersSteps.set_system_message\n        self.done: bool = False\n        self.messages: List[Dict[str, Any]] = []\n    def is_done(self) -> bool:",
+        "peekOfCode": "class WriteChaptersSteps(str, Enum):\n    set_system_message = \"set system message\"\n    write_chapters = \"write chapters\"\n# Class for writing chapters in a book\nclass WriteChapters(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step: WriteChaptersSteps = WriteChaptersSteps.set_system_message\n        self.done: bool = False\n        self.messages: list = []",
         "detail": "source.bookchainelements.writechapters",
         "documentation": {}
     },
@@ -439,7 +407,7 @@
         "kind": 6,
         "importPath": "source.bookchainelements.writechapters",
         "description": "source.bookchainelements.writechapters",
-        "peekOfCode": "class WriteChapters(BaseBookChainElement):\n    def __init__(self, book_path: str) -> None:\n        super().__init__(book_path)\n        self.current_step: WriteChaptersSteps = WriteChaptersSteps.set_system_message\n        self.done: bool = False\n        self.messages: List[Dict[str, Any]] = []\n    def is_done(self) -> bool:\n        return self.done\n    def step(self, llm_connection: Any) -> None:\n        # Set the system message.",
+        "peekOfCode": "class WriteChapters(BaseBookChainElement):\n    def __init__(self, book_path: str):\n        super().__init__(book_path)\n        self.current_step: WriteChaptersSteps = WriteChaptersSteps.set_system_message\n        self.done: bool = False\n        self.messages: list = []\n    def is_done(self) -> bool:\n        return self.done\n    def chapter_exists(self, chapter_path: str) -> bool:\n        \"\"\"",
         "detail": "source.bookchainelements.writechapters",
         "documentation": {}
     },
@@ -502,7 +470,7 @@
         "kind": 6,
         "importPath": "source.openaiconnection",
         "description": "source.openaiconnection",
-        "peekOfCode": "class OpenAIConnection:\n    def __init__(self, logger):\n        # Raise an exception if the OpenAI API key is not set.\n        # Else set the API key.\n        api_key = \"\"\n        if api_key is None:\n            raise ValueError(\"OPENAI_API_KEY environment variable is not set.\")\n        openai.api_key = api_key\n        openai.api_base = \"http://0.0.0.0:1337/v1\"\n        self.logger = logger",
+        "peekOfCode": "class OpenAIConnection:\n    def __init__(self, logger):\n        # Check if the OpenAI API key is set\n        api_key = \"\"\n        if api_key is None:\n            raise ValueError(\"OPENAI_API_KEY environment variable is not set.\")\n        openai.api_key = api_key\n        openai.api_base = \"http://0.0.0.0:1337/v1\"\n        self.logger = logger\n        # For 3.5 use only the 16k model.",
         "detail": "source.openaiconnection",
         "documentation": {}
     },

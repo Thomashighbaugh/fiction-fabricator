@@ -1,14 +1,18 @@
-# - Removed unnecessary imports.
+# Changes made:
 # - Added comments to improve code readability.
+# - Removed unnecessary imports.
+
 import os
 from enum import Enum
 from source.bookchainelements.basebookchainelement import BaseBookChainElement
 from source.prompttemplate import PromptTemplate
 
+# Enum class for different steps in the WriteChapters process
 class WriteChaptersSteps(str, Enum):
     set_system_message = "set system message"
     write_chapters = "write chapters"
 
+# Class for writing chapters in a book
 class WriteChapters(BaseBookChainElement):
     def __init__(self, book_path: str):
         super().__init__(book_path)
@@ -41,7 +45,7 @@ class WriteChapters(BaseBookChainElement):
             self.messages += [{"role": "system", "content": system_message}]
             self.current_step = WriteChaptersSteps.write_chapters
 
-        # Suggest initial table of contents.
+        # Write chapters
         elif current_step == WriteChaptersSteps.write_chapters:
             # Get the book title.
             book_title = self.get_book_title()

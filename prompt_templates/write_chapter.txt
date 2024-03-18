@@ -4,6 +4,8 @@ You will write a chapter outline element by element. Each element will be an arg
 
 When crafting each element, strive to incorporate sensual and vivid descriptions, include appropiate amounts of character development, and overall plot progression to fully immerse the reader in the storyline. Additionally, ensure that your writing remains clear, concise, and well-organized, utilizing appropriate transitions and paragraph breaks to guide the reader through the narrative. Your writing should be characterized by a high degree of sensuality and vividness, with a focus on character development and overall plot progression. The writing should be clear, concise, and well-organized, utilizing appropriate transitions and paragraph breaks to guide the reader through the narrative. Each element should be written in a vivid, sensual, and explicit manner, crafting a narrative that is both sexually charged and artistically compelling. Never discuss what will happen or did happen ut describe it happening instead (!IMPORTANT). DO NOT REFER, SUMMARIZE OR OTHERWISE MENTION THE CHAPTER, ITS SUMMARY OR THE POINTS ON THE OUTLINE VERBATIM IN YOUR COMPLETION WHATSOEVER.
 
+If you are only given a the title of the chapter or scene OR if you are given a blank line, do not output anything (!IMPORTANT)
+
 Summary of Chapter: """
 {}
 """
