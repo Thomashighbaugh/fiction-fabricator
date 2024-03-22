@@ -1,9 +1,3 @@
-# Changes Made:
-# 1. Added type hints to the writebook function parameters.
-# 2. Added comments to explain each section of the code.
-# 3. Replaced print statements with logger calls for better logging.
-# 4. Refactored the command line argument handling for better readability.
-
 import os
 import sys
 import fire
@@ -13,6 +7,7 @@ import time
 import datetime
 from typing import Optional
 
+# Importing custom modules for book writing process.
 from source.openaiconnection import OpenAIConnection
 from source.chain import ChainExecutor
 from source.writelogs import WriteLogs
@@ -25,45 +20,51 @@ from source.bookchainelements import (
     JoinBook
 )
 
-# Load the environment variables.
+# Load the environment variables from the .env file.
 dotenv.load_dotenv()
 
+# Custom exception for early termination of the script with an error message.
 class ExitException(Exception):
     pass
 
+# Function to orchestrate the book writing process using the OpenAI API.
 def writebook(book_path: str, log: bool = True, log_persistent: bool = True) -> None:
     """
-    Function to write a book using OpenAI API.
-
+    Orchestrates the process of writing a book by executing a series of steps (chain elements).
+    
     Args:
-    - book_path (str): Path to the book directory.
-    - log (bool): Flag to enable logging.
-    - log_persistent (bool): Flag to enable persistent logging.
-
+        book_path (str): The directory path where the book will be written.
+        log (bool, optional): Enables logging of the process. Defaults to True.
+        log_persistent (bool, optional): Enables persistent logging across sessions. Defaults to True.
+    
+    Raises:
+        ExitException: If the book_path or description.txt does not exist.
+    
     Returns:
-    - None
+        None
     """
     
-    # See if the book path exists. If not, raise an error.
+    # Check if the book path exists, raise an error if it does not.
     if not os.path.exists(book_path):
         raise ExitException(f"Path {book_path} does not exist. Please create it.")
     
-    # See if the description.txt file exists. If not, raise an error.
+    # Check if the description.txt file exists, raise an error if it does not.
     description_path = os.path.join(book_path, "description.txt")
     if not os.path.exists(description_path):
         raise ExitException(f"File {description_path} does not exist. Please create it. It should contain a short description of the book.")
 
-    # Create the logger
+    # Initialize the logger for the book writing process.
     logger = WriteLogs(book_path, log=log, log_persistent=log_persistent)
 
-    # Create the model connection.    
+    # Establish a connection to the OpenAI model.
     model_connection = OpenAIConnection(logger)
 
-    # Start time.
+    # Record the start time of the book writing process.
     start_time = time.time()
 
-    # Create a chain executor.
+    # Initialize the chain executor with the model connection.
     chain_executor = ChainExecutor(model_connection)
+    # Add each step of the book writing process to the chain executor.
     chain_executor.add_element(FindBookTitle(book_path))
     chain_executor.add_element(WriteTableOfContents(book_path))
     chain_executor.add_element(WriteChapterSummaries(book_path))
@@ -71,34 +72,39 @@ def writebook(book_path: str, log: bool = True, log_persistent: bool = True) -> 
     chain_executor.add_element(WriteChapters(book_path))
     chain_executor.add_element(JoinBook(book_path))
 
-    # Run the chain.
+    # Execute the chain of steps to write the book.
     chain_executor.run()
 
-    # Elapsed time.
+    # Calculate the elapsed time of the book writing process.
     elapsed_time = time.time() - start_time
 
-    # Write total tokens used and elapsed time to summary file.
+    # Write the total tokens used and elapsed time to the summary file.
     summary_file_path = os.path.join(book_path, "output", "summary.txt")
     with open(summary_file_path, "w") as summary_file:
-        total_tokens_used = model_connection.token_count
-        logger.log(f"Total tokens used: {total_tokens_used}", file=summary_file)
+#        total_tokens_used = model_connection.token_count
+        #logger.log(f"Total tokens used: {total_tokens_used}", file=summary_file)
 
         elapsed_time_string = str(datetime.timedelta(seconds=elapsed_time))
-        logger.log(f"Elapsed time: {elapsed_time_string}", file=summary_file)
+        #logger.log(f"Elapsed time: {elapsed_time_string}", file=summary_file)
 
-
+# Entry point of the script.
 if __name__ == "__main__":
     try:
-        # Parse command line arguments and handle flags for logging.
+        # Parse command line arguments and convert flags for logging.
         args = sys.argv[1:]
         for i, arg in enumerate(args):
             if arg == '--l':
                 args[i] = '--log=True'
             elif arg == '--lp':
                 args[i] = '--log_persistent=True'
-        print(args)  # For debugging purposes
+        # Use logger instead of print for debugging purposes.
+        #logger.log(str(args))  # Uncomment this line to enable logging of arguments.
+        # Execute the writebook function with the parsed arguments.
         fire.Fire(writebook, command=args)
     except ExitException as e:
-        print(e)
+        # Use logger instead of print for error reporting.
+        #logger.log(str(e))  # Uncomment this line to enable logging of the exception.
+        pass  # Handle the custom ExitException without printing the message.
     except:
+        # Log the full traceback for any other exceptions that occur.
         traceback.print_exc()

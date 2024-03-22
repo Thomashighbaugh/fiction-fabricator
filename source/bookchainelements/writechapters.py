@@ -87,7 +87,7 @@ class WriteChapters(BaseBookChainElement):
                     self.messages += [{"role": "user", "content": prompt}]
 
                     # Get the response.
-                    response_message = llm_connection.chat(self.messages, long=True, version4=True)
+                    response_message = llm_connection.chat(self.messages, long=True)
 
                     self.messages += [response_message]
 

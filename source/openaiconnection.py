@@ -1,4 +1,6 @@
 import os
+import json
+import g4f
 import openai
 from retry import retry
 
@@ -15,11 +17,11 @@ class OpenAIConnection:
         self.logger = logger
 
         # For 3.5 use only the 16k model.
-        self.chatbot_model_long = "gemini-pro"
+        self.chatbot_model_long = "mistral-7b"
         self.chatbot_contextmax_long = 32768
 
         self.chatbot_model_4 = "mixtral-8x7b"
-        self.chatbot_model_4_long = "gemini-pro"
+        self.chatbot_model_4_long = "mistral-7b"
         self.chatbot_contextmax_4 = 8192
         self.chatbot_contextmax_4_long = 32768
 
@@ -30,26 +32,20 @@ class OpenAIConnection:
         long: bool = True,
         verbose: bool = True,
         version4: bool = False,
-    ) -> str:
+    ) -> dict:  # Return type should be a dict
         if verbose:
             self.print_messages(messages)
 
         if version4:
             model = self.chatbot_model_4 if not long else self.chatbot_model_4_long
-            max_tokens = (
-                self.chatbot_contextmax_4
-                if not long
-                else self.chatbot_contextmax_4_long
-            )
         else:
             model = self.chatbot_model_long
-            max_tokens = self.chatbot_contextmax_long
 
-        response = openai.ChatCompletion.create(
-            model=model, max_tokens=max_tokens, messages=messages
-        )
+        response = g4f.ChatCompletion.create(model=model, messages=messages)
 
-        response = response["choices"][0]["message"]
+        # Parse the response into a dictionary if it's a string
+        if isinstance(response, str):
+            response = json.loads(response)
 
         if verbose:
             self.print_messages([response])
@@ -59,8 +55,11 @@ class OpenAIConnection:
     def print_messages(self, messages: list[dict]):
         for message in messages:
             print("\033[92m", end="")
-            print(f"{message['role']}:")
-            print("\033[95m", end="")
-            print(f"{message['content']}")
+            if "role" in message and "content" in message:  # Check if keys exist
+                print(f"{message['role']}:")
+                print("\033[95m", end="")
+                print(f"{message['content']}")
+            else:
+                self.logger.error("Message format is incorrect.")
             print("")
             print("\033[0m", end="")
