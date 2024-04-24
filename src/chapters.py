@@ -1,6 +1,6 @@
 import json
 
-from src.openaiconnection import call_openai_api
+from src.openaiconnection import call_g4f_api
 from src.prompts import get_beats_prompt, get_chapter_prompt
 
 
@@ -10,7 +10,7 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
     """
 
     prompt = get_chapter_prompt(synopsis, genre, style, tone, pov, premise)
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
     chapter_titles = response
 
     chapters_json = {}
@@ -28,7 +28,7 @@ def generate_beats(chapter_summary):
     """
 
     prompt = get_beats_prompt(chapter_summary)
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
     beats_text = response
 
     beats = []

@@ -2,7 +2,7 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-
+import json
 Base = declarative_base()
 
 
@@ -25,16 +25,16 @@ def create_database_if_not_exists(database_name):
     Checks if a database exists and creates it if it doesn't.
     """
 
-    if not os.path.isfile(database_name):  # Check if the database file exists
-        create_database()  # Create the database and tables
+    if not os.path.isfile(database_name):
+        create_database()
         print(f"Database '{database_name}' created.")
     else:
         print(f"Database '{database_name}' already exists.")
 
 
 def create_database():
-    engine = create_engine("sqlite:///books.db")  # Create or connect to the database
-    Base.metadata.create_all(engine)  # Create tables if they don't exist
+    engine = create_engine("sqlite:///books.db")
+    Base.metadata.create_all(engine)
 
 
 def save_book(book_data):
@@ -42,20 +42,19 @@ def save_book(book_data):
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    # Create a Book object and populate it with data
     book = Book(
-        title=book_data[0],
-        genre=book_data[1],
-        tone=book_data[2],
-        style=book_data[3],
-        pov=book_data[4],
-        premise=book_data[5],
-        characters=book_data[6],
-        chapters=book_data[7],
+        title=book_data["title"],
+        genre=book_data["genre"],
+        tone=book_data["tone"],
+        style=book_data["style"],
+        pov=book_data["pov"],
+        premise=book_data["premise"],
+        characters=book_data["characters"],
+        chapters=book_data["chapters"],
     )
 
-    session.add(book)  # Add the book to the session
-    session.commit()  # Save changes to the database
+    session.add(book)
+    session.commit()
     session.close()
 
 
@@ -64,8 +63,17 @@ def load_book(book_id):
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    # Query for the book with the given ID
     book = session.query(Book).get(book_id)
-
+    book.characters = json.loads(book.characters)
+    book.chapters = json.loads(book.chapters)
     session.close()
     return book
+
+def get_saved_projects():
+    engine = create_engine("sqlite:///books.db")
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    projects = session.query(Book.id, Book.title).all()
+    session.close()
+    return projects

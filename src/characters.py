@@ -1,18 +1,16 @@
 import json
 
-from src.openaiconnection import call_openai_api
+from src.openaiconnection import call_g4f_api
 from src.prompts import get_character_prompt
 
 
-def generate_characters(
-    updated_synopsis, genre, tone, style, pov, premise
-):
+def generate_characters(updated_synopsis, genre, tone, style, pov, premise):
     """
     Generates a list of characters for the novel based on the provided information.
     """
 
     prompt = get_character_prompt(updated_synopsis, genre, tone, style, pov, premise)
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
     characters_text = response
 
     # Assuming the API returns characters in a list format
@@ -25,6 +23,7 @@ def generate_characters(
         characters_dict[name] = {
             "details": " ".join(details),
             "traits": [],  # Initialize empty list for traits
+            "relationships": {},  # Initialize empty dictionary for relationships
         }
 
     # Character Trait Selection
@@ -41,7 +40,7 @@ def generate_characters(
     while True:
         character1 = input("Enter the first character's name (or 'done' to finish): ")
         if character1.lower() == "done":
-            break
+            break  # Exit the loop if 'done' is entered
         if character1 not in characters_dict:
             print("Character not found. Please try again.")
             continue
@@ -51,12 +50,8 @@ def generate_characters(
             print("Character not found. Please try again.")
             continue
 
-        relationship = input(
-            f"Describe the relationship between {character1} and {character2}: "
-        )
+        relationship = input(f"Describe the relationship between {character1} and {character2}: ")
         characters_dict[character1]["relationships"][character2] = relationship
-        characters_dict[character2]["relationships"][
-            character1
-        ] = relationship  # Add relationship to both characters
+        characters_dict[character2]["relationships"][character1] = relationship
 
     return json.dumps(characters_dict, indent=4)

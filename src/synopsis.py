@@ -1,4 +1,4 @@
-from src.openaiconnection import call_openai_api
+from src.openaiconnection import call_g4f_api
 from src.prompts import get_synopsis_prompt, get_synopsis_critique_prompt, get_synopsis_rewrite_prompt 
 import subprocess
 import os
@@ -10,7 +10,7 @@ def generate_synopsis(genre, style, tone, pov, premise):
     """
 
     prompt = get_synopsis_prompt(genre, style, tone, pov, premise)
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
 
     synopsis = response
     return synopsis
@@ -39,7 +39,7 @@ def expand_synopsis(synopsis):
     """
 
     prompt = f"Expand on the synopsis, focusing on key plot points and character motivations: {synopsis}"
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
     expanded_synopsis = response
     return expanded_synopsis
 
@@ -67,12 +67,12 @@ def critique_synopsis(synopsis):
 
     # Get AI critique
     critique_prompt = get_synopsis_critique_prompt(synopsis)
-    critique_response = call_openai_api(critique_prompt)
+    critique_response = call_g4f_api(critique_prompt)
     critique = critique_response
 
     # Rewrite synopsis based on critique
     rewrite_prompt = get_synopsis_rewrite_prompt(synopsis, critique)
-    rewrite_response = call_openai_api(rewrite_prompt)
+    rewrite_response = call_g4f_api(rewrite_prompt)
     updated_synopsis = rewrite_response
 
     return updated_synopsis

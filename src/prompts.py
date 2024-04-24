@@ -1,7 +1,7 @@
 # prompts.py
 
 
-# This file contains prompts for interacting with the OpenAI API for various tasks in the automated novel writing process.
+# This file contains prompts for interacting with the g4f API for various tasks in the automated novel writing process.
 # ─────────────────────────────────────────────────────────────────
 # ideas.py prompt
 def get_idea_prompt(genre, tone, style, pov, premise):
@@ -20,7 +20,7 @@ def get_synopsis_prompt(genre, style, tone, pov, premise):
     Returns a prompt to create a detailed novel synopsis.
     """
 
-    return f"Create a detailed synopsis for a {genre} novel with a {tone} tone, written in a {style} style, from {pov} point of view framed around this idea: {premise} \n\n Please condense your response into a single lng paragraph."
+    return f"Create a detailed synopsis for a {genre} novel with a {tone} tone, written in a {style} style, from {pov} point of view framed around this idea: {premise} \n\n Please condense your response into a single paragraph."
 
 
 def get_synopsis_critique_prompt(synopsis):
@@ -104,7 +104,7 @@ def get_genre_prompt(premise):
 
     return f"Generate a genre for the novel based on popular choices like science fiction, fantasy, romance, mystery, horror, etc based on this premise: {premise}\n\n Please respond only with the genre of the novel only and no explainations"
 
-
+# ─────────────────────────────────────────────────────────────────
 def get_tone_prompt(premise):
     """
     Returns a prompt to suggest a tone for the novel based on the premise.
@@ -112,7 +112,7 @@ def get_tone_prompt(premise):
 
     return f"Provide a tone for the novel such as `serious`, `dark`, `humorous`,`light-hearted``, etc based on this premise: {premise} \n\n Please respond only with the tone of the novel only and no explainations"
 
-
+# ─────────────────────────────────────────────────────────────────
 def get_style_prompt(premise):
     """
     Returns a prompt to suggest a writing style for the novel based on the premise.
@@ -120,10 +120,33 @@ def get_style_prompt(premise):
 
     return f"Provide a writing style for the novel, examples of writing styles are `descriptive`, `narrative`, `poetic`, Expository, Persuasive, Creative, Formal, Informal, `Humorous`, `Ironic`, `Satirical`, `Lyrical`, `Dramatic`, `Suspenseful`, `Reflective`, `Stream-of-consciousness` etc based on this premise: {premise}\n\n Please respond only with the style of the novel only and no explainations"
 
-
+# ─────────────────────────────────────────────────────────────────
 def get_pov_prompt(premise):
     """
     Returns a prompt to suggest a point of view for the novel based on the premise.
     """
 
     return f"Select a point of view for the novel such as first-person, third-person limited, omniscient, etc based on this premise: {premise}.\n\n Please respond only with the style of the novel only and no explainations"
+# ─────────────────────────────────────────────────────────────────
+def get_system_prompt():
+    """
+    Returns the System Prompt that is included with each prompt request to the AI
+    """
+    return "I want you to act as a best-selling novelist working on your latest book. You will come up with creative, unique, critically-acclaimed and captivating stories that can engage readers for long periods of time while leaving them wanting more. Your style is something of a mix between the prose of Steven King and F Scott Fitzgerald, H. P. Lovecraft & Frank Herbert."
+
+# ─────────────────────────────────────────────────────────────────
+def get_premise_prompt(user_input):
+    """
+    Returns a prompt to provide a premise for the novel
+
+    Parameters:
+        user_input (str): The input from the user
+
+    Returns:
+        str: The prompt to generate premises for a novel based on the user's input
+    """
+    return (
+        "Generate 5 distinct and captivating premises for a novel based on the "
+        f"following input: {user_input}"
+    )
+

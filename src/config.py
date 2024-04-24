@@ -4,7 +4,7 @@ from src.prompts import (
     get_style_prompt,
     get_pov_prompt,
 )
-from src.openaiconnection import call_openai_api
+from src.openaiconnection import call_g4f_api
 
 
 def input_premise():
@@ -38,7 +38,7 @@ def select_genre(premise):
         genre = input("Please enter your chosen genre: ")
     else:
         prompt = get_genre_prompt(premise)
-        response = call_openai_api(prompt)
+        response = call_g4f_api(prompt)
         genre = response
     return genre
 
@@ -62,7 +62,7 @@ def select_tone(premise):
         tone = input("Please enter the intended tone of the novel: ")
     else:
         prompt = get_tone_prompt(premise)
-        response = call_openai_api(prompt)
+        response = call_g4f_api(prompt)
         tone = response
     return tone
 
@@ -86,7 +86,7 @@ def select_style(premise):
         style = input("Please enter the intended style of the novel: ")
     else:
         prompt = get_style_prompt(premise)
-        response = call_openai_api(prompt)
+        response = call_g4f_api(prompt)
         style = response
     return style
 
@@ -110,6 +110,6 @@ def select_pov(premise):
         pov = input("Please enter the point of view for the novel: ")
     else:
         prompt = get_pov_prompt(premise)
-        response = call_openai_api(prompt)
+        response = call_g4f_api(prompt)
         pov = response
     return pov

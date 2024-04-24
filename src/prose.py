@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 
-from src.openaiconnection import call_openai_api
+from src.openaiconnection import call_g4f_api
 from src.prompts import get_prose_prompt, get_rewrite_prose_prompt
 
 
@@ -14,7 +14,7 @@ def write_prose(beat, genre, tone, pov, characters, style, premise):
     prompt = get_prose_prompt(
         [beat["action_point"]], genre, tone, pov, characters, style, premise
     )
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
     prose = response
     beat["expanded_content"] = prose
 
@@ -27,7 +27,7 @@ def rewrite_prose(beat, style, tone, genre, pov, premise):
     prompt = get_rewrite_prose_prompt(
         beat["expanded_content"], style, tone, genre, pov, premise
     )
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
     rewritten_prose = response
     beat["rewritten_content"] = rewritten_prose
 

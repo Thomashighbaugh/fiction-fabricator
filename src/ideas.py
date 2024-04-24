@@ -1,5 +1,5 @@
 # ideas.py functions (modified)
-from src.openaiconnection import call_openai_api
+from src.openaiconnection import call_g4f_api
 from src.prompts import get_idea_prompt
 
 # ─────────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ def generate_ideas(genre, style, tone, pov, premise):
     """
 
     prompt = get_idea_prompt(genre, style, tone, pov, premise)
-    response = call_openai_api(prompt)
+    response = call_g4f_api(prompt)
 
     # Assuming the API returns ideas in a list format
     ideas_list = response.split(

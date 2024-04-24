@@ -21,6 +21,7 @@ def main():
     Entry point for the Fiction Fabricator tool.
     """
 
+
     write_novel()
 
 
