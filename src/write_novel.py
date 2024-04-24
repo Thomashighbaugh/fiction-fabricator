@@ -57,30 +57,28 @@ def write_novel():
     generate_premises()
     premise = input_premise()
     book_data["premise"] = premise
-    save_book(book_data)
+
     genre = select_genre(premise)
     book_data["genre"] = genre
-    save_book(book_data)
     tone = select_tone(premise)
     book_data["tone"] = tone
-    save_book(book_data)
     style = select_style(premise)
     book_data["style"] = style
-    save_book(book_data)
+
     pov = select_pov(premise)
     book_data["pov"] = pov
-    save_book(book_data)
+
     synopsis = generate_synopsis(genre, style, tone, pov, premise)
     updated_synopsis = critique_synopsis(synopsis)
     book_data["synopsis"] = updated_synopsis
-    save_book(book_data)
+
     book_title = generate_title(updated_synopsis, genre, style, tone, pov, premise)
     print(f"The title of the novel is: {book_title}")
     book_data["title"] = book_title
-    save_book(book_data)
+
     characters = generate_characters(updated_synopsis, genre, style, tone, pov, premise)
     book_data["characters"] = characters
-    save_book(book_data)
+
     chapters = generate_chapters(updated_synopsis, genre, tone, style, pov, premise)
     for chapter_title, beats in chapters.items():
         chapter_content = ""
