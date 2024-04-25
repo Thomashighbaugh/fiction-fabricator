@@ -7,8 +7,6 @@ from src.config import (
     select_style,
     select_tone,
 )
-from src.ideas import choose_idea, generate_ideas
-from src.openaiconnection import call_g4f_api
 from src.prose import (
     print_and_edit_beat,
     rewrite_prose,
@@ -57,19 +55,23 @@ def write_novel():
     generate_premises()
     premise = input_premise()
     book_data["premise"] = premise
-
     genre = select_genre(premise)
+    print(f"The genre is: {genre}")
     book_data["genre"] = genre
     tone = select_tone(premise)
+    print(f"The tone of the novel is: {tone}")
     book_data["tone"] = tone
     style = select_style(premise)
+    print(f"The style of the novel is: {style}")
     book_data["style"] = style
 
     pov = select_pov(premise)
     book_data["pov"] = pov
+    print(f"The perspective of the novel is: {pov}")
 
     synopsis = generate_synopsis(genre, style, tone, pov, premise)
     updated_synopsis = critique_synopsis(synopsis)
+    print(f"The synopsis of the novel is: {updated_synopsis}")
     book_data["synopsis"] = updated_synopsis
 
     book_title = generate_title(updated_synopsis, genre, style, tone, pov, premise)

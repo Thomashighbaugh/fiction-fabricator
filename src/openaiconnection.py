@@ -11,14 +11,16 @@ def call_g4f_api(prompt):
     Returns:
         The generated text from the GPT4Free API.
     """
-
     api_instance = g4f.ChatCompletion()
 
         # Call the API with the specified parameters
     response = api_instance.create(
-            model="mistral-7b-v02",  # Use the 'mistral-7b' model
+            # TODO: possibly add in a means of selecting other g4f models at the beginning of the program.
+            model="mixtral-8x22b",  # Use the 'mixtral-8x22b' model, its new, its uncensored, and it's free.
+            # TODO: Create interactive means of changing the system prompt
             messages=[{"role": "system", "content": get_system_prompt()},
                 {"role": "user", "content": prompt}],
+
         )
 
         # Extract and return the generated text

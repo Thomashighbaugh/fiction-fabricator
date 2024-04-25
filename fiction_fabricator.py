@@ -1,5 +1,5 @@
 from src.write_novel import write_novel
-
+import g4f
 # Introductory message featuring ASCII art
 print(" _______ __        __   __                                    ")
 print("|    ___|__|.----.|  |_|__|.-----.-----.                      ")
@@ -17,6 +17,10 @@ print("--------------------------------------------------------------")
 
 
 def main():
+    # g4f settings arranged early
+    g4f.debug.logging = False
+    g4f.debug.version_check = False
+
     """
     Entry point for the Fiction Fabricator tool.
     """

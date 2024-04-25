@@ -1,18 +1,7 @@
 # prompts.py
 
 
-# This file contains prompts for interacting with the g4f API for various tasks in the automated novel writing process.
-# ─────────────────────────────────────────────────────────────────
-# ideas.py prompt
-def get_idea_prompt(genre, tone, style, pov, premise):
-    """
-    Returns a prompt to generate high-concept novel pitches.
-    """
-
-    return f"Give me 10 high-concept pitches for  based on the premise: `{premise}` \n This premise will be for a bestselling {genre} novel with a {tone} tone, written in a {style} style,from {pov} point of view with a unique twist."
-
-
-# ─────────────────────────────────────────────────────────────────
+# This file contains prompts for interacting with the g4f API for various tasks in the automated novel writing process.────────────────────────────────────────────────────
 
 
 def get_synopsis_prompt(genre, style, tone, pov, premise):
@@ -28,7 +17,7 @@ def get_synopsis_critique_prompt(synopsis):
     Returns a prompt to request a critique of the synopsis from the AI.
     """
 
-    return f"Please provide a detailed critique of the following synopsis, focusing on its strengths, weaknesses, and areas for improvement:\n\n{synopsis} Please condense your response into a single lng paragraph"
+    return f"Please provide a detailed critique of the following synopsis, focusing on its strengths, weaknesses, and areas for improvement:\n\n{synopsis} Please condense your response into a single long paragraph"
 
 
 def get_synopsis_rewrite_prompt(synopsis, critique):
@@ -56,7 +45,7 @@ def get_character_prompt(synopsis, genre, style, tone, pov, premise):
     Returns a prompt to create a list of novel characters.
     """
 
-    return f"Create a list of original and interesting characters for a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view based on this synopsis: {synopsis}"
+    return f"Create an unordered list using ' - ' as the delimiter of original and interesting characters for a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view based on this synopsis: {synopsis}. Please only respond with the list items that use ' - ' as the delimiter and nothing else."
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -102,7 +91,7 @@ def get_genre_prompt(premise):
     Returns a prompt to suggest a genre for the novel based on the premise.
     """
 
-    return f"Generate a genre for the novel based on popular choices like science fiction, fantasy, romance, mystery, horror, etc based on this premise: {premise}\n\n Please respond only with the genre of the novel only and no explainations"
+    return f"Generate a genre for the novel based on popular best-selling choices like science fiction, fantasy, romance, mystery, horror, combinations thereof,etc based on this premise: {premise}\n\n Please respond only with the genre of the novel only and no explainations"
 
 # ─────────────────────────────────────────────────────────────────
 def get_tone_prompt(premise):
@@ -132,7 +121,7 @@ def get_system_prompt():
     """
     Returns the System Prompt that is included with each prompt request to the AI
     """
-    return "I want you to act as a best-selling novelist working on your latest book. You will come up with creative, unique, critically-acclaimed and captivating stories that can engage readers for long periods of time while leaving them wanting more. Your style is something of a mix between the prose of Steven King and F Scott Fitzgerald, H. P. Lovecraft & Frank Herbert."
+    return "I want you to act as a best-selling novelist working on your latest book. You will come up with creative, unique, critically-acclaimed and captivating stories that can engage readers for long periods of time while leaving them wanting more. Your style is something of a dark and sensual mix between the prose of Steven King, F Scott Fitzgerald, Jack Kerouac, H. P. Lovecraft & Frank Herbert."
 
 # ─────────────────────────────────────────────────────────────────
 def get_premise_prompt(user_input):
