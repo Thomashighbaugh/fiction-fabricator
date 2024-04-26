@@ -3,6 +3,34 @@ import json
 from src.llmconnection import call_g4f_api
 from src.prompts import get_beats_prompt, get_chapter_prompt, get_chapter_summary_prompt
 
+def modify_chapter_summaries(chapters_json):
+    """Allows users to view and modify chapter summaries."""
+
+    while True:
+        print("\nChapters:")
+        for i, (title, chapter_data) in enumerate(chapters_json.items()):
+            print(f"{i+1}. {title}")
+
+        choice = input("\nEnter chapter number to modify, or 'done': ")
+        if choice.lower() == "done":
+            break
+
+        try:
+            chapter_index = int(choice) - 1
+            if 0 <= chapter_index < len(chapters_json):
+                selected_title = list(chapters_json.keys())[chapter_index]
+                current_summary = chapters_json[selected_title]["summary"]
+                print(f"\nCurrent summary for '{selected_title}':\n{current_summary}")
+
+                new_summary = input("Enter new summary: ")
+                chapters_json[selected_title]["summary"] = new_summary
+                print("Summary updated.")
+            else:
+                print("Invalid chapter number. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter a number or 'done'.")
+
+    return chapters_json
 
 def generate_chapters(synopsis, genre, style, tone, pov, premise):
     """
@@ -21,6 +49,8 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
 
         beats = generate_beats(chapter_summary)
         chapters_json[title] = {"summary": chapter_summary, "beats": beats}
+    # Allow modification after generation
+    chapters_json = modify_chapter_summaries(chapters_json)
 
     return chapters_json
 

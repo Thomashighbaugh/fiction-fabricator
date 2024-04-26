@@ -4,3 +4,4 @@ temp_file.txt
 .venv/*
 development/*
 .vscode/*
+books.db
