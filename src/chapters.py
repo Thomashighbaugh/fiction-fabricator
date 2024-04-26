@@ -1,7 +1,7 @@
 import json
 
 from src.llmconnection import call_g4f_api
-from src.prompts import get_beats_prompt, get_chapter_prompt
+from src.prompts import get_beats_prompt, get_chapter_prompt, get_chapter_summary_prompt
 
 
 def generate_chapters(synopsis, genre, style, tone, pov, premise):
