@@ -88,7 +88,7 @@ def get_genre_prompt(premise):
     Returns a prompt to suggest a genre for the novel based on the premise.
     """
 
-    return f"Generate a genre for the novel based on popular best-selling choices like science fiction, fantasy, romance, mystery, horror, combinations thereof,etc based on this premise: {premise}\n\n Please respond only with the genre of the novel only and no explainations"
+    return f"Generate a genre for the novel based on popular best-selling choices like science fiction, fantasy, romance, mystery, horror, combinations thereof,etc based on this premise: {premise}\n\n Please respond only with the genre of the novel only and no explanations"
 
 # ─────────────────────────────────────────────────────────────────
 def get_tone_prompt(premise):
@@ -96,7 +96,7 @@ def get_tone_prompt(premise):
     Returns a prompt to suggest a tone for the novel based on the premise.
     """
 
-    return f"Provide a tone for the novel such as `serious`, `dark`, `humorous`,`light-hearted``, etc based on this premise: {premise} \n\n Please respond only with the tone of the novel only and no explainations"
+    return f"Provide a tone for the novel such as `serious`, `dark`, `humorous`,`light-hearted``, etc based on this premise: {premise} \n\n Please respond only with the tone of the novel only and no explanations"
 
 # ─────────────────────────────────────────────────────────────────
 def get_style_prompt(premise):
