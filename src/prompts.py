@@ -19,7 +19,8 @@ def get_synopsis_critique_prompt(synopsis):
 
     return f"Please provide a detailed critique of the following synopsis, focusing on its strengths, weaknesses, and areas for improvement:\n\n{synopsis} Please condense your response into a single long paragraph"
 
-
+def get_chapter_summary_prompt(title, synopsis):
+    return f"Generate a brief summary for a chapter titled '{title}' based on the synopsis: {synopsis}"
 def get_synopsis_rewrite_prompt(synopsis, critique):
     """
     Returns a prompt to rewrite the synopsis based on the provided critique.

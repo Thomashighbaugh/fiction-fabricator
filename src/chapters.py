@@ -16,7 +16,7 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
     chapters_json = {}
     for title in chapter_titles:
         # Generate or write chapter summary
-        chapter_summary_prompt = f"Generate a brief summary for a chapter titled '{title}' based on the synopsis: {synopsis}"
+        chapter_summary_prompt =get_chapter_summary_prompt(title, synopsis)
         chapter_summary = call_g4f_api(chapter_summary_prompt)
 
         beats = generate_beats(chapter_summary)
