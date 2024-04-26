@@ -1,6 +1,6 @@
 import json
 
-from src.openaiconnection import call_g4f_api
+from src.llmconnection import call_g4f_api
 from src.prompts import get_beats_prompt, get_chapter_prompt
 
 
@@ -15,9 +15,12 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
 
     chapters_json = {}
     for title in chapter_titles:
-        chapter_summary = title  # Assuming title contains the summary
+        # Generate or write chapter summary
+        chapter_summary_prompt = f"Generate a brief summary for a chapter titled '{title}' based on the synopsis: {synopsis}"
+        chapter_summary = call_g4f_api(chapter_summary_prompt)
+
         beats = generate_beats(chapter_summary)
-        chapters_json[title] = beats
+        chapters_json[title] = {"summary": chapter_summary, "beats": beats}
 
     return chapters_json
 

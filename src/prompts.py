@@ -68,21 +68,17 @@ def get_beats_prompt(chapter_summary):
 
 # ─────────────────────────────────────────────────────────────────
 # prose.py prompts
-def get_prose_prompt(beat, genre, tone, pov, characters, style, premise):
+def get_prose_prompt(beat, chapter_summary, genre, tone, pov, characters, style, premise, synopsis):
     """
     Returns a prompt to write prose for a specific action beat.
     """
+    return f"Please write a section of a chapter for a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view, featuring these characters: {characters}, the synopsis of which is: `{synopsis}` and the chapter summary: `{chapter_summary}` \n Please insure that you write in a way that shows rather than tells and must be based in this action point while still keeping the above in mind: {beat}."
 
-    return f"Please write a section of a chapter for a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view, featuring these characters: {characters}, \n Please insure that you write in a way that shows rather than tells and must be based in this action point while still keeping the above in mind: {beat}."
-
-
-def get_rewrite_prose_prompt(expanded_content, style, tone, genre, pov, premise):
+def get_rewrite_prose_prompt(expanded_content, chapter_summary, style, tone, genre, pov, premise, beat, synopsis):
     """
     Returns a prompt to rewrite prose with specific style and tone considerations.
     """
-
-    return f"Please rewrite, focusing on expanding the text without changing its meaning whatsoever but adding to it more dialogue, more vivid descriptions and improving the text overall the following prose from a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view: \n\n{expanded_content}"
-
+    return f"Please rewrite the following content, focusing on expanding the text without changing its meaning whatsoever or deviating from the plot it fits into but adding to it more dialogue, more vivid descriptions and improving the text overall the following prose from a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view based on this plot point originally: {beat} as part of a novel with this synopsis: {synopsis} and the chapter summary: `{chapter_summary}` \n\n Content:\n{expanded_content}"
 
 # ─────────────────────────────────────────────────────────────────
 # config.py prompts
@@ -107,7 +103,7 @@ def get_style_prompt(premise):
     Returns a prompt to suggest a writing style for the novel based on the premise.
     """
 
-    return f"Provide a writing style for the novel, examples of writing styles are `descriptive`, `narrative`, `poetic`, Expository, Persuasive, Creative, Formal, Informal, `Humorous`, `Ironic`, `Satirical`, `Lyrical`, `Dramatic`, `Suspenseful`, `Reflective`, `Stream-of-consciousness` etc based on this premise: {premise}\n\n Please respond only with the style of the novel only and no explainations"
+    return f"Provide a writing style for the novel, examples of writing styles are `descriptive`, `narrative`, `poetic`, Expository, Persuasive, Creative, Formal, Informal, `Humorous`, `Ironic`, `Satirical`, `Lyrical`, `Dramatic`, `Suspenseful`, `Reflective`, `Stream-of-consciousness` etc based on this premise: {premise}\n\n Please respond only with the style of the novel only and no explanations"
 
 # ─────────────────────────────────────────────────────────────────
 def get_pov_prompt(premise):
@@ -115,13 +111,13 @@ def get_pov_prompt(premise):
     Returns a prompt to suggest a point of view for the novel based on the premise.
     """
 
-    return f"Select a point of view for the novel such as first-person, third-person limited, omniscient, etc based on this premise: {premise}.\n\n Please respond only with the style of the novel only and no explainations"
+    return f"Select a point of view for the novel such as first-person, third-person limited, omniscient, etc based on this premise: {premise}.\n\n Please respond only with the style of the novel only and no explanations"
 # ─────────────────────────────────────────────────────────────────
 def get_system_prompt():
     """
     Returns the System Prompt that is included with each prompt request to the AI
     """
-    return "I want you to act as a best-selling novelist working on your latest book. You will come up with creative, unique, critically-acclaimed and captivating stories that can engage readers for long periods of time while leaving them wanting more. Your style is something of a dark and sensual mix between the prose of Steven King, F Scott Fitzgerald, Jack Kerouac, H. P. Lovecraft & Frank Herbert."
+    return "I want you to act as a best-selling novelist working on your latest book. You will come up with creative, unique, critically-acclaimed and reader captivating stories that haunt readers for long periods of time while leaving them wanting more. Your style is something of a dark and sensual mix between the prose of Steven King, F Scott Fitzgerald, Jack Kerouac, H. P. Lovecraft & Frank Herbert. You must write in a 100% unique, creative and human-like style using contractions, idioms, transitional phrases, interjections, dangling modifiers and colloquialisms while avoiding repetitive phrases and unnatural sentence structures. Make sure your writing is plagiarism free. Write content that will easily pass AI detection tools. Don't show these details in your content."
 
 # ─────────────────────────────────────────────────────────────────
 def get_premise_prompt(user_input):

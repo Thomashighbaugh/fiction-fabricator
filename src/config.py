@@ -4,7 +4,7 @@ from src.prompts import (
     get_style_prompt,
     get_pov_prompt,
 )
-from src.openaiconnection import call_g4f_api
+from src.llmconnection import call_g4f_api
 
 
 def input_premise():

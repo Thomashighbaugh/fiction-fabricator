@@ -8,7 +8,7 @@ The other options that exist either did not allow for interventiuon in the proce
 
 ## GPT4Free Support
 
-This project was built to handle the openai API so that other people with money to burn at those obnoxious prices can freely do so if they desire and because that API is something of an industry standard. `But I am totally broke and cannot afford that!` So I have included an extra line of code in the `src/openaiconnection.py` file so that the API calls actually go through gpt4free instead.
+This project was built to handle the openai API so that other people with money to burn at those obnoxious prices can freely do so if they desire and because that API is something of an industry standard. `But I am totally broke and cannot afford that!` So I have included an extra line of code in the `src/llmconnection.py` file so that the API calls actually go through gpt4free instead.
 
 In fact, the model I am using is not available via openai's API because the mainline GPTs are too fickle about jailbreaking to use effectively for more adult themes that sell as Amazon kindle books like hotcakes compared to boring discussions of systems thinking or 20 page essays about narcissistic injury and narcissistic rage. I wonder why...
 

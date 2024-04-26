@@ -1,4 +1,4 @@
-from src.openaiconnection import call_g4f_api
+from src.llmconnection import call_g4f_api
 from src.prompts import get_title_prompt
 
 

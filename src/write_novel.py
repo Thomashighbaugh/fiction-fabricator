@@ -84,10 +84,11 @@ def write_novel():
     chapters = generate_chapters(updated_synopsis, genre, tone, style, pov, premise)
     for chapter_title, beats in chapters.items():
         chapter_content = ""
+        chapter_summary = chapters["summary"]
         for beat in beats:
-            write_prose(beat, genre, tone, pov, characters, style, premise)
+            write_prose(beat, chapter_summary, genre, tone, pov, characters, style, premise, updated_synopsis)
             print_and_edit_beat(chapter_title, beat, "expanded_content")
-            rewrite_prose(beat, genre, tone, pov, characters, style)  # Call the new function
+            rewrite_prose(beat, chapter_summary, genre, tone, pov, characters, style, premise, updated_synopsis)
             print_and_edit_beat(chapter_title, beat, "rewritten_content")
             chapter_content += f"\n\n{beat['rewritten_content']}"  # Use the rewritten content
         print(f"Chapter: {chapter_title}\n{chapter_content}")

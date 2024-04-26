@@ -1,3 +1,2 @@
-google.generativeai
 g4f
 sqlalchemy
