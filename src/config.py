@@ -5,7 +5,26 @@ from src.prompts import (
     get_pov_prompt,
 )
 from src.llmconnection import call_g4f_api
+def edit_config_variables(book_data):
+    """
+    Allows the user to edit the config variables (genre, tone, style, pov) stored in book_data.
+    """
+    while True:
+        print("\nCurrent configuration:")
+        for key, value in book_data.items():
+            if key in ["genre", "tone", "style", "pov"]:
+                print(f"{key}: {value}")
 
+        choice = input("\nEnter the variable to edit (genre, tone, style, pov) or 'done': ")
+        if choice.lower() == "done":
+            break
+
+        if choice.lower() in book_data:
+            new_value = input(f"Enter new value for {choice}: ")
+            book_data[choice.lower()] = new_value
+            print(f"{choice} updated.")
+        else:
+            print("Invalid variable name. Please try again.")
 
 def input_premise():
     """
@@ -113,3 +132,4 @@ def select_pov(premise):
         response = call_g4f_api(prompt)
         pov = response
     return pov
+

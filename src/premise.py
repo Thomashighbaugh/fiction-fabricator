@@ -10,8 +10,12 @@ def generate_premises():
     response = call_g4f_api(prompt)
 
     premises = response.split('\n')  # Assuming each premise is on a separate line
+
+    # Remove number lines and empty lines
+    premises = [line.strip() for line in premises if line.strip() and not line.startswith(('(', ')'))]
+
     print("Potential Novel Premises:")
-    for premise in enumerate(premises, 1):
-        print(f"{premise}")
+    for premise in premises:
+        print(premise)
 
     print("\nPlease copy and paste your chosen premise into the next prompt.")
