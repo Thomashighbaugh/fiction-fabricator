@@ -48,9 +48,14 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
         chapter_summary = call_g4f_api(chapter_summary_prompt)
 
         beats = generate_beats(chapter_summary)
+        print(f"\nChapter: {title}")
+        print(f"Summary: {chapter_summary}")
+        print(f"Beats: {beats}")
+
+        beats = customize_beats(beats)
         chapters_json[title] = {"summary": chapter_summary, "beats": beats}
     # Allow modification after generation
-    chapters_json = modify_chapter_summaries(chapters_json)
+        chapters_json = modify_chapter_summaries(chapters_json)
 
     return chapters_json
 

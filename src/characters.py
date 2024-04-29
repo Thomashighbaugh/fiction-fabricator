@@ -7,7 +7,7 @@ from src.prompts import get_character_prompt
 def generate_characters(updated_synopsis, genre, tone, style, pov, premise):
     """
     Generates and manages characters for the novel with an interactive list,
-    including character details, traits, and relationships.
+    including character details and traits.
     """
 
     prompt = get_character_prompt(updated_synopsis, genre, tone, style, pov, premise)
@@ -27,15 +27,21 @@ def generate_characters(updated_synopsis, genre, tone, style, pov, premise):
             characters_dict[name.strip()] = {
                 "details": details.strip(),
                 "traits": [],  # Initialize empty list for traits
-                "relationships": {},  # Initialize empty dictionary for relationships
             }
+
+    return characters_dict
+
+def manage_characters(characters_dict, updated_synopsis, genre, tone, style, pov, premise):
+    """
+    Provides an interactive menu for adding, editing, and deleting characters.
+    """
 
     while True:
         print("\nCharacters:")
         for i, name in enumerate(characters_dict.keys()):
             print(f"{i+1}. {name}")
 
-        choice = input("\nChoose action (add, edit, relationships, delete, done): ")
+        choice = input("\nChoose action (add, edit, delete, generate, done): ")
 
         if choice.lower() == 'done':
             break
@@ -43,7 +49,7 @@ def generate_characters(updated_synopsis, genre, tone, style, pov, premise):
         elif choice.lower() == 'add':
             new_name = input("Enter new character name: ")
             new_details = input("Enter details for new character: ")
-            characters_dict[new_name] = {"details": new_details, "traits": [], "relationships": {}}
+            characters_dict[new_name] = {"details": new_details, "traits": []}
 
         elif choice.lower() == 'edit':
             try:
@@ -54,24 +60,6 @@ def generate_characters(updated_synopsis, genre, tone, style, pov, premise):
             except (ValueError, IndexError):
                 print("Invalid character number. Please try again.")
 
-        elif choice.lower() == 'relationships':
-            while True:
-                character1 = input("Enter first character's name (or 'back'): ")
-                if character1.lower() == 'back':
-                    break
-                if character1 not in characters_dict:
-                    print("Character not found. Please try again.")
-                    continue
-
-                character2 = input("Enter second character's name: ")
-                if character2 not in characters_dict:
-                    print("Character not found. Please try again.")
-                    continue
-
-                relationship = input(f"Describe relationship between {character1} and {character2}: ")
-                characters_dict[character1]["relationships"][character2] = relationship
-                characters_dict[character2]["relationships"][character1] = relationship
-
         elif choice.lower() == 'delete':
             try:
                 delete_index = int(input("Enter number of character to delete: ")) - 1
@@ -79,6 +67,9 @@ def generate_characters(updated_synopsis, genre, tone, style, pov, premise):
                 del characters_dict[name_to_delete]
             except (ValueError, IndexError):
                 print("Invalid character number. Please try again.")
+
+        elif choice.lower() == 'generate':
+            characters_dict.update(generate_characters(updated_synopsis, genre, tone, style, pov, premise))
 
         else:
             print("Invalid choice. Please try again.")
