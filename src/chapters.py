@@ -3,8 +3,20 @@ import json
 from src.llmconnection import call_g4f_api
 from src.prompts import get_beats_prompt, get_chapter_prompt, get_chapter_summary_prompt
 
+
 def modify_chapter_summaries(chapters_json):
-    """Allows users to view and modify chapter summaries."""
+    """
+    Allows users to view and modify chapter summaries.
+
+    Loops until user enters 'done' to indicate they are finished.
+    For each iteration, user is prompted to enter a chapter number.
+    If the number is valid, the corresponding chapter's summary is displayed,
+    and the user is given the opportunity to enter a new summary.
+    The new summary is saved to the JSON object and the loop continues.
+    If the number is invalid, an error message is displayed and the loop continues.
+
+    Returns the modified JSON object.
+    """
 
     while True:
         print("\nChapters:")
@@ -32,6 +44,7 @@ def modify_chapter_summaries(chapters_json):
 
     return chapters_json
 
+
 def generate_chapters(synopsis, genre, style, tone, pov, premise):
     """
     Generates chapter outlines and action beats in JSON format.
@@ -39,22 +52,29 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
 
     prompt = get_chapter_prompt(synopsis, genre, style, tone, pov, premise)
     response = call_g4f_api(prompt)
-    chapter_titles = response
+    chapter_titles = response.split('\n')  # Assuming each title is on a separate line
 
     chapters_json = {}
     for title in chapter_titles:
+        # Remove any empty titles
+        if not title.strip():
+            continue
+
         # Generate or write chapter summary
-        chapter_summary_prompt =get_chapter_summary_prompt(title, synopsis)
+        chapter_summary_prompt = get_chapter_summary_prompt(title, synopsis)
         chapter_summary = call_g4f_api(chapter_summary_prompt)
 
         beats = generate_beats(chapter_summary)
-        print(f"\nChapter: {title}")
-        print(f"Summary: {chapter_summary}")
-        print(f"Beats: {beats}")
 
-        beats = customize_beats(beats)
+        print(f"\nChapter: {title}")  # Print the chapter title
+        print("-" * 20)  # Add a separator
+
+        for i, beat in enumerate(beats):
+            print(f"{i+1}. {beat['action_point']}")
+
+        chapters_json = customize_beats(chapters_json)
         chapters_json[title] = {"summary": chapter_summary, "beats": beats}
-    # Allow modification after generation
+        # Allow modification after generation
         chapters_json = modify_chapter_summaries(chapters_json)
 
     return chapters_json
@@ -64,17 +84,20 @@ def generate_beats(chapter_summary):
     """
     Generates a list of action beats for a given chapter summary.
     """
-
     prompt = get_beats_prompt(chapter_summary)
     response = call_g4f_api(prompt)
-    beats_text = response
 
+    # Split the response using the "###" delimiter
+    beats_text = response.split("###")
+
+    # Parse and clean the beats
     beats = []
-    for beat in beats_text:
-        beats.append({"action_point": beat})
+    for beat_text in beats_text:
+        beat_text = beat_text.strip()
+        if beat_text:
+            beats.append({"action_point": beat_text})
 
     return beats
-
 
 # ─────────────────────────────────────────────────────────────────
 # chapters.py functions (for user interaction)

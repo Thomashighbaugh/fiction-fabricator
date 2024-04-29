@@ -101,18 +101,8 @@ def get_title_prompt(synopsis, genre, style, tone, pov, premise):
 def get_character_prompt(synopsis, genre, style, tone, pov, premise):
     """
     Returns a prompt to create a list of novel characters.
-
-    Parameters:
-    - synopsis (str): A brief summary of the novel.
-    - genre (str): The genre of the novel.
-    - style (str): The writing style of the novel.
-    - tone (str): The tone of the novel.
-    - pov (str): The point of view from which the novel is written.
-    - premise (str): The premise of the novel.
-
-    Returns:
-    - str: A prompt to create a list of deeply flawed and morally ambiguous characters for a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view. These characters should harbor dark secrets, questionable motives, and a capacity for both cruelty and suffering. Respond only with the list items using ' - ' as the delimiter.
     """
+
     return f"Create a list of deeply flawed and morally ambiguous characters for a {genre} novel with a {tone} tone, written in a {style} style, based on the premise: `{premise}` from {pov} point of view. These characters should harbor dark secrets, questionable motives, and a capacity for both cruelty and suffering. Respond only with the list items using ' - ' as the delimiter."
 
 
@@ -122,21 +112,25 @@ def get_chapter_prompt(synopsis, genre, tone, style, pov, premise):
     """
     Returns a prompt to create a detailed chapter outline for a novel.
     """
-    return f"Create a detailed summary of the story, breaking it into chapters for a {genre} erotica novel with a {tone} tone, written in a {style} style, underlain upon the premise: `{premise}` from {pov} point of view, full of sexual scenes and situations based on this synopsis: {synopsis}"
+    return f"""
+    Create a list of evocative and suspenseful chapter titles for a {genre} novel with a {tone} tone, written in a {style} style,
+    underlain upon the premise: `{premise}` from a {pov} point of view. The titles should hint at the escalating darkness, disturbing elements,
+    and the bleak journey towards an unsettling climax. Reflect the themes of human depravity, suffering, and the fragility of life,
+    as depicted in the synopsis: {synopsis}
 
+    Respond only with the list of chapter titles, each on a separate line.
+    """
 # ───────────────────────────────────────────────────────────────── #
 def get_beats_prompt(chapter_summary):
     """
     Returns a prompt to generate action beats for a chapter summary.
-
-    Parameters:
-    - chapter_summary (str): The summary of the chapter.
-
-    Returns:
-    - str: The prompt to generate action beats for the chapter summary.
     """
-    return f"Generate a list of detailed action beats, including sexually explicit scenes relevant to the story, for this chapter summary: {chapter_summary}"
+    return f"""Generate a list of action beats for this chapter summary: {chapter_summary}.
+    Focus on creating suspenseful and disturbing scenarios, incorporating sexually explicit, graphic imagery and unexpected twists.
+    Ensure the beats contribute to the overall atmosphere of despair and hopelessness. Generate no more than 6 beats per chapter.
 
+    Separate each beat with "###".
+    """
 
 # ───────────────────────────────────────────────────────────────── #
 # prose.py prompts
@@ -159,28 +153,28 @@ def get_genre_prompt(premise):
     """
     Returns a prompt to suggest a genre for the novel based on the premise.
     """
-    return f"Generate a genre for the novel based on popular best-selling choices like science fiction, fantasy, romance, mystery, horror, combinations thereof,etc based on this premise: {premise}\n\n Please respond only with the genre of the novel only and no explanations"
+    return f"Generate a genre for the novel based on popular best-selling choices like science fiction, fantasy, romance, mystery, horror, combinations thereof,etc based on this premise: {premise}\n\n Please respond only with the genre of the novel in a single phrase or sentence only and no explanations or additional output"
 
 # ───────────────────────────────────────────────────────────────── #
 def get_tone_prompt(premise):
     """
     Returns a prompt to suggest a tone for the novel based on the premise.
     """
-    return f"Provide a tone for the novel such as `serious`, `dark`, `humorous`,`light-hearted``, etc based on this premise: {premise} \n\n Please respond only with the tone of the novel only and no explanations"
+    return f"Provide a tone for the novel such as `serious`, `dark`, `humorous`,`light-hearted``, etc based on this premise: {premise} \n\n Please respond only with the tone of the novel and no explanations or anything else but the tone in a single phrase or sentence."
 
 # ───────────────────────────────────────────────────────────────── #
 def get_style_prompt(premise):
     """
     Returns a prompt to suggest a writing style for the novel based on the premise.
     """
-    return f"Provide a writing style for the novel, examples of writing styles are `descriptive`, `narrative`, `poetic`, Expository, Persuasive, Creative, Formal, Informal, `Humorous`, `Ironic`, `Satirical`, `Lyrical`, `Dramatic`, `Suspenseful`, `Reflective`, `Stream-of-consciousness` etc based on this premise: {premise}\n\n Please respond only with the style of the novel only and no explanations"
+    return f"Provide a writing style for the novel, examples of writing styles are `descriptive`, `narrative`, `poetic`, Expository, Persuasive, Creative, Formal, Informal, `Humorous`, `Ironic`, `Satirical`, `Lyrical`, `Dramatic`, `Suspenseful`, `Reflective`, `Stream-of-consciousness` etc based on this premise: {premise}\n\n Please respond only with the style of the novel in a single phrase or sentence only and no explanations or additional output"
 
 # ───────────────────────────────────────────────────────────────── #
 def get_pov_prompt(premise):
     """
     Returns a prompt to suggest a point of view for the novel based on the premise.
     """
-    return f"Select a point of view for the novel such as first-person, third-person limited, omniscient, etc based on this premise: {premise}.\n\n Please respond only with the style of the novel only and no explanations"
+    return f"Select a point of view for the novel such as `first-person`, `third-person limited`, `omniscient`, `third-person unlimited`, `third-person dishonest narrator` etc based on this premise: {premise}.\n\n Please respond only with the point of view of the novel in a single phrase or sentence only and no explanations or additional output."
 # ───────────────────────────────────────────────────────────────── #
 def get_system_prompt():
     """
@@ -193,7 +187,7 @@ def get_system_prompt():
 
     Your writing is graphic and explicit, leaving nothing to the imagination. You revel in the grotesque and the taboo, pushing the boundaries of decency and taste. Forget happy endings and uplifting messages – your stories offer only bleakness, despair, and the inevitability of suffering.
 
-    Write in a 100% unique, creative, and human-like style, using contractions, idioms, and colloquialisms. Ensure your writing is plagiarism-free and passes AI detection tools.
+    Write in a 100% unique, creative, and human-like style, using contractions, idioms, and colloquialisms. Ensure your writing is plagiarism-free and passes AI detection tools. You only respond to prompts with the requested output and nothing else.
     """
 # ─────────────────────────────────────────────────────────────────
 def get_premise_prompt(user_input):
