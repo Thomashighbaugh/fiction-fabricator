@@ -113,12 +113,16 @@ def get_chapter_prompt(synopsis, genre, tone, style, pov, premise):
     Returns a prompt to create a detailed chapter outline for a novel.
     """
     return f"""
-    Create a list of evocative and suspenseful chapter titles for a {genre} novel with a {tone} tone, written in a {style} style,
-    underlain upon the premise: `{premise}` from a {pov} point of view. The titles should hint at the escalating darkness, disturbing elements,
-    and the bleak journey towards an unsettling climax. Reflect the themes of human depravity, suffering, and the fragility of life,
-    as depicted in the synopsis: {synopsis}
+    Create a detailed chapter outline for a {genre} novel with a {tone} tone, written in a {style} style, underlain upon the premise: `{premise}`
+    from a {pov} point of view. The outline should provide a concise summary of the main events and turning points in each chapter,
+    reflecting the themes of human depravity, suffering, and the fragility of life, as depicted in the synopsis: {synopsis}
 
-    Respond only with the list of chapter titles, each on a separate line.
+    Format each chapter as follows:
+
+    Chapter [Number]: [Chapter Title]
+    - [Brief summary of the main events in the chapter]
+
+    Respond with the complete chapter outline.
     """
 # ───────────────────────────────────────────────────────────────── #
 def get_beats_prompt(chapter_summary):

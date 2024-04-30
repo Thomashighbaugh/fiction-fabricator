@@ -49,8 +49,8 @@ def save_book(book_data):
         style=book_data["style"],
         pov=book_data["pov"],
         premise=book_data["premise"],
-        characters=book_data["characters"],
-        chapters=book_data["chapters"],
+        characters=json.dumps(book_data["characters"]),  # Convert to JSON
+        chapters=json.dumps(book_data["chapters"]),     # Convert to JSON
     )
 
     session.add(book)
@@ -64,8 +64,8 @@ def load_book(book_id):
     session = Session()
 
     book = session.query(Book).get(book_id)
-    book.characters = json.loads(book.characters)
-    book.chapters = json.loads(book.chapters)
+    book.characters = json.loads(book.characters)  # Convert back to dictionary
+    book.chapters = json.loads(book.chapters)      # Convert back to dictionary
     session.close()
     return book
 

@@ -1,4 +1,4 @@
-from src.chapters import generate_chapters
+from src.chapters import generate_beats, generate_chapters
 from src.characters import generate_characters
 from src.config import (
     input_premise,
@@ -6,7 +6,7 @@ from src.config import (
     select_pov,
     select_style,
     select_tone,
-    edit_config_variables,  # Import the new function
+    edit_config_variables,
 )
 from src.prose import (
     print_and_edit_beat,
@@ -29,7 +29,7 @@ def write_novel():
     create_database_if_not_exists("books.db")
     # Prompt for new/load project
     choice = input("New project (n) or load saved project (l)? ")
-    if choice.lower() == 'l':
+    if choice.lower() == "l":
         # Load saved project
         saved_projects = get_saved_projects()
         if saved_projects:
@@ -85,30 +85,71 @@ def write_novel():
     # Allow editing of config variables
     edit_config_variables(book_data)
 
-    synopsis = generate_synopsis(book_data["genre"], book_data["style"], book_data["tone"], book_data["pov"], premise)
+    synopsis = generate_synopsis(
+        book_data["genre"], book_data["style"], book_data["tone"], book_data["pov"], premise
+    )
     updated_synopsis = critique_synopsis(synopsis)
     print(f"The synopsis of the novel is: {updated_synopsis}")
     book_data["synopsis"] = updated_synopsis
 
-    book_title = generate_title(updated_synopsis, book_data["genre"], book_data["style"], book_data["tone"], book_data["pov"], premise)
+    book_title = generate_title(
+        updated_synopsis,
+        book_data["genre"],
+        book_data["style"],
+        book_data["tone"],
+        book_data["pov"],
+        premise,
+    )
     print(f"The title of the novel is: {book_title}")
     book_data["title"] = book_title
 
-    characters = generate_characters(updated_synopsis, book_data["genre"], book_data["style"], book_data["tone"], book_data["pov"], premise)
+    characters = generate_characters(
+        updated_synopsis, book_data["genre"], book_data["style"], book_data["tone"], book_data["pov"], premise
+    )
     book_data["characters"] = characters
 
-    chapters = generate_chapters(updated_synopsis, book_data["genre"], book_data["tone"], book_data["style"], book_data["pov"], premise)
-    for chapter_title, beats in chapters.items():
+    chapters = generate_chapters(
+        updated_synopsis, book_data["genre"], book_data["tone"], book_data["style"], book_data["pov"], premise
+    )
+
+    # Display the generated chapter outline
+    print("Generated Chapter Outline:")
+    for chapter_num, chapter_data in chapters.items():
+        print(f"Chapter {chapter_num}: {chapter_data['title']}")
+        print(f"  - {chapter_data['summary']}")
+
+        # Process beats for each chapter
         chapter_content = ""
-        chapter_summary = chapters["summary"]
-        for beat in beats:
-            write_prose(beat, chapter_summary, book_data["genre"], book_data["tone"], book_data["pov"], characters, book_data["style"], premise, updated_synopsis)
-            print_and_edit_beat(chapter_title, beat, "expanded_content")
-            rewrite_prose(beat, chapter_summary, book_data["genre"], book_data["tone"], book_data["pov"], characters, book_data["style"], premise, updated_synopsis)
-            print_and_edit_beat(chapter_title, beat, "rewritten_content")
+        chapter_summary = chapter_data["summary"]
+        for beat in generate_beats(chapter_summary):
+            beat = write_prose(
+                beat,
+                chapter_summary,
+                book_data["genre"],
+                book_data["tone"],
+                book_data["pov"],
+                characters,
+                book_data["style"],
+                premise,
+                updated_synopsis,
+            )
+            print_and_edit_beat(chapter_data["title"], beat, "expanded_content")
+            beat = rewrite_prose(
+                beat,
+                chapter_summary,
+                book_data["genre"],
+                book_data["tone"],
+                book_data["pov"],
+                characters,
+                book_data["style"],
+                premise,
+                updated_synopsis,
+            )
+            print_and_edit_beat(chapter_data["title"], beat, "rewritten_content")
             chapter_content += f"\n\n{beat['rewritten_content']}"  # Use the rewritten content
-        print(f"Chapter: {chapter_title}\n{chapter_content}")
-        save_chapter_as_markdown(chapter_title, chapter_content, book_title)
+        print(f"Chapter: {chapter_data['title']}\n{chapter_content}")
+        save_chapter_as_markdown(chapter_data["title"], chapter_content, book_title)
+
     book_data["chapters"] = chapters
 
     # Save project data to the database

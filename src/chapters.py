@@ -44,38 +44,34 @@ def modify_chapter_summaries(chapters_json):
 
     return chapters_json
 
-
 def generate_chapters(synopsis, genre, style, tone, pov, premise):
     """
-    Generates chapter outlines and action beats in JSON format.
+    Generates chapter outlines and stores them in JSON format.
     """
 
     prompt = get_chapter_prompt(synopsis, genre, style, tone, pov, premise)
     response = call_g4f_api(prompt)
-    chapter_titles = response.split('\n')  # Assuming each title is on a separate line
+
+    # Split the response into chapters
+    chapters_text = response.split("Chapter ")
 
     chapters_json = {}
-    for title in chapter_titles:
-        # Remove any empty titles
-        if not title.strip():
+    for chapter_text in chapters_text:
+        if not chapter_text.strip():
             continue
 
-        # Generate or write chapter summary
-        chapter_summary_prompt = get_chapter_summary_prompt(title, synopsis)
-        chapter_summary = call_g4f_api(chapter_summary_prompt)
+        # Extract chapter number and title
+        chapter_lines = chapter_text.strip().split("\n")
+        chapter_number, chapter_title = chapter_lines[0].split(":")
+        chapter_number = int(chapter_number)
 
-        beats = generate_beats(chapter_summary)
+        # Extract chapter summary
+        chapter_summary = "\n".join(chapter_lines[1:])
 
-        print(f"\nChapter: {title}")  # Print the chapter title
-        print("-" * 20)  # Add a separator
-
-        for i, beat in enumerate(beats):
-            print(f"{i+1}. {beat['action_point']}")
-
-        chapters_json = customize_beats(chapters_json)
-        chapters_json[title] = {"summary": chapter_summary, "beats": beats}
-        # Allow modification after generation
-        chapters_json = modify_chapter_summaries(chapters_json)
+        chapters_json[chapter_number] = {
+            "title": chapter_title.strip(),
+            "summary": chapter_summary.strip(),
+        }
 
     return chapters_json
 
