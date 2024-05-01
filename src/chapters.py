@@ -3,7 +3,7 @@ import json
 from src.llmconnection import call_g4f_api
 from src.prompts import get_beats_prompt, get_chapter_prompt, get_chapter_summary_prompt
 
-
+# ───────────────────────────────────────────────────────────────── #
 def modify_chapter_summaries(chapters_json):
     """
     Allows users to view and modify chapter summaries.
@@ -43,7 +43,7 @@ def modify_chapter_summaries(chapters_json):
             print("Invalid input. Please enter a number or 'done'.")
 
     return chapters_json
-
+# ───────────────────────────────────────────────────────────────── #
 def generate_chapters(synopsis, genre, style, tone, pov, premise):
     """
     Generates chapter outlines and stores them in JSON format.
@@ -75,7 +75,7 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
 
     return chapters_json
 
-
+# ───────────────────────────────────────────────────────────────── #
 def generate_beats(chapter_summary):
     """
     Generates a list of action beats for a given chapter summary.
@@ -95,7 +95,7 @@ def generate_beats(chapter_summary):
 
     return beats
 
-# ─────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────── #
 # chapters.py functions (for user interaction)
 def reorder_chapters(chapters_json):
     """
@@ -127,7 +127,7 @@ def reorder_chapters(chapters_json):
 
     return reordered_chapters_json
 
-
+# ───────────────────────────────────────────────────────────────── #
 def merge_chapters(chapters_json):
     """
     Allows users to merge chapters.
@@ -164,23 +164,21 @@ def merge_chapters(chapters_json):
 
     return chapters_json
 
-
+# ───────────────────────────────────────────────────────────────── #
 def customize_beats(chapters_json):
     """
     Allows users to add, remove, or modify beats within chapters.
     """
 
-    chapter_titles = list(chapters_json.keys())
     print("Current chapters:")
-    for i, title in enumerate(chapter_titles, 1):
-        print(f"{i}. {title}")
+    for chapter_num, chapter_data in chapters_json.items():
+        print(f"{chapter_num}. {chapter_data['title']}")
 
     while True:
         try:
-            chapter_index = int(input("Enter the number of the chapter to customize beats: ")) - 1
-            if 0 <= chapter_index < len(chapter_titles):
-                chapter_title = chapter_titles[chapter_index]
-                beats = chapters_json[chapter_title]
+            chapter_num = int(input("Enter the number of the chapter to customize beats: "))
+            if chapter_num in chapters_json:
+                beats = chapters_json[chapter_num]["beats"]
 
                 while True:
                     print("\nBeats for this chapter:")
@@ -208,7 +206,7 @@ def customize_beats(chapters_json):
                     else:
                         print("Invalid choice. Please try again.")
 
-                chapters_json[chapter_title] = beats  # Update beats in chapters_json
+                chapters_json[chapter_num]["beats"] = beats  # Update beats in chapters_json
                 break
             else:
                 print("Invalid chapter index. Please try again.")
@@ -216,3 +214,4 @@ def customize_beats(chapters_json):
             print("Invalid input. Please enter numbers.")
 
     return chapters_json
+# ───────────────────────────────────────────────────────────────── #
