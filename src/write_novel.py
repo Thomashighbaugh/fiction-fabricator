@@ -1,4 +1,4 @@
-from src.chapters import generate_beats, generate_chapters
+from src.chapters import generate_beats, generate_chapters, customize_beats
 from src.characters import generate_characters
 from src.config import (
     input_premise,
@@ -94,8 +94,7 @@ def write_novel():
 
     book_title = generate_title(
         updated_synopsis,
-        book_data["genre"],
-        book_data["style"],
+        book_data["genre"], book_data["style"],
         book_data["tone"],
         book_data["pov"],
         premise,
@@ -104,13 +103,26 @@ def write_novel():
     book_data["title"] = book_title
 
     characters = generate_characters(
-        updated_synopsis, book_data["genre"], book_data["style"], book_data["tone"], book_data["pov"], premise
+        updated_synopsis,
+        book_data["genre"],
+        book_data["style"],
+        book_data["tone"],
+        book_data["pov"],
+        premise,
     )
     book_data["characters"] = characters
 
     chapters = generate_chapters(
-        updated_synopsis, book_data["genre"], book_data["tone"], book_data["style"], book_data["pov"], premise
+        updated_synopsis,
+        book_data["genre"],
+        book_data["tone"],
+        book_data["style"],
+        book_data["pov"],
+        premise,
     )
+
+    # Allow customization of chapter outlines
+    chapters = customize_beats(chapters)
 
     # Display the generated chapter outline
     print("Generated Chapter Outline:")

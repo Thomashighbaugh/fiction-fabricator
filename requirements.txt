@@ -1,2 +1,2 @@
-g4f
+gradio_client
 sqlalchemy
