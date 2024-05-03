@@ -1,7 +1,7 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey  # Add ForeignKey here
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 import json
 Base = declarative_base()
 
@@ -18,6 +18,17 @@ class Book(Base):
     premise = Column(Text)
     characters = Column(Text)
     chapters = Column(Text)
+
+class Chapter(Base):
+    __tablename__ = "chapters"
+
+    id = Column(Integer, primary_key=True)
+    book_id = Column(Integer, ForeignKey("books.id"))  # Foreign key to Book table
+    title = Column(String)
+    summary = Column(Text)
+    content = Column(Text)  # Store the full chapter content
+
+    book = relationship("Book", backref="chapters")  # Relationship for easier access
 
 
 def create_database_if_not_exists(database_name):
@@ -54,6 +65,19 @@ def save_book(book_data):
     )
 
     session.add(book)
+
+    # Create Chapter objects and link them to the Book
+    for chapter_num, chapter_data in book_data["chapters"].items():
+        chapter = Chapter(
+            title=chapter_data["title"],
+            summary=chapter_data["summary"],
+            content="",  # You might want to store the final content here
+            book=book,  # Associate the chapter with the book
+        )
+        session.add(chapter)
+
+    session.commit()
+    session.close()
     session.commit()
     session.close()
 
@@ -77,3 +101,5 @@ def get_saved_projects():
     projects = session.query(Book.id, Book.title).all()
     session.close()
     return projects
+
+

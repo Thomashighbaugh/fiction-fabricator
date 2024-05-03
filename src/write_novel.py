@@ -1,4 +1,4 @@
-from src.chapters import generate_beats, generate_chapters, customize_beats
+from src.chapters import generate_and_modify_chapter_summaries, generate_beats, generate_chapters, customize_beats
 from src.characters import generate_characters
 from src.config import (
     input_premise,
@@ -120,6 +120,8 @@ def write_novel():
         book_data["pov"],
         premise,
     )
+
+    chapters = generate_and_modify_chapter_summaries(chapters, updated_synopsis)
 
     # Allow customization of chapter outlines
     chapters = customize_beats(chapters)

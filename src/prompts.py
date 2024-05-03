@@ -210,3 +210,17 @@ def get_premise_prompt(user_input):
     )
 
 # ───────────────────────────────────────────────────────────────── #
+
+def get_chapter_summary_prompt(title, synopsis):
+    """
+    Generate a prompt for creating a brief but detailed summary for a chapter.
+
+    Args:
+        title (str): The title of the chapter.
+        synopsis (str): The synopsis of the book.
+
+    Returns:
+        str: The generated prompt.
+
+    """
+    return f"Generate a brief but detailed summary for a chapter titled '{title}' based on the synopsis: {synopsis}"

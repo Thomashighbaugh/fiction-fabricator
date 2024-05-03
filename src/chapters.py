@@ -215,3 +215,40 @@ def customize_beats(chapters_json):
 
     return chapters_json
 # ───────────────────────────────────────────────────────────────── #
+def generate_and_modify_chapter_summaries(chapters_json, synopsis):
+    """
+    Generates chapter summaries using AI and allows user modifications.
+
+    Args:
+        chapters_json (dict): Existing chapter data with titles.
+        synopsis (str): The synopsis of the novel.
+
+    Returns:
+        dict: Updated chapters_json with summaries and user edits.
+    """
+
+    for chapter_num, chapter_data in chapters_json.items():
+        title = chapter_data["title"]
+        prompt = get_chapter_summary_prompt(title, synopsis)
+        summary = call_g4f_api(prompt)
+
+        print(f"\nAI-Generated Summary for Chapter {chapter_num}: {title}\n")
+        print(summary)
+        choice = input("\nAccept summary (a), edit (e), or regenerate (r)? ")
+
+        if choice.lower() == 'e':
+            new_summary = input("Enter your edited summary: ")
+            chapters_json[chapter_num]["summary"] = new_summary
+        elif choice.lower() == 'r':
+            # Regenerate and repeat the process
+            new_summary = call_g4f_api(prompt)
+            print(f"\nNew AI-Generated Summary:\n{new_summary}")
+            choice = input("\nAccept summary (a) or edit (e)? ")
+            if choice.lower() == 'e':
+                new_summary = input("Enter your edited summary: ")
+            chapters_json[chapter_num]["summary"] = new_summary
+        else:
+            chapters_json[chapter_num]["summary"] = summary
+
+    return chapters_json
+
