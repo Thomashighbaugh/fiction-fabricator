@@ -155,7 +155,6 @@ def write_novel():
                 book_data["genre"],
                 book_data["tone"],
                 book_data["pov"],
-                characters,
                 book_data["style"],
                 premise,
                 updated_synopsis,

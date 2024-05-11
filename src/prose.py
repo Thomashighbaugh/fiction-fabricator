@@ -30,9 +30,9 @@ def write_prose(beat, chapter_summary, genre, tone, pov, characters, style, prem
     beat["expanded_content"] = prose
     return beat
 
-def rewrite_prose(beat, chapter_summary, style, tone, genre, pov, premise, synopsis):
+def rewrite_prose(beat, chapter_summary, style, tone, genre, pov, premise, synopsis, chapter_title, book_title):
     """
-    Rewrite the given prose based on the provided parameters.
+    Rewrite the given prose based on the provided parameters and save to a Markdown file.
 
     Args:
         beat (dict): The action beat.
@@ -43,6 +43,8 @@ def rewrite_prose(beat, chapter_summary, style, tone, genre, pov, premise, synop
         pov (str): The point of view of the novel.
         premise (str): The premise of the novel.
         synopsis (str): The synopsis of the novel.
+        chapter_title (str): The title of the chapter.
+        book_title (str): The title of the book.
 
     Returns:
         dict: The updated beat dictionary with the rewritten content.
@@ -51,7 +53,38 @@ def rewrite_prose(beat, chapter_summary, style, tone, genre, pov, premise, synop
     response = call_g4f_api(prompt)
     rewritten_prose = response
     beat["rewritten_content"] = rewritten_prose
+
+    # Save the rewritten prose to a Markdown file
+    save_prose_to_markdown(rewritten_prose, chapter_title, book_title)
     return beat
+
+def save_prose_to_markdown(prose, chapter_title, book_title):
+    """
+    Saves the given prose to a Markdown file in the output directory.
+
+    Args:
+        prose (str): The prose content to be saved.
+        chapter_title (str): The title of the chapter.
+        book_title (str): The title of the book.
+
+    Returns:
+        None
+    """
+    output_dir = f"output/{book_title}/{chapter_title}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Replace spaces with underscores and remove special characters for the filename
+    filename = "".join(
+        char for char in "Beat_" + chapter_title if char.isalnum() or char in " "
+    ).replace(" ", "_")
+    filepath = f"{output_dir}/{filename}.md"
+
+    # Save the chapter content to the markdown file
+    with open(filepath, "w", encoding="utf-8") as file:
+        file.write(prose)
+
+    print(f"Chapter '{chapter_title}' beat saved as markdown file: {filepath}")
+
 def chapters_to_json(chapters):
     """
     Converts a dictionary of chapters to a JSON string.
