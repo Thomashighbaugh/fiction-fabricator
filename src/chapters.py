@@ -63,7 +63,7 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
         # Extract chapter number and title
         chapter_lines = chapter_text.strip().split("\n")
         chapter_number, chapter_title = chapter_lines[0].split(":")
-        chapter_number = int(chapter_number)
+        chapter_number = int(chapter_number)  # Convert chapter number to integer
 
         # Extract chapter summary
         chapter_summary = "\n".join(chapter_lines[1:])
@@ -178,14 +178,20 @@ def customize_beats(chapters_json):
         try:
             chapter_num = int(input("Enter the number of the chapter to customize beats: "))
             if chapter_num in chapters_json:
-                beats = chapters_json[chapter_num]["beats"]
+                chapter_data = chapters_json[chapter_num]
+                chapter_data.setdefault("beats", [])  # Initialize 'beats' if it doesn't exist
+                beats = chapter_data["beats"]
+
+                # Generate initial beats based on the chapter summary
+                new_beats = generate_beats(chapter_data['summary'])
+                beats.extend(new_beats)
 
                 while True:
                     print("\nBeats for this chapter:")
                     for i, beat in enumerate(beats, 1):
                         print(f"{i}. {beat['action_point']}")
 
-                    choice = input("Enter 'add', 'remove', 'modify', or 'done': ")
+                    choice = input("Enter 'add', 'remove', 'modify', 'done', or 'edit': ")
                     if choice.lower() == "done":
                         break
                     elif choice.lower() == "add":
@@ -203,6 +209,13 @@ def customize_beats(chapters_json):
                             beats[beat_index]["action_point"] = input("Enter the modified action point: ")
                         else:
                             print("Invalid beat index. Please try again.")
+                    elif choice.lower() == 'edit':
+                        for i, beat in enumerate(beats):
+                            print(f"Beat {i+1}: {beat['action_point']}")
+                            edit_choice = input("Edit this beat? (y/n): ")
+                            if edit_choice.lower() == 'y':
+                                new_action_point = input(f"Enter new action point for beat {i+1}: ")
+                                beat['action_point'] = new_action_point
                     else:
                         print("Invalid choice. Please try again.")
 
@@ -251,4 +264,3 @@ def generate_and_modify_chapter_summaries(chapters_json, synopsis):
             chapters_json[chapter_num]["summary"] = summary
 
     return chapters_json
-
