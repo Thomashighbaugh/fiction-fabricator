@@ -15,8 +15,8 @@ def call_g4f_api(prompt):
 
         # Call the API with the specified parameters
     response = api_instance.create(
-            provider=g4f.Provider.HuggingChat,
-            model="HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",  # Use the 'mixtral-8x22b' model, its new, its uncensored, and it's free.
+            # TODO: possibly add in a means of selecting other g4f models at the beginning of the program.
+            model="mistral-7b",  # Use the 'mixtral-8x22b' model, its new, its uncensored, and it's free.
             # TODO: Create interactive means of changing the system prompt
             messages=[{"role": "system", "content": get_system_prompt()},
                 {"role": "user", "content": prompt}],

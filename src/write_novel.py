@@ -120,6 +120,7 @@ def write_novel():
         book_data["pov"],
         premise,
     )
+    chapters = {int(k): v for k, v in chapters.items()}  # Ensure keys are integers
 
     chapters = generate_and_modify_chapter_summaries(chapters, updated_synopsis)
 
