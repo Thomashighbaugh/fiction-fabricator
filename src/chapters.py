@@ -63,7 +63,9 @@ def generate_chapters(synopsis, genre, style, tone, pov, premise):
         # Extract chapter number and title
         chapter_lines = chapter_text.strip().split("\n")
         chapter_number, chapter_title = chapter_lines[0].split(":")
-        chapter_number = int(chapter_number)  # Convert chapter number to integer
+
+        # Convert word-based chapter number to integer
+        chapter_number = word_to_int(chapter_number.strip())
 
         # Extract chapter summary
         chapter_summary = "\n".join(chapter_lines[1:])
@@ -170,61 +172,50 @@ def customize_beats(chapters_json):
     Allows users to add, remove, or modify beats within chapters.
     """
 
-    print("Current chapters:")
     for chapter_num, chapter_data in chapters_json.items():
-        print(f"{chapter_num}. {chapter_data['title']}")
+        print(f"\nChapter {chapter_num}: {chapter_data['title']}")
 
-    while True:
-        try:
-            chapter_num = int(input("Enter the number of the chapter to customize beats: "))
-            if chapter_num in chapters_json:
-                chapter_data = chapters_json[chapter_num]
-                chapter_data.setdefault("beats", [])  # Initialize 'beats' if it doesn't exist
-                beats = chapter_data["beats"]
+        chapter_data.setdefault("beats", [])  # Initialize 'beats' if it doesn't exist
+        beats = chapter_data["beats"]
 
-                # Generate initial beats based on the chapter summary
-                new_beats = generate_beats(chapter_data['summary'])
-                beats.extend(new_beats)
+        # Generate initial beats based on the chapter summary
+        new_beats = generate_beats(chapter_data['summary'])
+        beats.extend(new_beats)
 
-                while True:
-                    print("\nBeats for this chapter:")
-                    for i, beat in enumerate(beats, 1):
-                        print(f"{i}. {beat['action_point']}")
+        while True:
+            print("\nBeats for this chapter:")
+            for i, beat in enumerate(beats, 1):
+                print(f"{i}. {beat['action_point']}")
 
-                    choice = input("Enter 'add', 'remove', 'modify', 'done', or 'edit': ")
-                    if choice.lower() == "done":
-                        break
-                    elif choice.lower() == "add":
-                        new_beat = {"action_point": input("Enter the new action point: ")}
-                        beats.append(new_beat)
-                    elif choice.lower() == "remove":
-                        beat_index = int(input("Enter the number of the beat to remove: ")) - 1
-                        if 0 <= beat_index < len(beats):
-                            del beats[beat_index]
-                        else:
-                            print("Invalid beat index. Please try again.")
-                    elif choice.lower() == "modify":
-                        beat_index = int(input("Enter the number of the beat to modify: ")) - 1
-                        if 0 <= beat_index < len(beats):
-                            beats[beat_index]["action_point"] = input("Enter the modified action point: ")
-                        else:
-                            print("Invalid beat index. Please try again.")
-                    elif choice.lower() == 'edit':
-                        for i, beat in enumerate(beats):
-                            print(f"Beat {i+1}: {beat['action_point']}")
-                            edit_choice = input("Edit this beat? (y/n): ")
-                            if edit_choice.lower() == 'y':
-                                new_action_point = input(f"Enter new action point for beat {i+1}: ")
-                                beat['action_point'] = new_action_point
-                    else:
-                        print("Invalid choice. Please try again.")
-
-                chapters_json[chapter_num]["beats"] = beats  # Update beats in chapters_json
+            choice = input("Enter 'add', 'remove', 'modify', 'done', or 'edit': ")
+            if choice.lower() == "done":
                 break
+            elif choice.lower() == "add":
+                new_beat = {"action_point": input("Enter the new action point: ")}
+                beats.append(new_beat)
+            elif choice.lower() == "remove":
+                beat_index = int(input("Enter the number of the beat to remove: ")) - 1
+                if 0 <= beat_index < len(beats):
+                    del beats[beat_index]
+                else:
+                    print("Invalid beat index. Please try again.")
+            elif choice.lower() == "modify":
+                beat_index = int(input("Enter the number of the beat to modify: ")) - 1
+                if 0 <= beat_index < len(beats):
+                    beats[beat_index]["action_point"] = input("Enter the modified action point: ")
+                else:
+                    print("Invalid beat index. Please try again.")
+            elif choice.lower() == 'edit':
+                for i, beat in enumerate(beats):
+                    print(f"Beat {i+1}: {beat['action_point']}")
+                    edit_choice = input("Edit this beat? (y/n): ")
+                    if edit_choice.lower() == 'y':
+                        new_action_point = input(f"Enter new action point for beat {i+1}: ")
+                        beat['action_point'] = new_action_point
             else:
-                print("Invalid chapter index. Please try again.")
-        except ValueError:
-            print("Invalid input. Please enter numbers.")
+                print("Invalid choice. Please try again.")
+
+        chapters_json[chapter_num]["beats"] = beats  # Update beats in chapters_json
 
     return chapters_json
 # ───────────────────────────────────────────────────────────────── #
@@ -264,3 +255,16 @@ def generate_and_modify_chapter_summaries(chapters_json, synopsis):
             chapters_json[chapter_num]["summary"] = summary
 
     return chapters_json
+
+def word_to_int(word):
+    """
+    Converts a word-based number (e.g., "One", "Two") to an integer.
+    """
+    word_to_num = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+        'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+        'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20
+        # Add more numbers as needed
+    }
+    return word_to_num.get(word.lower(), -1)  # Returns -1 if word not found in dictionary

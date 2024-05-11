@@ -152,12 +152,14 @@ def write_novel():
             beat = rewrite_prose(
                 beat,
                 chapter_summary,
-                book_data["genre"],
-                book_data["tone"],
-                book_data["pov"],
                 book_data["style"],
+                book_data["tone"],
+                book_data["genre"],
+                book_data["pov"],
                 premise,
                 updated_synopsis,
+                chapter_data["title"],  # Added chapter_title
+                book_title,            # Added book_title
             )
             print_and_edit_beat(chapter_data["title"], beat, "rewritten_content")
             chapter_content += f"\n\n{beat['rewritten_content']}"  # Use the rewritten content

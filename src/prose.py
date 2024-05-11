@@ -1,10 +1,11 @@
 import json
 import os
+import re
 import subprocess
 
 from src.llmconnection import call_g4f_api
 from src.prompts import get_prose_prompt, get_rewrite_prose_prompt
-
+# ───────────────────────────────────────────────────────────────── #
 def write_prose(beat, chapter_summary, genre, tone, pov, characters, style, premise, synopsis):
     """
     Writes prose based on the given parameters.
@@ -29,7 +30,7 @@ def write_prose(beat, chapter_summary, genre, tone, pov, characters, style, prem
     prose = response
     beat["expanded_content"] = prose
     return beat
-
+# ───────────────────────────────────────────────────────────────── #
 def rewrite_prose(beat, chapter_summary, style, tone, genre, pov, premise, synopsis, chapter_title, book_title):
     """
     Rewrite the given prose based on the provided parameters and save to a Markdown file.
@@ -58,6 +59,7 @@ def rewrite_prose(beat, chapter_summary, style, tone, genre, pov, premise, synop
     save_prose_to_markdown(rewritten_prose, chapter_title, book_title)
     return beat
 
+# ───────────────────────────────────────────────────────────────── #
 def save_prose_to_markdown(prose, chapter_title, book_title):
     """
     Saves the given prose to a Markdown file in the output directory.
@@ -70,21 +72,22 @@ def save_prose_to_markdown(prose, chapter_title, book_title):
     Returns:
         None
     """
+
+    # Shorten and sanitize both chapter title and book title
+    chapter_title = re.sub(r'[^\w\s-]', '', chapter_title)[:50]  # Limit to 50 characters
+    book_title = re.sub(r'[^\w\s-]', '', book_title)[:50]  # Limit to 50 characters
+
     output_dir = f"output/{book_title}/{chapter_title}"
     os.makedirs(output_dir, exist_ok=True)
 
-    # Replace spaces with underscores and remove special characters for the filename
-    filename = "".join(
-        char for char in "Beat_" + chapter_title if char.isalnum() or char in " "
-    ).replace(" ", "_")
-    filepath = f"{output_dir}/{filename}.md"
+    filename = f"Beat_{chapter_title}.md"
+    filepath = f"{output_dir}/{filename}"
 
-    # Save the chapter content to the markdown file
     with open(filepath, "w", encoding="utf-8") as file:
         file.write(prose)
 
     print(f"Chapter '{chapter_title}' beat saved as markdown file: {filepath}")
-
+# ───────────────────────────────────────────────────────────────── #
 def chapters_to_json(chapters):
     """
     Converts a dictionary of chapters to a JSON string.
@@ -99,7 +102,7 @@ def chapters_to_json(chapters):
 
     return json.dumps(chapters, indent=4)
 
-
+# ───────────────────────────────────────────────────────────────── #
 def save_chapter_as_markdown(chapter_title, chapter_content, book_title):
     """
     Saves a chapter as a markdown file in the output directory.
@@ -136,6 +139,7 @@ def save_chapter_as_markdown(chapter_title, chapter_content, book_title):
     print(f"Chapter '{chapter_title}' saved as markdown file: {filepath}")
 
 
+# ───────────────────────────────────────────────────────────────── #
 def print_and_edit_beat(chapter_title, beat, content_type):
     """
     Prints the content of a beat and allows for manual editing.
