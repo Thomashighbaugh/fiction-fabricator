@@ -1,3 +1,4 @@
+# fiction-fabricator/src/config.py
 from src.prompts import (
     get_genre_prompt,
     get_tone_prompt,
@@ -25,7 +26,6 @@ def select_genre(premise):
 
     Args:
         premise: The premise of the novel.
-        system_message: The system message for prompting the AI.
 
     Returns:
         The selected genre.
@@ -39,7 +39,7 @@ def select_genre(premise):
     else:
         prompt = get_genre_prompt(premise)
         response = call_g4f_api(prompt)
-        genre = response
+        genre = response.strip()
     return genre
 
 
@@ -49,7 +49,6 @@ def select_tone(premise):
 
     Args:
         premise: The premise of the novel.
-        system_message: The system message for prompting the AI.
 
     Returns:
         The selected tone.
@@ -63,7 +62,7 @@ def select_tone(premise):
     else:
         prompt = get_tone_prompt(premise)
         response = call_g4f_api(prompt)
-        tone = response
+        tone = response.strip()
     return tone
 
 
@@ -73,7 +72,6 @@ def select_style(premise):
 
     Args:
         premise: The premise of the novel.
-        system_message: The system message for prompting the AI.
 
     Returns:
         The selected style.
@@ -87,7 +85,7 @@ def select_style(premise):
     else:
         prompt = get_style_prompt(premise)
         response = call_g4f_api(prompt)
-        style = response
+        style = response.strip()
     return style
 
 
@@ -97,7 +95,6 @@ def select_pov(premise):
 
     Args:
         premise: The premise of the novel.
-        system_message: The system message for prompting the AI.
 
     Returns:
         The selected point of view.
@@ -111,5 +108,5 @@ def select_pov(premise):
     else:
         prompt = get_pov_prompt(premise)
         response = call_g4f_api(prompt)
-        pov = response
+        pov = response.strip()
     return pov

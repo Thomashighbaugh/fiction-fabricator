@@ -1,3 +1,4 @@
+# fiction-fabricator/src/characters.py
 import json
 
 from src.llmconnection import call_g4f_api

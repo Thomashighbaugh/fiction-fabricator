@@ -1,3 +1,4 @@
+# fiction-fabricator/src/synopsis.py
 from src.llmconnection import call_g4f_api
 from src.prompts import get_synopsis_prompt, get_synopsis_critique_prompt, get_synopsis_rewrite_prompt
 import subprocess

@@ -1,3 +1,4 @@
+# fiction-fabricator/src/prompts.py
 # prompts.py
 
 
@@ -135,4 +136,3 @@ def get_premise_prompt(user_input):
         "Generate 5 distinct and captivating premises for a novel based on the "
         f"following input: {user_input}"
     )
-

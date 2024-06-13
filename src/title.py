@@ -1,3 +1,4 @@
+# fiction-fabricator/src/title.py
 from src.llmconnection import call_g4f_api
 from src.prompts import get_title_prompt
 

@@ -1,8 +1,10 @@
+# fiction-fabricator/src/database.py
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import json
+
 Base = declarative_base()
 
 
@@ -64,8 +66,9 @@ def load_book(book_id):
     session = Session()
 
     book = session.query(Book).get(book_id)
-    book.characters = json.loads(book.characters)
-    book.chapters = json.loads(book.chapters)
+    if book:
+        book.characters = json.loads(book.characters)
+        book.chapters = json.loads(book.chapters)
     session.close()
     return book
 

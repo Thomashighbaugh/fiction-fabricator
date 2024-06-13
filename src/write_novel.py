@@ -1,3 +1,4 @@
+# fiction-fabricator/src/write_novel.py
 from src.chapters import generate_chapters
 from src.characters import generate_characters
 from src.config import (
@@ -84,7 +85,7 @@ def write_novel():
     chapters = generate_chapters(updated_synopsis, genre, tone, style, pov, premise)
     for chapter_title, beats in chapters.items():
         chapter_content = ""
-        chapter_summary = chapters["summary"]
+        chapter_summary = chapters[chapter_title]["summary"]
         for beat in beats:
             write_prose(beat, chapter_summary, genre, tone, pov, characters, style, premise, updated_synopsis)
             print_and_edit_beat(chapter_title, beat, "expanded_content")

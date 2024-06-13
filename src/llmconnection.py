@@ -1,12 +1,13 @@
+# fiction-fabricator/src/llmconnection.py
 import g4f
 from src.prompts import get_system_prompt
+import os 
 def call_g4f_api(prompt):
     """
     Calls the GPT4Free API with the provided prompt and system message.
 
     Args:
         prompt: The prompt to send to the API.
-        system_message: The system message for prompting the AI.
 
     Returns:
         The generated text from the GPT4Free API.
@@ -15,8 +16,11 @@ def call_g4f_api(prompt):
 
         # Call the API with the specified parameters
     response = api_instance.create(
+          
             # TODO: possibly add in a means of selecting other g4f models at the beginning of the program.
-            model="mixtral-8x22b",  # Use the 'mixtral-8x22b' model, its new, its uncensored, and it's free.
+            provider=g4f.Provider.DeepInfra,
+            api_key=os.getenv("G4F_API_KEY"),
+            model="microsoft/WizardLM-2-8x22B",
             # TODO: Create interactive means of changing the system prompt
             messages=[{"role": "system", "content": get_system_prompt()},
                 {"role": "user", "content": prompt}],

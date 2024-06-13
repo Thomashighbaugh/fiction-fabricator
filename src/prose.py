@@ -1,3 +1,4 @@
+# fiction-fabricator/src/prose.py
 import json
 import os
 import subprocess
@@ -146,4 +147,4 @@ def print_and_edit_beat(chapter_title, beat, content_type):
         with open("temp_file.txt", "r") as temp_file:
             edited_content = temp_file.read()
 
-        beat[content_type] = edited_content
+        beat[content_type] = edited_content 
