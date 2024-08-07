@@ -1,81 +1,100 @@
-# fiction-fabricator/src/synopsis.py
-from src.llmconnection import call_g4f_api
-from src.prompts import get_synopsis_prompt, get_synopsis_critique_prompt, get_synopsis_rewrite_prompt
-import subprocess
+import streamlit as st
 import os
+import json
+from llm import call_g4f_api
 
+def synopsis_management():
+    st.header("Synopsis Management")
 
-def generate_synopsis(genre, style, tone, pov, premise):
-    """
-    Generates a synopsis for the novel using the OpenAI API.
-    """
+    # Get project path
+    project_path = os.getcwd()
+    config_file = os.path.join(project_path, "config", "config.json")
 
-    prompt = get_synopsis_prompt(genre, style, tone, pov, premise)
-    response = call_g4f_api(prompt)
+    # Load configuration data
+    try:
+        with open(config_file, "r") as f:
+            config_data = json.load(f)
+    except FileNotFoundError:
+        st.error("Project configuration file not found. Please create a new project.")
+        return
 
-    synopsis = response
-    return synopsis
+    # Display configuration settings
+    st.write("Project configuration:")
+    st.write(f"Genre: {config_data['genre']}")
+    st.write(f"Tone: {config_data['tone']}")
+    st.write(f"Point of View: {config_data['point_of_view']}")
+    st.write(f"Writing Style: {config_data['writing_style']}")
+    st.write(f"Premise: {config_data['premise']}")
 
+    # Options for synopsis management
+    choice = st.selectbox("Select an option", ["Generate Synopsis", "Modify Synopsis", "Critique & Improve Synopsis", "Save Synopsis"])
 
-def edit_synopsis(synopsis):
-    """
-    Opens the synopsis in the user's editor for manual editing.
-    """
+    # Generate synopsis
+    if choice == "Generate Synopsis":
+        # Get user-defined configuration settings
+        genre = config_data["genre"]
+        tone = config_data["tone"]
+        point_of_view = config_data["point_of_view"]
+        writing_style = config_data["writing_style"]
+        premise = config_data["premise"]
 
-    editor = os.getenv("EDITOR", "vim")  # Default to 'vi' if $EDITOR is not set
-    with open("temp_file.txt", "w") as temp_file:
-        temp_file.write(synopsis)
+        # Use call_g4f_api to generate synopsis based on user settings
+        prompt = f"Generate a synopsis for a story with the following characteristics:\nGenre: {genre}\nTone: {tone}\nPoint of View: {point_of_view}\nWriting Style: {writing_style}\nPremise: {premise}"
+        response = call_g4f_api(prompt)
 
-    subprocess.call([editor, "temp_file.txt"])
+        # Display generated synopsis
+        st.write("Generated Synopsis:")
+        st.write(response)
 
-    with open("temp_file.txt", "r") as temp_file:
-        edited_synopsis = temp_file.read()
+        # Save synopsis to file
+        synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
+        with open(synopsis_file, "w") as f:
+            f.write(response)
+        st.success("Synopsis saved to file.")
 
-    return edited_synopsis
+    # Modify synopsis
+    elif choice == "Modify Synopsis":
+        synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
+        try:
+            with open(synopsis_file, "r") as f:
+                synopsis_text = f.read()
+            modified_synopsis = st.text_area("Modify Synopsis:", synopsis_text)
 
+            # Save modified synopsis
+            with open(synopsis_file, "w") as f:
+                f.write(modified_synopsis)
+            st.success("Synopsis updated.")
 
-def expand_synopsis(synopsis):
-    """
-    Expands the synopsis using AI assistance.
-    """
+        except FileNotFoundError:
+            st.error("Synopsis file not found. Please generate a synopsis first.")
 
-    prompt = f"Expand on the synopsis, focusing on adding into the existing synopsis additional key plot points and additional characters with some hint of whatever the character's motivations: {synopsis}"
-    response = call_g4f_api(prompt)
-    expanded_synopsis = response
-    return expanded_synopsis
+    # Critique and improve synopsis
+    elif choice == "Critique & Improve Synopsis":
+        synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
+        try:
+            with open(synopsis_file, "r") as f:
+                synopsis_text = f.read()
+            
+            # Use call_g4f_api to critique and improve synopsis
+            prompt = f"Critique and improve the following synopsis:\n{synopsis_text}"
+            response = call_g4f_api(prompt)
 
+            # Display critique and improvement suggestions
+            st.write("Critique and Improvement Suggestions:")
+            st.write(response)
 
-# ─────────────────────────────────────────────────────────────────
-# synopsis.py function (for user interaction)
-def critique_synopsis(synopsis):
-    """
-    Prompts the AI for a critique of the synopsis and then rewrites it based on the critique.
-    """
+        except FileNotFoundError:
+            st.error("Synopsis file not found. Please generate a synopsis first.")
 
-    while True:
-        print("Synopsis:")
-        print(synopsis)
+    # Save synopsis
+    elif choice == "Save Synopsis":
+        synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
+        try:
+            with open(synopsis_file, "r") as f:
+                synopsis_text = f.read()
+            st.write("Current Synopsis:")
+            st.write(synopsis_text)
+            st.success("Synopsis saved.")
 
-        choice = input("Do you want to 'edit', 'expand', or 'done'? ")
-        if choice.lower() == "done":
-            break
-        elif choice.lower() == "edit":
-            synopsis = edit_synopsis(synopsis)
-        elif choice.lower() == "expand":
-            synopsis = expand_synopsis(synopsis)
-        else:
-            print("Invalid choice. Please try again.")
-
-    # Get AI critique
-    critique_prompt = get_synopsis_critique_prompt(synopsis)
-    critique_response = call_g4f_api(critique_prompt)
-    critique = critique_response
-    print("Critique:")
-    print(critique)
-
-    # Rewrite synopsis based on critique
-    rewrite_prompt = get_synopsis_rewrite_prompt(synopsis, critique)
-    rewrite_response = call_g4f_api(rewrite_prompt)
-    updated_synopsis = rewrite_response
-
-    return updated_synopsis
+        except FileNotFoundError:
+            st.error("Synopsis file not found. Please generate a synopsis first.")

@@ -1,2 +1,4 @@
+streamlit
 g4f
-sqlalchemy
+markdown
+watchdog
