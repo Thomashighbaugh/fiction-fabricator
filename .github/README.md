@@ -1,10 +1,12 @@
+> Check out the Streamlit branch for a GUI to use this project within
+
 # Fiction Fabricator
 
 Yet another project that uses OpenAI's API to produce long-form content, in this case a full fictional novel (with the option of adult themes and scenes if you so choose such).
 
 ## Why I Wrote This
 
-The other options that exist either did not allow for interventiuon in the process to edit things the AI is messing up or were python notebooks (which are fine and awesome things to use for AI demonstrations) but I wanted to run this app locally with my terminal and without jumping through any more hoops than I have to.
+The intention of this project is to create something open source that actually can generate viable content, not merely a proof-of-concept like the altenratives that exist, without the use of the OpenAI API that locks AI away behind a paywall I and many others can not afford (and given how the open source models available generate higher quality software, why would you pay for the use of their model?)
 
 ## GPT4Free Support
 
@@ -22,4 +24,4 @@ In fact, the model I am using is not available via openai's API because the main
 - Ability to interject and change values, edit generated text and overall high degree of control for automated book writing
 - Cool ASCII art
 - Jailbroken to enable the generation of novels with adult themes (this can be more than merely sexual, maybe not American Psycho but even Moby Dick would generate policy warnings from OpenAI and Meta's offerings as they are).
--
+
