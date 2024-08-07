@@ -1,9 +1,19 @@
-import streamlit as st
-import os
+"""
+Module for generating and managing story outlines.
+"""
+
 import json
-from llm import call_g4f_api
+import os
+
+import streamlit as st
+
+from src.llm import call_g4f_api
+
 
 def outline_management():
+    """
+    Manages the generation, editing, critique, and saving of story outlines.
+    """
     st.header("Outline Generation")
 
     # Get project path
@@ -13,14 +23,24 @@ def outline_management():
 
     # Load configuration data
     try:
-        with open(config_file, "r") as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             config_data = json.load(f)
     except FileNotFoundError:
-        st.error("Project configuration file not found. Please create a new project.")
+        st.error(
+            "Project configuration file not found. Please create a new project."
+        )
         return
 
     # Options for outline management
-    choice = st.selectbox("Select an option", ["Generate Outline", "Edit Outline", "Critique & Improve Outline", "Save Outline"])
+    choice = st.selectbox(
+        "Select an option",
+        [
+            "Generate Outline",
+            "Edit Outline",
+            "Critique & Improve Outline",
+            "Save Outline",
+        ],
+    )
 
     # Generate outline
     if choice == "Generate Outline":
@@ -32,7 +52,7 @@ def outline_management():
         premise = config_data["premise"]
         synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
         try:
-            with open(synopsis_file, "r") as f:
+            with open(synopsis_file, "r", encoding="utf-8") as f:
                 synopsis_text = f.read()
         except FileNotFoundError:
             synopsis_text = "No synopsis found."
@@ -45,14 +65,24 @@ def outline_management():
 
         world_file = os.path.join(project_path, "world", "world.json")
         try:
-            with open(world_file, "r") as f:
+            with open(world_file, "r", encoding="utf-8") as f:
                 world_data = json.load(f)
                 world_info = world_data.get("world_info", "")
         except FileNotFoundError:
             world_info = ""
 
         # Use call_g4f_api to generate outline based on user settings
-        prompt = f"Generate a story outline with the following characteristics:\nGenre: {genre}\nTone: {tone}\nPoint of View: {point_of_view}\nWriting Style: {writing_style}\nPremise: {premise}\nSynopsis: {synopsis_text}\nCharacters: {characters}\nWorld Information: {world_info}"
+        prompt = (
+            f"Generate a story outline with the following characteristics:\n"
+            f"Genre: {genre}\n"
+            f"Tone: {tone}\n"
+            f"Point of View: {point_of_view}\n"
+            f"Writing Style: {writing_style}\n"
+            f"Premise: {premise}\n"
+            f"Synopsis: {synopsis_text}\n"
+            f"Characters: {characters}\n"
+            f"World Information: {world_info}"
+        )
         response = call_g4f_api(prompt)
 
         # Display generated outline
@@ -61,34 +91,40 @@ def outline_management():
 
         # Save generated outline to file
         outline_data = response.split("\n\n")
-        with open(outline_file, "w") as f:
+        with open(outline_file, "w", encoding="utf-8") as f:
             json.dump(outline_data, f)
         st.success("Outline saved to file.")
 
     # Edit outline
     elif choice == "Edit Outline":
         try:
-            with open(outline_file, "r") as f:
+            with open(outline_file, "r", encoding="utf-8") as f:
                 outline_data = json.load(f)
-            modified_outline = st.text_area("Edit Outline:", "\n\n".join(outline_data))
+            modified_outline = st.text_area(
+                "Edit Outline:", "\n\n".join(outline_data)
+            )
 
             # Save modified outline
-            with open(outline_file, "w") as f:
+            with open(outline_file, "w", encoding="utf-8") as f:
                 json.dump(modified_outline.split("\n\n"), f)
             st.success("Outline updated.")
 
         except FileNotFoundError:
-            st.error("Outline file not found. Please generate an outline first.")
+            st.error(
+                "Outline file not found. Please generate an outline first."
+            )
 
     # Critique and improve outline
     elif choice == "Critique & Improve Outline":
         try:
-            with open(outline_file, "r") as f:
+            with open(outline_file, "r", encoding="utf-8") as f:
                 outline_data = json.load(f)
             outline_text = "\n\n".join(outline_data)
 
             # Use call_g4f_api to critique and improve outline
-            prompt = f"Critique and improve the following outline:\n{outline_text}"
+            prompt = (
+                f"Critique and improve the following outline:\n{outline_text}"
+            )
             response = call_g4f_api(prompt)
 
             # Display critique and improvement suggestions
@@ -96,16 +132,20 @@ def outline_management():
             st.write(response)
 
         except FileNotFoundError:
-            st.error("Outline file not found. Please generate an outline first.")
+            st.error(
+                "Outline file not found. Please generate an outline first."
+            )
 
-    # Save outline
+    # Save outline - this seems redundant; should it be automatic on edit?
     elif choice == "Save Outline":
         try:
-            with open(outline_file, "r") as f:
+            with open(outline_file, "r", encoding="utf-8") as f:
                 outline_data = json.load(f)
             st.write("Current Outline:")
             st.write("\n\n".join(outline_data))
-            st.success("Outline saved.")
+            st.success("Outline saved.") 
 
         except FileNotFoundError:
-            st.error("Outline file not found. Please generate an outline first.")
+            st.error(
+                "Outline file not found. Please generate an outline first."
+            )

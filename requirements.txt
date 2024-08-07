@@ -2,3 +2,4 @@ streamlit
 g4f
 markdown
 watchdog
+curl_cffi
