@@ -1,3 +1,5 @@
+# fiction-fabricator/src/create_project.py
+
 """
 Module for creating new writing projects.
 Handles project setup, directory creation,
@@ -9,12 +11,6 @@ import os
 import streamlit as st
 
 from src.system_prompt import system_prompt_management
-
-# Consider removing these unused imports for better readability:
-# from src.prompts import (generate_synopsis_prompt, generate_characters_prompt, 
-#    generate_world_settings_prompt, generate_title_prompt, generate_outline_prompt, 
-#    generate_scenes_summary_prompt, generate_chapter_prompt, critique_improve_prompt,) 
-# from src.llm import call_g4f_api
 
 
 def create_new_project():
@@ -29,9 +25,13 @@ def create_new_project():
 
     # Validate the project name and create the project directory
     if project_name:
-        project_path = os.path.join(os.getcwd(), project_name)
+        project_path = os.path.join(
+            os.path.expanduser("~"), project_name
+        )  # Create in home directory
         if not os.path.exists(project_path):
-            os.makedirs(project_path, exist_ok=True)  # Ensure all parent dirs are created if needed 
+            os.makedirs(
+                project_path, exist_ok=True
+            )  # Ensure all parent dirs are created if needed
             st.success(f"Project '{project_name}' created successfully!")
 
             # Create subdirectories for the project
@@ -66,9 +66,10 @@ def create_project_subdirectories(project_path: str):
     os.makedirs(os.path.join(project_path, "chapters"), exist_ok=True)
     st.success("Project subdirectories created.")
 
+
 def initialize_project_config(project_path: str):
-    """Initializes a basic config file for the new project. 
-    
+    """Initializes a basic config file for the new project.
+
     Args:
         project_path: Path to the project directory
     """
@@ -82,13 +83,15 @@ def get_initial_config_settings(project_path: str):
     """Prompts the user for initial project configuration settings.
 
     Args:
-        project_path (str): The path to the project directory. 
+        project_path (str): The path to the project directory.
     """
+
+    # Premise comes first
+    premise = st.text_area("Premise/General Idea:")
     genre = st.text_input("Genre:")
     tone = st.text_input("Tone:")
     point_of_view = st.text_input("Point of View:")
     writing_style = st.text_input("Writing Style:")
-    premise = st.text_area("Premise/General Idea:")
 
     # Save configuration settings to config.json
     config_data = {
@@ -104,5 +107,5 @@ def get_initial_config_settings(project_path: str):
         json.dump(config_data, f)
     st.success("Configuration settings saved.")
 
-    # Modify the System Prompt 
+    # Modify the System Prompt
     system_prompt_management()

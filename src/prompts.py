@@ -1,3 +1,5 @@
+# fiction-fabricator/src/prompts.py
+
 """
 This module contains functions for generating prompts for a language model 
 used in a writing assistant application.

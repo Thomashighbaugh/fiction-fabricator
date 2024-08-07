@@ -1,3 +1,5 @@
+# fiction-fabricator/src/world.py
+
 """
 This module focuses on managing world-building aspects 
 and individual setting details within the writing project.
@@ -10,6 +12,7 @@ import os
 import streamlit as st
 
 from src.llm import call_g4f_api
+from src.prompts import generate_world_settings_prompt
 
 
 def world_management():
@@ -58,44 +61,45 @@ def world_management():
     st.write(f"Writing Style: {config_data['writing_style']}")
     st.write(f"Premise: {config_data['premise']}")
 
-    # User choices for world & settings management
-    choice = st.selectbox(
-        "Select an option",
-        [
-            "Generate World & Settings",
-            "Add Setting",
-            "Edit Setting",
-            "Delete Setting",
-            "Edit World Information",
-            "Save Settings & World Information",  # Consider making saving automatic
-        ],
-    )
+    # User input for world info - autosaved
+    world_info = st.text_area("World Information:", world_data.get("world_info", ""))
+    if world_info:
+        world_data["world_info"] = world_info
+        with open(world_file, "w", encoding="utf-8") as f:
+            json.dump(world_data, f)
 
-    # Generates the world and its settings using the language model (LLM)
-    if choice == "Generate World & Settings":
+    # User input for setting name and description - autosaved
+    setting_name = st.text_input("Setting Name:")
+    setting_description = st.text_area("Setting Description:")
+    if setting_name and setting_description:
+        settings_data[setting_name] = {
+            "name": setting_name,
+            "description": setting_description,
+        }
+        setting_file = os.path.join(settings_dir, f"{setting_name}.json")
+        with open(setting_file, "w", encoding="utf-8") as f:
+            json.dump(settings_data[setting_name], f)
+        st.success(f"Setting '{setting_name}' saved.")
+
+    # Generate World & Settings button
+    if st.button("Generate World & Settings"):
         # Gather data from configuration and synopsis
-        genre = config_data["genre"]
-        tone = config_data["tone"]
-        point_of_view = config_data["point_of_view"]
-        writing_style = config_data["writing_style"]
-        premise = config_data["premise"]
+        genre = config_data.get("genre", "")
+        tone = config_data.get("tone", "")
+        point_of_view = config_data.get("point_of_view", "")
+        writing_style = config_data.get("writing_style", "")
+        premise = config_data.get("premise", "")
 
         synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
         try:
             with open(synopsis_file, "r", encoding="utf-8") as f:
                 synopsis_text = f.read()
         except FileNotFoundError:
-            synopsis_text = "No synopsis found."
+            synopsis_text = ""  # Use an empty string if synopsis is not found
 
         # Craft the prompt for world generation
-        prompt = (
-            f"Generate the world and settings for a story with the following characteristics:\n"
-            f"Genre: {genre}\n"
-            f"Tone: {tone}\n"
-            f"Point of View: {point_of_view}\n"
-            f"Writing Style: {writing_style}\n"
-            f"Premise: {premise}\n"
-            f"Synopsis: {synopsis_text}"
+        prompt = generate_world_settings_prompt(
+            genre, tone, point_of_view, writing_style, premise, synopsis_text
         )
         response = call_g4f_api(prompt)
 
@@ -129,65 +133,39 @@ def world_management():
                         json.dump(settings_data[setting_name], f)
         st.success("World and settings saved to files.")
 
-    # Adds a new setting
-    elif choice == "Add Setting":
-        setting_name = st.text_input("Enter Setting Name:")
-        setting_description = st.text_area("Enter Setting Description:")
+    # Display existing settings
+    st.subheader("Existing Settings:")
+    for setting_name, setting_info in settings_data.items():
+        st.write(f"**{setting_name}**")
+        st.write(setting_info["description"])
 
-        if setting_name:
-            settings_data[setting_name] = {
-                "name": setting_name,
-                "description": setting_description,
-            }
-            setting_file = os.path.join(settings_dir, f"{setting_name}.json")
-            with open(setting_file, "w", encoding="utf-8") as f:
-                json.dump(settings_data[setting_name], f)
-            st.success(f"Setting '{setting_name}' added.")
+        # Edit setting button
+        if st.button(f"Edit {setting_name}"):
+            # Load the setting's current description
+            current_description = setting_info["description"]
 
-    # Allows for editing of existing settings
-    elif choice == "Edit Setting":
-        selected_setting = st.selectbox("Select Setting:", list(settings_data.keys()))
-        if selected_setting:
-            setting_name = selected_setting
-            current_description = settings_data[setting_name]["description"]
+            # Display a text area for editing
             modified_description = st.text_area(
-                "Edit Setting Description:", current_description
+                f"Edit Setting Description for {setting_name}:",
+                current_description,
+                key=f"edit_{setting_name}",
             )
-            settings_data[setting_name]["description"] = modified_description
-            setting_file = os.path.join(settings_dir, f"{setting_name}.json")
-            with open(setting_file, "w", encoding="utf-8") as f:
-                json.dump(settings_data[setting_name], f)
-            st.success(f"Setting '{setting_name}' updated.")
 
-    # Delete a specific setting
-    elif choice == "Delete Setting":
-        selected_setting = st.selectbox(
-            "Select Setting to Delete:", list(settings_data.keys())
-        )
-        if selected_setting:
-            setting_name = selected_setting
-            confirm_delete = st.button(f"Delete {setting_name}?")
+            # Update and save the modified setting information
+            if modified_description != current_description:
+                settings_data[setting_name]["description"] = modified_description
+                setting_file = os.path.join(settings_dir, f"{setting_name}.json")
+                with open(setting_file, "w", encoding="utf-8") as f:
+                    json.dump(settings_data[setting_name], f)
+                st.success(f"Setting '{setting_name}' updated.")
+
+        # Delete setting button
+        if st.button(f"Delete {setting_name}"):
+            confirm_delete = st.checkbox(f"Confirm deletion of {setting_name}")
             if confirm_delete:
                 setting_file = os.path.join(settings_dir, f"{setting_name}.json")
                 os.remove(setting_file)
                 del settings_data[setting_name]
                 st.success(f"Setting '{setting_name}' deleted.")
 
-    # Modify general world information
-    elif choice == "Edit World Information":
-        try:
-            current_world_info = world_data["world_info"]
-            modified_world_info = st.text_area(
-                "Edit World Information:", current_world_info
-            )
-            world_data["world_info"] = modified_world_info
-            with open(world_file, "w", encoding="utf-8") as f:
-                json.dump(world_data, f)
-            st.success("World information updated.")
-        except KeyError:
-            st.info("No world information found. Please generate world details first.")
-
-    # Consider making saving automatic on any modifications
-    elif choice == "Save Settings & World Information":
-        st.write("Settings & World Information Saved.")
-
+        st.write("---")

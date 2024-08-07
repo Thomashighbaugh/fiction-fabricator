@@ -1,3 +1,5 @@
+# fiction-fabricator/src/title.py
+
 """
 Module for generating, editing, and managing story titles.
 """
@@ -8,6 +10,8 @@ import os
 import streamlit as st
 
 from src.llm import call_g4f_api
+from src.prompts import generate_title_prompt
+
 
 def title_management():
     """
@@ -19,13 +23,21 @@ def title_management():
     project_path = os.getcwd()
     title_file = os.path.join(project_path, "title", "title.txt")
 
-    # Options for title management
-    choice = st.selectbox(
-        "Select an option", ["Generate Title", "Edit Title", "Save Title"]
-    )
+    # Load existing title if it exists
+    try:
+        with open(title_file, "r", encoding="utf-8") as f:
+            current_title = f.read()
+    except FileNotFoundError:
+        current_title = ""
 
-    # Generate title
-    if choice == "Generate Title":
+    # User input for title - autosaved
+    title_text = st.text_input("Title:", current_title)
+    if title_text:
+        with open(title_file, "w", encoding="utf-8") as f:
+            f.write(title_text)
+
+    # Generate Title button
+    if st.button("Generate Title"):
         # Get user-defined configuration settings
         config_file = os.path.join(project_path, "config", "config.json")
         try:
@@ -37,54 +49,22 @@ def title_management():
             )
             return
 
-        genre = config_data["genre"]
-        tone = config_data["tone"]
-        premise = config_data["premise"]
+        genre = config_data.get("genre", "")
+        tone = config_data.get("tone", "")
+        premise = config_data.get("premise", "")
 
         # Use call_g4f_api to generate titles based on user settings
-        prompt = (
-            f"Generate a list of potential titles for a story with the following characteristics:\n"
-            f"Genre: {genre}\n"
-            f"Tone: {tone}\n"
-            f"Premise: {premise}"
-        )
+        prompt = generate_title_prompt(genre, tone, premise)
         response = call_g4f_api(prompt)
 
         # Display generated titles
         st.write("Generated Titles:")
         st.write(response)
 
-        # Allow user to select a title
+        # Allow user to select a title and autosave
         selected_title = st.selectbox("Select a Title:", response.split("\n"))
-
-        # Save selected title to file
-        with open(title_file, "w", encoding="utf-8") as f:
-            f.write(selected_title)
-        st.success("Title saved to file.")
-
-    # Edit title
-    elif choice == "Edit Title":
-        try:
-            with open(title_file, "r", encoding="utf-8") as f:
-                current_title = f.read()
-            modified_title = st.text_input("Edit Title:", current_title)
-
-            # Save edited title
+        if selected_title:
             with open(title_file, "w", encoding="utf-8") as f:
-                f.write(modified_title)
-            st.success("Title updated.")
-
-        except FileNotFoundError:
-            st.error("Title file not found. Please generate a title first.")
-
-    # Save title (Redundant - consider automatic saving after generation/edit)
-    elif choice == "Save Title":
-        try:
-            with open(title_file, "r", encoding="utf-8") as f:
-                title_text = f.read()
-            st.write("Current Title:")
-            st.write(title_text)
-            st.success("Title saved.")
-
-        except FileNotFoundError:
-            st.error("Title file not found. Please generate a title first.")
+                f.write(selected_title)
+            st.success("Title saved to file.")
+            st.text_input("Title:", selected_title, key="selected_title")

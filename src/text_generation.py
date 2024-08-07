@@ -1,3 +1,5 @@
+# fiction-fabricator/src/text_generation.py
+
 """
 Module for managing the text generation aspects of chapters within the application.
 This includes creating, modifying, and managing chapters based on the story outline.
@@ -9,6 +11,11 @@ import os
 import streamlit as st
 
 from src.llm import call_g4f_api
+from src.prompts import (
+    generate_scenes_summary_prompt,
+    generate_chapter_prompt,
+    critique_improve_prompt,
+)
 
 
 def text_generation():
@@ -29,14 +36,11 @@ def text_generation():
             "Add Chapter",
             "Remove Chapter",
             "Rearrange Chapters",
-            "Save Modified Outline",  # This could potentially be automated
             "Generate Scenes & Summary",
             "Edit Scenes & Summary",
-            "Save Scenes & Summary",  # Also could be automated
             "Generate Chapter",
             "Edit Chapter",
             "Critique & Improve Chapter",
-            "Save Chapter",  # Potentially automate saving
         ],
     )
 
@@ -50,9 +54,6 @@ def text_generation():
     elif choice == "Rearrange Chapters":
         outline_data = rearrange_chapters(outline_data, project_path)
 
-    elif choice == "Save Modified Outline":  # This might be redundant
-        save_outline(outline_data, project_path)
-
     # Chapter Content Generation and Manipulation
 
     elif choice == "Generate Scenes & Summary":
@@ -60,9 +61,6 @@ def text_generation():
 
     elif choice == "Edit Scenes & Summary":
         edit_scenes_and_summary(outline_data, project_path)
-
-    elif choice == "Save Scenes & Summary":
-        save_scenes_and_summary(outline_data, project_path)
 
     elif choice == "Generate Chapter":
         generate_chapter(config_data, outline_data, project_path)
@@ -72,9 +70,6 @@ def text_generation():
 
     elif choice == "Critique & Improve Chapter":
         critique_and_improve_chapter(outline_data, project_path)
-
-    elif choice == "Save Chapter":
-        save_chapter(outline_data, project_path)
 
 
 def load_project_data(project_path: str):
@@ -134,15 +129,9 @@ def rearrange_chapters(outline_data: list, project_path: str):
     return outline_data  # Return the updated outline data
 
 
-def save_outline(outline_data: list, project_path: str):
-    """Saves the current outline. This might be redundant with autosave."""
-    outline_file = os.path.join(project_path, "outline", "outline.json")
-    with open(outline_file, "w", encoding="utf-8") as f:
-        json.dump(outline_data, f)
-    st.success("Modified Outline Saved.")
-
-
-def generate_scenes_and_summary(config_data: dict, outline_data: list, project_path: str):
+def generate_scenes_and_summary(
+    config_data: dict, outline_data: list, project_path: str
+):
     """Generates detailed scenes and a summary for a selected chapter."""
     selected_chapter = st.selectbox(
         "Select chapter to generate scenes and summary:", outline_data
@@ -165,17 +154,16 @@ def generate_scenes_and_summary(config_data: dict, outline_data: list, project_p
         world_info = load_world_info(project_path)
 
         # Generate scenes and summary using the language model
-        prompt = (
-            f"Generate detailed scenes and a summary for the chapter '{selected_chapter}' based on the following:\n"
-            f"Genre: {genre}\n"
-            f"Tone: {tone}\n"
-            f"Point of View: {point_of_view}\n"
-            f"Writing Style: {writing_style}\n"
-            f"Premise: {premise}\n"
-            f"Synopsis: {synopsis_text}\n"
-            f"Characters: {characters}\n"
-            f"World Information: {world_info}\n"
-            f"Outline: {selected_chapter}"
+        prompt = generate_scenes_summary_prompt(
+            genre,
+            tone,
+            point_of_view,
+            writing_style,
+            premise,
+            synopsis_text,
+            characters,
+            world_info,
+            selected_chapter,
         )
         response = call_g4f_api(prompt)
 
@@ -200,32 +188,10 @@ def edit_scenes_and_summary(outline_data: list, project_path: str):
         try:
             with open(chapter_file, "r", encoding="utf-8") as f:
                 chapter_text = f.read()
-            modified_chapter_text = st.text_area(
-                "Edit Scenes & Summary:", chapter_text
-            )
+            modified_chapter_text = st.text_area("Edit Scenes & Summary:", chapter_text)
             with open(chapter_file, "w", encoding="utf-8") as f:
                 f.write(modified_chapter_text)
             st.success("Scenes and summary updated.")
-        except FileNotFoundError:
-            st.error(
-                "Scenes and summary file not found. Please generate scenes and summary first."
-            )
-
-
-def save_scenes_and_summary(outline_data: list, project_path: str):
-    """Saves scenes and summary - consider automatic saving on edit."""
-    chapters_dir = os.path.join(project_path, "chapters")
-    selected_chapter = st.selectbox(
-        "Select chapter to save scenes and summary:", outline_data
-    )
-    if selected_chapter:
-        chapter_file = os.path.join(chapters_dir, f"{selected_chapter}.txt")
-        try:
-            with open(chapter_file, "r", encoding="utf-8") as f:
-                chapter_text = f.read()
-            st.write("Current Scenes & Summary:")
-            st.write(chapter_text)
-            st.success("Scenes and summary saved.")
         except FileNotFoundError:
             st.error(
                 "Scenes and summary file not found. Please generate scenes and summary first."
@@ -261,18 +227,17 @@ def generate_chapter(config_data: dict, outline_data: list, project_path: str):
             scenes_and_summary = "No scenes and summary found."
 
         # Generate chapter using the language model
-        prompt = (
-            f"Generate a full chapter based on the following:\n"
-            f"Genre: {genre}\n"
-            f"Tone: {tone}\n"
-            f"Point of View: {point_of_view}\n"
-            f"Writing Style: {writing_style}\n"
-            f"Premise: {premise}\n"
-            f"Synopsis: {synopsis_text}\n"
-            f"Characters: {characters}\n"
-            f"World Information: {world_info}\n"
-            f"Outline: {selected_chapter}\n"
-            f"Scenes & Summary: {scenes_and_summary}"
+        prompt = generate_chapter_prompt(
+            genre,
+            tone,
+            point_of_view,
+            writing_style,
+            premise,
+            synopsis_text,
+            characters,
+            world_info,
+            selected_chapter,
+            scenes_and_summary,
         )
         response = call_g4f_api(prompt)
 
@@ -316,28 +281,12 @@ def critique_and_improve_chapter(outline_data: list, project_path: str):
             with open(chapter_file, "r", encoding="utf-8") as f:
                 chapter_text = f.read()
 
-            prompt = f"Critique and improve the following chapter:\n{chapter_text}"
+            prompt = critique_improve_prompt(chapter_text)
             response = call_g4f_api(prompt)
 
             st.write("Critique and Improvement Suggestions:")
             st.write(response)
 
-        except FileNotFoundError:
-            st.error("Chapter file not found. Please generate a chapter first.")
-
-
-def save_chapter(outline_data: list, project_path: str):
-    """Saves the current chapter - could be automated to save on edits."""
-    chapters_dir = os.path.join(project_path, "chapters")
-    selected_chapter = st.selectbox("Select chapter to save:", outline_data)
-    if selected_chapter:
-        chapter_file = os.path.join(chapters_dir, f"{selected_chapter}.txt")
-        try:
-            with open(chapter_file, "r", encoding="utf-8") as f:
-                chapter_text = f.read()
-            st.write("Current Chapter:")
-            st.write(chapter_text)
-            st.success("Chapter saved.")
         except FileNotFoundError:
             st.error("Chapter file not found. Please generate a chapter first.")
 

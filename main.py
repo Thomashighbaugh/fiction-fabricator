@@ -1,3 +1,5 @@
+# fiction-fabricator/main.py
+
 """
 Main module for the Fiction Fabricator application.
 """
@@ -18,20 +20,40 @@ from src.text_generation import text_generation
 from src.export import export_management
 from src.system_prompt import system_prompt_management
 
-# Importing for potential future use, but currently unused:
-# from src.llm import call_g4f_api
-
 
 # Define main menu function
 def main():
     """
     Main function to display the application and handle user interaction.
     """
+
     st.title("Fiction Fabricator")
+
+    # Set the project directory to the user's home directory
+    project_dir = os.path.expanduser("~")
+    os.chdir(project_dir)
 
     # Display menu options in the sidebar
     choice = st.sidebar.selectbox(
-        "Select an option", ["Create New Project", "Load Existing Project", "Quit"]
+        "Navigation",
+        [
+            "Create New Project",
+            "Load Existing Project",
+            "System Prompt",
+            "Premise",
+            "Genre",
+            "Tone",
+            "Point of View",
+            "Writing Style",
+            "Synopsis",
+            "Character",
+            "World",
+            "Title",
+            "Outline",
+            "Text Generation",
+            "Export",
+            "Quit",
+        ],
     )
 
     # Process user selection
@@ -39,6 +61,22 @@ def main():
         create_new_project()
     elif choice == "Load Existing Project":
         load_existing_project()
+    elif choice == "System Prompt":
+        system_prompt_management()
+    elif choice == "Synopsis":
+        synopsis_management()
+    elif choice == "Character":
+        character_management()
+    elif choice == "World":
+        world_management()
+    elif choice == "Title":
+        title_management()
+    elif choice == "Outline":
+        outline_management()
+    elif choice == "Text Generation":
+        text_generation()
+    elif choice == "Export":
+        export_management()
     elif choice == "Quit":
         st.write("Exiting Fiction Fabricator...")
         exit()

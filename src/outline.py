@@ -1,3 +1,5 @@
+# fiction-fabricator/src/outline.py
+
 """
 Module for generating and managing story outlines.
 """
@@ -8,6 +10,7 @@ import os
 import streamlit as st
 
 from src.llm import call_g4f_api
+from src.prompts import generate_outline_prompt
 
 
 def outline_management():
@@ -26,36 +29,37 @@ def outline_management():
         with open(config_file, "r", encoding="utf-8") as f:
             config_data = json.load(f)
     except FileNotFoundError:
-        st.error(
-            "Project configuration file not found. Please create a new project."
-        )
+        st.error("Project configuration file not found. Please create a new project.")
         return
 
-    # Options for outline management
-    choice = st.selectbox(
-        "Select an option",
-        [
-            "Generate Outline",
-            "Edit Outline",
-            "Critique & Improve Outline",
-            "Save Outline",
-        ],
-    )
+    # Load existing outline if it exists
+    try:
+        with open(outline_file, "r", encoding="utf-8") as f:
+            outline_data = json.load(f)
+    except FileNotFoundError:
+        outline_data = []
 
-    # Generate outline
-    if choice == "Generate Outline":
+    # User input for outline - autosaved
+    outline_text = st.text_area("Outline:", "\n\n".join(outline_data))
+    if outline_text:
+        outline_data = outline_text.split("\n\n")
+        with open(outline_file, "w", encoding="utf-8") as f:
+            json.dump(outline_data, f)
+
+    # Generate Outline button
+    if st.button("Generate Outline"):
         # Get user-defined configuration settings
-        genre = config_data["genre"]
-        tone = config_data["tone"]
-        point_of_view = config_data["point_of_view"]
-        writing_style = config_data["writing_style"]
-        premise = config_data["premise"]
+        genre = config_data.get("genre", "")
+        tone = config_data.get("tone", "")
+        point_of_view = config_data.get("point_of_view", "")
+        writing_style = config_data.get("writing_style", "")
+        premise = config_data.get("premise", "")
         synopsis_file = os.path.join(project_path, "synopsis", "synopsis.txt")
         try:
             with open(synopsis_file, "r", encoding="utf-8") as f:
                 synopsis_text = f.read()
         except FileNotFoundError:
-            synopsis_text = "No synopsis found."
+            synopsis_text = ""  # Use an empty string if synopsis is not found
 
         characters_dir = os.path.join(project_path, "characters")
         characters = []
@@ -72,59 +76,35 @@ def outline_management():
             world_info = ""
 
         # Use call_g4f_api to generate outline based on user settings
-        prompt = (
-            f"Generate a story outline with the following characteristics:\n"
-            f"Genre: {genre}\n"
-            f"Tone: {tone}\n"
-            f"Point of View: {point_of_view}\n"
-            f"Writing Style: {writing_style}\n"
-            f"Premise: {premise}\n"
-            f"Synopsis: {synopsis_text}\n"
-            f"Characters: {characters}\n"
-            f"World Information: {world_info}"
+        prompt = generate_outline_prompt(
+            genre,
+            tone,
+            point_of_view,
+            writing_style,
+            premise,
+            synopsis_text,
+            characters,
+            world_info,
         )
         response = call_g4f_api(prompt)
 
-        # Display generated outline
+        # Display generated outline and autosave
         st.write("Generated Outline:")
-        st.write(response)
-
-        # Save generated outline to file
+        st.text_area("Outline:", response, key="generated_outline")
         outline_data = response.split("\n\n")
         with open(outline_file, "w", encoding="utf-8") as f:
             json.dump(outline_data, f)
         st.success("Outline saved to file.")
 
-    # Edit outline
-    elif choice == "Edit Outline":
-        try:
-            with open(outline_file, "r", encoding="utf-8") as f:
-                outline_data = json.load(f)
-            modified_outline = st.text_area(
-                "Edit Outline:", "\n\n".join(outline_data)
-            )
-
-            # Save modified outline
-            with open(outline_file, "w", encoding="utf-8") as f:
-                json.dump(modified_outline.split("\n\n"), f)
-            st.success("Outline updated.")
-
-        except FileNotFoundError:
-            st.error(
-                "Outline file not found. Please generate an outline first."
-            )
-
-    # Critique and improve outline
-    elif choice == "Critique & Improve Outline":
+    # Critique and Improve Outline button
+    if st.button("Critique & Improve Outline"):
         try:
             with open(outline_file, "r", encoding="utf-8") as f:
                 outline_data = json.load(f)
             outline_text = "\n\n".join(outline_data)
 
             # Use call_g4f_api to critique and improve outline
-            prompt = (
-                f"Critique and improve the following outline:\n{outline_text}"
-            )
+            prompt = f"Critique and improve the following outline:\n{outline_text}"
             response = call_g4f_api(prompt)
 
             # Display critique and improvement suggestions
@@ -132,20 +112,4 @@ def outline_management():
             st.write(response)
 
         except FileNotFoundError:
-            st.error(
-                "Outline file not found. Please generate an outline first."
-            )
-
-    # Save outline - this seems redundant; should it be automatic on edit?
-    elif choice == "Save Outline":
-        try:
-            with open(outline_file, "r", encoding="utf-8") as f:
-                outline_data = json.load(f)
-            st.write("Current Outline:")
-            st.write("\n\n".join(outline_data))
-            st.success("Outline saved.") 
-
-        except FileNotFoundError:
-            st.error(
-                "Outline file not found. Please generate an outline first."
-            )
+            st.error("Outline file not found. Please generate an outline first.")

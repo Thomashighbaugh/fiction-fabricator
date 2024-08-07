@@ -1,3 +1,5 @@
+# fiction-fabricator/src/load_project.py
+
 """
 Module for loading existing writing projects.
 """
@@ -9,12 +11,6 @@ import streamlit as st
 
 from src.system_prompt import system_prompt_management
 
-# The following imports seem unused, consider removing them if not needed:
-# from src.prompts import generate_synopsis_prompt, generate_characters_prompt, \
-#    generate_world_settings_prompt, generate_title_prompt, generate_outline_prompt, \
-#    generate_scenes_summary_prompt, generate_chapter_prompt, critique_improve_prompt
-# from src.llm import call_g4f_api
-
 
 def load_existing_project():
     """
@@ -22,18 +18,19 @@ def load_existing_project():
     """
     st.header("Load Existing Project")
 
-    # Get a list of potential project directories
+    # Get a list of potential project directories from the user's home directory
+    home_dir = os.path.expanduser("~")
     project_directories = [
         directory
-        for directory in os.listdir(os.getcwd())
-        if os.path.isdir(os.path.join(os.getcwd(), directory))
+        for directory in os.listdir(home_dir)
+        if os.path.isdir(os.path.join(home_dir, directory))
     ]
 
     # Allow user to select a project from the found directories
     selected_project = st.selectbox("Select Project:", project_directories)
 
     if selected_project:
-        project_path = os.path.join(os.getcwd(), selected_project)
+        project_path = os.path.join(home_dir, selected_project)
         config_file = os.path.join(project_path, "config", "config.json")
 
         # Load project configuration data
