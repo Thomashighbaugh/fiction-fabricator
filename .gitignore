@@ -1,7 +1,7 @@
-__pycache__/
-output/*
-temp_file.txt
-.venv/*
-development/*
-.vscode/*
-books.db
+__pycache__
+test*
+data
+build
+*.DS_Store
+*egg-info
+*env

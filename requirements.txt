@@ -1,2 +1,7 @@
-g4f
-sqlalchemy
+openai
+joblib
+loguru
+omegaconf
+tenacity
+transformers
+questionary
