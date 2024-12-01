@@ -1,35 +1,35 @@
+--- START OF FILE goat_storytelling_agent/README.md ---
+# Fiction Fabricator -- GOAT Storytelling Agent Enhanced Edition
 
-# Fiction Fabricator -- GOAT Storytelling Agent Edition 
-# GOAT Storytelling Agent: Enhanced Edition
-
-This project is an enhanced version of the original GOAT Storytelling Agent, designed to generate long-form fiction (short stories, novels, etc.) from a simple user-provided topic or idea.  It leverages the power of large language models (LLMs) and a structured, iterative writing process.
+This project generates long-form fiction (short stories, novels) from a user-provided topic. It uses large language models (LLMs) and a structured, iterative writing process.
 
 ## Key Improvements
 
-This enhanced edition features several improvements over the original:
+* **Simplified User Interaction:** A text-based menu guides users.
+* **Streamlined LLM Interaction:** Fewer LLM calls for efficiency.
+* **GLHF API:** Access to powerful LLMs.
+* **Clearer Codebase:** Improved readability and maintainability.
+* **Enhanced Error Handling:**  Robust handling and feedback.
+* **Automatic Scene Generation and Enhancement:** Automated workflow for writing and expanding scenes.
+* **Title Generation:**  LLM generates a title based on the topic.
+* **Output Caching:** Saves LLM responses to markdown files.
+* **Model Selection:** User can choose from a list of LLMs.
 
-* **Simplified User Interaction:**  A text-based user interface (TUI) menu guides users through the story creation process, making it more intuitive and user-friendly.
-* **Streamlined LLM Interaction:**  Optimized to reduce the number of LLM calls, mitigating rate limiting issues and improving efficiency.
-* **Uses GLHF API:**  Utilizes the GLHF API for access to powerful LLMs, enabling more sophisticated story generation capabilities.
-* **Clearer Codebase:**  Refactored for improved readability and maintainability, with descriptive variable names and comprehensive comments.
-* **Enhanced Error Handling:**  More robust error handling to gracefully handle unexpected situations and provide helpful feedback to the user.
 
 ## Features
 
-* **Book Specification Generation:**  Creates and refines a detailed specification for your story, covering genre, setting, characters, plot, and more.
-* **Plot Outline Creation:**  Develops a three-act plot outline with chapters, ensuring a compelling narrative arc.
-* **Scene Breakdown:**  Breaks down chapters into individual scenes, each with detailed specifications for characters, setting, events, and emotional tone.
-* **Scene Writing:**  Generates scene text, incorporating dark, cynical, and erotic elements as per the specified tone.
-* **Scene Continuation:**  Allows for continuing existing scenes, maintaining narrative consistency.
-* **Full Story Generation:**  Generates a complete story based on the defined specifications and plot.
-* **Story Saving:** Option to save the generated story to a file.
+* **Book Specification:** Creates and refines story details.
+* **Plot Outline:** Develops a three-act plot with chapters.
+* **Scene Breakdown:** Divides chapters into scenes with specifications.
+* **Scene Writing:** Generates scene text (dark, cynical, erotic).
+* **Scene Continuation:** Expands existing scenes.
 
 
 ## Getting Started
 
 1. **Prerequisites:**
-    - Python 3.9 or higher
-    - An active GLHF authentication token (set as the `GLHF_AUTH_TOKEN` environment variable)
+    - Python 3.9+
+    - GLHF authentication token (`GLHF_AUTH_TOKEN` environment variable)
 
 2. **Installation:**
     ```bash
@@ -41,32 +41,27 @@ This enhanced edition features several improvements over the original:
 
 3. **Usage:**
     ```bash
-    python menu.py 
+    python menu.py
     ```
 
-    Follow the on-screen prompts to provide a story topic and navigate through the menu options.
-
+    Follow the prompts to provide a topic and navigate the menu.
 
 ## Configuration
 
-The `config.py` file allows you to configure the LLM used:
+`config.py`:
 
-* `MODEL_NAME`: Specifies the name of the LLM on GLHF. Make sure to keep the `hf:` prefix for Hugging Face models.
-
+* `MODEL_NAME`: LLM name on GLHF (keep `hf:` prefix for Hugging Face models).
+* `TIMEOUT`: Timeout for LLM calls (seconds).
+* `RETRY_WAIT`: Wait time before retrying (seconds).
 
 ## Contributing
 
-Contributions are welcome!  Please open an issue or submit a pull request.
-
-
+Contributions are welcome! Open an issue or submit a pull request.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).  The original GOAT Storytelling Agent was created by [Original Author Name/GitHub username].  This enhanced edition is maintained by [Your Name/GitHub Username].
-
-
+MIT License. Original GOAT Storytelling Agent by Thomas Leon Highbaugh. This enhanced edition is maintained by Thomas Leon Highbaugh.
 
 ## Acknowledgements
 
-- Thanks to the original creator of the GOAT Storytelling Agent for providing the foundation for this project.
-- Thanks to GLHF for providing access to powerful LLMs.
+- Thanks to GLHF.

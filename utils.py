@@ -1,4 +1,3 @@
-# goat_storytelling_agent/utils.py
 def split_into_words_w_newline(text):
     lines = text.split('\n')
     split_text = [line.split(None) for line in lines if line]
@@ -47,3 +46,4 @@ def keep_last_n_words(text, n):
     split_text = split_text[-(lines_to_slice+1):]
     text = "\n".join([" ".join(line) for line in split_text])
     return text.strip()
+

@@ -1,4 +1,3 @@
-"""Unifies all plot forms such as by-chapter and by-scene outlines in a single dict."""
 import re
 import json
 
@@ -6,11 +5,8 @@ import json
 class Plan:
     @staticmethod
     def split_by_act(original_plan):
-        # removes only Act texts with newline prepended somewhere near
         acts = re.split('\n.{0,5}?Act ', original_plan)
-        # remove random short garbage from re split
-        acts = [text.strip() for text in acts[:]
-                if (text and (len(text.split()) > 3))]
+        acts = [text.strip() for text in acts[:] if (text and (len(text.split()) > 3))]
         if len(acts) == 4:
             acts = acts[1:]
         elif len(acts) != 3:
@@ -22,7 +18,6 @@ class Plan:
                 print('Fail: split_by_act, attempt 2', original_plan)
                 return []
 
-        # [act1, act2, act3], [Act + act1, act2, act3]
         if acts[0].startswith('Act '):
             acts = [acts[0]] + ['Act ' + act for act in acts[1:]]
         else:
@@ -88,4 +83,3 @@ class Plan:
     def save_plan(plan, fpath):
         with open(fpath, 'w') as fp:
             json.dump(plan, fp, indent=4)
-
