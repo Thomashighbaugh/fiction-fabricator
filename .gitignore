@@ -1,4 +1,6 @@
 __pycache__
+.output/*
+.output
 test*
 data
 build
