@@ -1,4 +1,4 @@
-openai
+ollama
 joblib
 loguru
 omegaconf

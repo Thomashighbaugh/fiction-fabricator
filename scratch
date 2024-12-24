@@ -1,0 +1,67 @@
+    Semantic Storage: Use embeddings to create a semantic representation of key parts of the text:
+
+        Story Specification
+
+        Act/Chapter Summaries
+
+        Key Scenes
+
+        Character Descriptions
+
+        Thematic Statements
+
+    Retrieval: When the LLM needs context, use embeddings to retrieve relevant snippets from storage. You can use cosine similarity to find the most similar stored content to the current prompt.
+
+    Prompt Augmentation: Inject the retrieved snippets into the prompt to provide extra context to the LLM.
+
+    Incremental Update: Update embeddings incrementally as the story evolves.
+
+    Vector Databases: Use vector databases to store and retrieve embeddings efficiently.
+
+3. Explicit "World Model"
+
+    Data Structures: Maintain a structured data representation of the story:
+
+        Characters (with detailed profiles, relationships, and motivations).
+
+        Locations (with descriptions and significance).
+
+        Key Objects (with descriptions and history).
+
+        Timeline (of important events).
+
+        Themes (list of recurring ideas and motifs).
+
+    LLM as Manager: Use the LLM to manage this model. For example, after a major scene, have the LLM update relevant character profiles, the timeline, or other elements of the model.
+
+    Context Injection: Selectively inject parts of this world model into prompts to provide essential context for each step of the writing process.
+
+4. Prompt Engineering for Human-Like Text:
+
+    Persona: The system prompt does an okay job of this, and should be expanded upon.
+
+    Show, Don't Tell: Encourage the LLM to use sensory language, actions, and dialogue, rather than just stating facts.
+
+    Vary Sentence Structure: Prompt the LLM to vary sentence lengths, use transitions, and create a natural flow.
+
+    Emotional Range: Instruct the LLM to generate text with a full range of emotions appropriate to the scene.
+
+    Character Voice: Be very clear in your prompt that the LLM should be consistent in how each character speaks and acts.
+
+    Literary Devices: Add instruction to use metaphors, similes, and other literary devices.
+
+5. Implementation Details
+
+    Modular Design: Break the code into modules that handle different tasks:
+
+        Embedding generation/retrieval.
+
+        World model management.
+
+        Prompt construction.
+
+        LLM interaction.
+
+    Caching: Implement caching to avoid repeated calls for the same information (this is done already using joblib).
+
+    Error Handling: Ensure robust error handling at each stage, with detailed logging for debugging.

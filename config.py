@@ -1,14 +1,11 @@
 # goat_storytelling_agent/config.py
 import os
 
-# The GLHF authentication token is sourced from the environment
-GLHF_AUTH_TOKEN = os.environ.get("GLHF_AUTH_TOKEN")
-
-# OpenAI model name, initialized to a default but changed by user selection
-MODEL_NAME = "hf:meta-llama/Meta-Llama-3.1-405B-Instruct"
+# Ollama model name
+MODEL_NAME = ("llama3.3:latest",)
 
 # Timeout for LLM calls (in seconds)
-TIMEOUT = 300
+TIMEOUT = 30
 
 # Retry wait time
-RETRY_WAIT = 300
+RETRY_WAIT = 15
