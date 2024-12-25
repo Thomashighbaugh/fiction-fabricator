@@ -3,5 +3,5 @@ joblib
 loguru
 omegaconf
 tenacity
-transformers
 questionary
+aiohttp

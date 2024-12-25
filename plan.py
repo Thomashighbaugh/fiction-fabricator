@@ -1,5 +1,3 @@
-
-
 import re
 import json
 
@@ -7,8 +5,8 @@ import json
 class Plan:
     @staticmethod
     def split_by_act(original_plan):
-        acts = re.split("\n.{0,5}?Act ", original_plan)
-        acts = [text.strip() for text in acts[:] if (text and (len(text.split()) > 3))]
+        acts = re.split(r"\n\s{0,5}?Act ", original_plan)
+        acts = [text.strip() for text in acts[1:] if (text and (len(text.split()) > 3))]
         if len(acts) == 4:
             acts = acts[1:]
         elif len(acts) != 3:
@@ -20,6 +18,7 @@ class Plan:
                 print("Fail: split_by_act, attempt 2", original_plan)
                 return []
 
+
         if acts[0].startswith("Act "):
             acts = [acts[0]] + ["Act " + act for act in acts[1:]]
         else:
@@ -28,11 +27,12 @@ class Plan:
 
     @staticmethod
     def parse_act(act):
-        act = re.split(r"\n.{0,20}?Chapter .+:", act.strip())
-        chapters = [
-            text.strip() for text in act[1:] if (text and (len(text.split()) > 3))
-        ]
-        return {"act_descr": act[0].strip(), "chapters": chapters}
+      act = re.split(r"\n\s{0,20}?Chapter .+:", act.strip())
+      chapters = [
+          text.strip() for text in act[1:] if (text and (len(text.split()) > 3))
+      ]
+      return {"act_descr": act[0].strip(), "chapters": chapters}
+
 
     @staticmethod
     def parse_text_plan(text_plan):
@@ -86,7 +86,3 @@ class Plan:
     def save_plan(plan, fpath):
         with open(fpath, "w") as fp:
             json.dump(plan, fp, indent=4)
-
-
-
-

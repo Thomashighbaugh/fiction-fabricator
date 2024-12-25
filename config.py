@@ -2,7 +2,8 @@
 import os
 
 # Ollama model name
-MODEL_NAME = ("llama3.3:latest",)
+MODEL_NAME = "llama3.2:3b"
+SUMMARY_MODEL_NAME = "llama3.2:3b"
 
 # Timeout for LLM calls (in seconds)
 TIMEOUT = 30
