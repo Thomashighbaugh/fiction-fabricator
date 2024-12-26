@@ -12,17 +12,21 @@ import config
 
 
 class StoryAgent:
-    def __init__(self, llm_config, summary_config, prompt_engine=None, form='novel', n_crop_previous=400, max_combined_length=1500):
+    def __init__(self, llm_config, summary_config, system_prompt = None, prompt_engine=None, form='novel', n_crop_previous=400, max_combined_length=1500):
 
         self.form = form
         self.llm_config = llm_config
         self.summary_config = summary_config
         self.n_crop_previous = n_crop_previous
         self.max_combined_length = max_combined_length
+        self.system_prompt = system_prompt
+
 
         # Initialize helper classes
         self.embedding_manager = EmbeddingManager(llm_config=llm_config)
-        self.prompt_constructor = PromptConstructor(prompt_engine, llm_config=llm_config)
+        self.prompt_constructor = PromptConstructor(prompt_engine, llm_config=llm_config, summary_config=summary_config)
+        if self.system_prompt:
+             self.prompt_constructor.system_message = self.system_prompt
         self.world_model = WorldModel()
 
     async def query_chat(self, prompt, system_message, loop):
@@ -143,14 +147,12 @@ class StoryAgent:
 
                 try:
                     act_dict = Plan.parse_act(enhanced_act)
-                    while len(act_dict['chapters']) < 2:
-                        result = await self.query_chat(messages[1]['content'], messages[0]['content'], loop)
-                        if result:
-                            act_dict = Plan.parse_act(result)
-                        else:
-                            break
+                    if len(act_dict['chapters']) < 2:
+                        logger.warning(f"Failed to generate a useable act for act: {act_num}, skipping")
+                        enhanced_acts.append(None)
+                        continue
                     else:
-                      enhanced_acts.append(act_dict)
+                        enhanced_acts.append(act_dict)
 
                     text_plan = Plan.plan_2_str(plan)
                     # Only add the embedding when enhancing the plot:
@@ -164,9 +166,10 @@ class StoryAgent:
                     continue
 
             if any(act is None for act in enhanced_acts):
-              return all_messages, plan
+                logger.warning("One or more acts failed to enhance, returning incomplete plan")
+                return all_messages, plan
             else:
-              return all_messages, enhanced_acts
+                return all_messages, enhanced_acts
         except Exception as e:
             logger.error(f'Failed to enhance plot chapters: {e}')
             return None, []

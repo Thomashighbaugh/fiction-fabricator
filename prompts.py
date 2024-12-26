@@ -8,7 +8,7 @@ book_spec_format = (
     "Tone: (Dark, cynical, sensual)\n"
     "Point of View: (First, third-limited, omniscient)\n"
     "Characters: (Names, motivations, backstories)\n"
-    "Premise: (Story's central conflict)"
+    "Premise: (Story's central conflict, must adhere to topic)"
 )
 
 scene_spec_format = (
@@ -34,7 +34,7 @@ def init_book_spec_messages(topic, form):
     return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Create a detailed {form} specification for a story about {topic}. Use this format:\n\"\"\"\n{book_spec_format}\"\"\""}
+         "content": f"Create a detailed {form} specification for a story about the following topic: '{topic}'. Strictly adhere to the topic and build upon it; do not deviate. Use this format:\n\"\"\"\n{book_spec_format}\"\"\""}
     ]
 
 
@@ -42,7 +42,7 @@ def missing_book_spec_messages(field, text_spec):
     return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Provide only the missing {field} and its value:\n\"\"\"{text_spec}\"\"\""}
+         "content": f"Provide ONLY the missing {field} and its value, strictly adhering to the existing specification. Do not alter existing values:\n\"\"\"{text_spec}\"\"\""}
     ]
 
 
@@ -50,7 +50,7 @@ def enhance_book_spec_messages(book_spec, form):
      return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Enhance the existing {form} specification. Deepen dark themes, erotic elements, imagery, and moral ambiguity. Do not change format or core story. Specification:\n\"\"\"{book_spec}\"\"\""}
+         "content": f"Enhance the existing {form} specification, strictly building upon all existing values. Deepen dark themes, erotic elements, imagery, and moral ambiguity. Do not change the format or the core premise. Specification:\n\"\"\"{book_spec}\"\"\""}
     ]
 
 
@@ -58,7 +58,7 @@ def create_plot_chapters_messages(book_spec, form):
     return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Create a three-act plot for a {form}. Each act builds to moral compromise and has 3-5 chapters. Format:\nActs\n- Chapters\n\nSpecification:\n\"\"\"{book_spec}\"\"\""}
+         "content": f"Create a three-act plot for a {form}, strictly adhering to the premise and other details of the specification. Each act should build to a point of moral compromise and should include 3-5 chapters. Format:\nActs\n- Chapters\n\nSpecification:\n\"\"\"{book_spec}\"\"\""}
     ]
 
 
@@ -67,7 +67,7 @@ def enhance_plot_chapters_messages(act_num, text_plan, book_spec, form):
     return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Refine Act {act_num}. Each chapter should alternate between hope/escape and despair. Describe moral descent/erotic temptations. Maintain original topic. Existing outline:\n\"\"\"{text_plan}\"\"\"\nSpecification:\n\"\"\"{book_spec}\"\"\""}
+         "content": f"Refine Act {act_num}, strictly building upon the existing outline. Each chapter should alternate between hope/escape and despair. Describe moral descent/erotic temptations. Maintain the original topic and premise as described in the specification. Existing outline:\n\"\"\"{text_plan}\"\"\"\nSpecification:\n\"\"\"{book_spec}\"\"\""}
     ]
 
 
