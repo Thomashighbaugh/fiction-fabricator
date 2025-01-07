@@ -7,3 +7,5 @@ build
 *.DS_Store
 *egg-info
 *env
+.joblib_cache
+.joblib_cache/*
