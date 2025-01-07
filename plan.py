@@ -1,3 +1,4 @@
+# /home/tlh/fiction-fabricator/plan.py
 import re
 import json
 
@@ -5,6 +6,14 @@ import json
 class Plan:
     @staticmethod
     def split_by_act(original_plan):
+        """Splits a plan string into acts based on the 'Act' keyword.
+
+        Args:
+            original_plan (str): The plan string to split.
+
+        Returns:
+             list: A list of act strings.
+        """
         acts = re.split(r"\n\s{0,5}?Act ", original_plan)
         acts = [text.strip() for text in acts[1:] if (text and (len(text.split()) > 3))]
         if len(acts) == 4:
@@ -27,62 +36,114 @@ class Plan:
 
     @staticmethod
     def parse_act(act):
-      act = re.split(r"\n\s{0,20}?Chapter .+:", act.strip())
-      chapters = [
-          text.strip() for text in act[1:] if (text and (len(text.split()) > 3))
-      ]
-      return {"act_descr": act[0].strip(), "chapters": chapters}
+        """Parses an act string into a dictionary containing the act description and chapters.
+
+        Args:
+            act (str): The act string to parse.
+
+         Returns:
+            dict: A dictionary with keys 'act_descr' and 'chapters'.
+        """
+        act = re.split(r"\n\s{0,20}?Chapter .+:", act.strip())
+        chapters = [
+            text.strip() for text in act[1:] if (text and (len(text.split()) > 3))
+        ]
+        return {"act_descr": act[0].strip(), "chapters": chapters}
 
 
     @staticmethod
     def parse_text_plan(text_plan):
+        """Parses a text plan string into a structured list of act dictionaries.
+
+        Args:
+            text_plan (str): The plan string to parse.
+
+        Returns:
+            list: A list of dictionaries, each representing an act.
+        """
         acts = Plan.split_by_act(text_plan)
         if not acts:
             return []
         plan = [Plan.parse_act(act) for act in acts if act]
-        plan = [act for act in plan if act["chapters"]]
+        plan = [act for act in plan if act["chapters"] or act["act_descr"]]
         return plan
 
     @staticmethod
     def normalize_text_plan(text_plan):
+        """Normalizes a text plan by parsing it and then converting it back to a string.
+
+        Args:
+            text_plan (str): The plan string to normalize.
+
+        Returns:
+             str: The normalized plan string.
+        """
         plan = Plan.parse_text_plan(text_plan)
         text_plan = Plan.plan_2_str(plan)
         return text_plan
 
     @staticmethod
     def act_2_str(plan, act_num):
+        """Converts a specific act within a plan to a formatted string.
+
+        Args:
+            plan (list): The list of act dictionaries.
+            act_num (int): The act number to convert.
+
+         Returns:
+             tuple: A tuple containing the formatted act string and list of chapter numbers.
+         """
         text_plan = ""
         chs = []
         ch_num = 1
         for i, act in enumerate(plan):
-            act_descr = act["act_descr"] + "\n"
-            if not re.search(r"Act \d", act_descr[0:50]):
+             if isinstance(act, str):
+                text_plan = plan
+                return text_plan.strip(), chs
+             act_descr = act["act_descr"] + "\n"
+             if not re.search(r"Act \d", act_descr[0:50]):
                 act_descr = f"Act {i+1}:\n" + act_descr
-            for chapter in act["chapters"]:
+             for chapter in act["chapters"]:
                 if (i + 1) == act_num:
                     act_descr += f"- Chapter {ch_num}: {chapter}\n"
                     chs.append(ch_num)
                 elif (i + 1) > act_num:
                     return text_plan.strip(), chs
                 ch_num += 1
-            text_plan += act_descr + "\n"
+             text_plan += act_descr + "\n"
         return text_plan.strip(), chs
 
     @staticmethod
     def plan_2_str(plan):
-        text_plan = ""
-        ch_num = 1
-        for i, act in enumerate(plan):
-            act_descr = act["act_descr"] + "\n"
-            if not re.search(r"Act \d", act_descr[0:50]):
+         """Converts a plan (list of acts) to a formatted string.
+
+         Args:
+            plan (list): The list of act dictionaries.
+
+        Returns:
+            str: The formatted plan string.
+         """
+         text_plan = ""
+         ch_num = 1
+         for i, act in enumerate(plan):
+             if isinstance(act, str):
+                  return plan
+             act_descr = act["act_descr"] + "\n"
+             if not re.search(r"Act \d", act_descr[0:50]):
                 act_descr = f"Act {i+1}:\n" + act_descr
-            for chapter in act["chapters"]:
-                act_descr += f"- Chapter {ch_num}: {chapter}\n"
-                ch_num += 1
-            text_plan += act_descr + "\n"
-        return text_plan.strip()
+             for chapter in act["chapters"]:
+                 act_descr += f"- Chapter {ch_num}: {chapter}\n"
+                 ch_num += 1
+             text_plan += act_descr + "\n"
+         return text_plan.strip()
 
     @staticmethod
     def save_plan(plan, fpath):
-        with open(fpath, "w") as fp:
-            json.dump(plan, fp, indent=4)
+         """Saves a plan (list of acts) to a JSON file.
+
+        Args:
+            plan (list): The list of act dictionaries.
+            fpath (str): The path to save the plan to.
+         """
+         with open(fpath, "w") as fp:
+             json.dump(plan, fp, indent=4)

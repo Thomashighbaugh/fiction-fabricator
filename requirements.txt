@@ -1,3 +1,4 @@
+# /home/tlh/fiction-fabricator/requirements.txt
 ollama
 joblib
 loguru

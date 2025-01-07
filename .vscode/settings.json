@@ -4,5 +4,8 @@
         "joblib",
         "ollama",
         "pseudokey"
-    ]
+    ],
+    "[markdown]": {
+        "editor.cursorSurroundingLines": 0
+    }
 }
