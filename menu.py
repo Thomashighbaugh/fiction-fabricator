@@ -165,12 +165,22 @@ async def process_action(action, agent, output_manager, book_specification, plan
             if not plan:
                 logger.warning("Please create plot acts first.")
                 return book_specification, plan
-            messages, plan = await agent.create_chapters(book_specification, plan, loop, output_manager)
-            if plan:
-                text_plan = Plan.plan_2_str(plan)
+            # Ensure the plan is in the correct format before passing to create_chapters
+            if isinstance(plan, str):
+                logger.warning("Plan is a string. Parsing it into the correct format.")
+                plan = Plan.parse_text_plan(plan)
+            elif not all(isinstance(item, dict) and 'act_descr' in item and 'chapters' in item for item in plan):
+                logger.error("Invalid plan format: 'plan' must be a list of dictionaries with 'act_descr' and 'chapters' keys.")
+                return book_specification, plan
+
+            messages, enhanced_plan = await agent.create_chapters(book_specification, plan, loop, output_manager)
+            if enhanced_plan:
+                text_plan = Plan.plan_2_str(enhanced_plan)
                 logger.info(f"Initial Chapter Descriptions:\n{text_plan}")
-                plan = await handle_edit(text_plan, "chapter descriptions", "plot_chapters", Plan.parse_text_plan) or plan
-            return book_specification, plan
+                enhanced_plan = await handle_edit(text_plan, "chapter descriptions", "plot_chapters", Plan.parse_text_plan) or enhanced_plan
+            else:
+                logger.warning("Failed to create chapter descriptions.")
+            return book_specification, enhanced_plan
 
         elif action == "Enhance Plot Outline":
             if not plan:
@@ -250,7 +260,6 @@ async def process_action(action, agent, output_manager, book_specification, plan
     except Exception as exception:
         logger.exception(f"An error occurred: {exception}")
         return book_specification, plan
-
 
 async def main():
     parser = argparse.ArgumentParser(description="Storytelling Agent")

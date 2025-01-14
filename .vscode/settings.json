@@ -7,5 +7,6 @@
     ],
     "[markdown]": {
         "editor.cursorSurroundingLines": 0
-    }
+    },
+    "python.pythonPath": ".venv/bin/python3.12"
 }
