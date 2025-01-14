@@ -3,6 +3,8 @@ __pycache__
 .output
 test*
 data
+output/* 
+output
 build
 *.DS_Store
 *egg-info
