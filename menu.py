@@ -161,10 +161,30 @@ async def process_action(action, agent, output_manager, book_specification, plan
                 plan = await handle_edit(text_plan, "plot acts", "plot_acts", Plan.parse_text_plan) or plan
             return book_specification, plan
 
+        elif action == "Enhance Plot Outline":
+            if not plan:
+                logger.warning("Please create a plot outline first.")
+                return book_specification, plan
+            messages, enhanced_plan = await agent.enhance_plot(book_specification, plan, loop, output_manager)
+            if enhanced_plan:
+                text_plan = Plan.plan_2_str(enhanced_plan)
+                logger.info(f"Enhanced Plot Outline:\n{text_plan}")
+                enhanced_plan = await handle_edit(text_plan, "enhanced plot outline", "enhanced_plot_outline", Plan.parse_text_plan) or enhanced_plan
+            else:
+                logger.warning("Failed to enhance plot outline.")
+            return book_specification, enhanced_plan
+
         elif action == "Create Chapter Descriptions":
             if not plan:
                 logger.warning("Please create plot acts first.")
                 return book_specification, plan
+
+            # Ask the user for the desired number of chapters
+            num_chapters = await run_questionary(
+                questionary.text("How many chapters do you want in your book?", validate=lambda text: text.isdigit() and int(text) > 0)
+            )
+            num_chapters = int(num_chapters)
+
             # Ensure the plan is in the correct format before passing to create_chapters
             if isinstance(plan, str):
                 logger.warning("Plan is a string. Parsing it into the correct format.")
@@ -173,25 +193,17 @@ async def process_action(action, agent, output_manager, book_specification, plan
                 logger.error("Invalid plan format: 'plan' must be a list of dictionaries with 'act_descr' and 'chapters' keys.")
                 return book_specification, plan
 
-            messages, enhanced_plan = await agent.create_chapters(book_specification, plan, loop, output_manager)
+            messages, enhanced_plan = await agent.create_chapters(book_specification, plan, loop, output_manager, num_chapters)
             if enhanced_plan:
                 text_plan = Plan.plan_2_str(enhanced_plan)
                 logger.info(f"Initial Chapter Descriptions:\n{text_plan}")
-                enhanced_plan = await handle_edit(text_plan, "chapter descriptions", "plot_chapters", Plan.parse_text_plan) or enhanced_plan
+
+                # Ask the user if they want to edit the generated chapter descriptions
+                if await questionary.confirm("Do you want to edit the chapter descriptions?").ask_async():
+                    enhanced_plan = await handle_edit(text_plan, "chapter descriptions", "plot_chapters", Plan.parse_text_plan) or enhanced_plan
             else:
                 logger.warning("Failed to create chapter descriptions.")
             return book_specification, enhanced_plan
-
-        elif action == "Enhance Plot Outline":
-            if not plan:
-                logger.warning("Please create plot chapters first.")
-                return book_specification, plan
-            messages, plan = await agent.enhance_plot(book_specification, plan, loop, output_manager)
-            if plan:
-                text_plan = Plan.plan_2_str(plan)
-                logger.info(f"Enhanced Plot Chapters:\n{text_plan}")
-                plan = await handle_edit(text_plan, "enhanced plot outline", "enhanced_plot_chapters", Plan.parse_text_plan) or plan
-            return book_specification, plan
 
         elif action == "Split Chapters into Scenes":
             if not plan:
@@ -310,8 +322,8 @@ async def main():
                     "Initialize Book Specification",
                     "Enhance Book Specification",
                     "Create Plot Outline",
-                    "Create Chapter Descriptions",
                     "Enhance Plot Outline",
+                    "Create Chapter Descriptions",
                     "Split Chapters into Scenes",
                     "Write All Scenes",
                     "Enhance All Scenes",

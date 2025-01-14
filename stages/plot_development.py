@@ -39,8 +39,9 @@ async def create_plot_outline(agent, book_spec, loop, output_manager):
     logger.info("Plot outline created and saved.")
     return messages, plan
 
-async def create_chapters(agent, book_spec, plan, loop, output_manager):
-    """Creates the initial chapter descriptions for the three acts by querying the LLM.
+async def create_chapters(agent, book_spec, plan, loop, output_manager, num_chapters):
+    """
+    Creates the initial chapter descriptions for the three acts by querying the LLM.
 
     Args:
         agent (StoryAgent): The main story agent instance.
@@ -48,42 +49,55 @@ async def create_chapters(agent, book_spec, plan, loop, output_manager):
         plan (list): The initial plot plan.
         loop (asyncio.AbstractEventLoop): The event loop.
         output_manager (OutputManager): An object to handle output and loading.
+        num_chapters (int): The total number of chapters to create.
 
     Returns:
         tuple: A tuple containing the messages and the plan, or (None, []).
     """
-    logger.info("Creating initial chapter descriptions...")
+    logger.info(f"Creating initial chapter descriptions for {num_chapters} chapters...")
     all_messages = []
     enhanced_acts = []
+
     if len(plan) != 3:
         logger.error(f"Plan passed into create_chapters does not have 3 acts. Instead, it has {len(plan)} acts.")
         return all_messages, plan
 
-    for act_num in range(len(plan)):  # Iterate over the original acts from the plan
-        logger.info(f"Starting chapter creation for act {act_num + 1}")
+    # Distribute chapters among acts
+    chapters_per_act = [num_chapters // 3] * 3
+    for i in range(num_chapters % 3):
+        chapters_per_act[i] += 1
+
+    for act_num in range(len(plan)):
+        num_chapters_in_act = chapters_per_act[act_num]
+        logger.info(f"Starting chapter creation for act {act_num + 1} with {num_chapters_in_act} chapters")
         try:
             # Generate text_plan based on current state of enhanced_acts
             current_plan = plan[:act_num] + enhanced_acts[act_num:]
             text_plan = Plan.plan_2_str(current_plan)
 
-            messages = agent.prompt_constructor.enhance_plot_chapters_messages(act_num, text_plan, book_spec, agent.form)
+            messages = agent.prompt_constructor.create_chapters_messages(act_num, text_plan, book_spec, agent.form, num_chapters_in_act)
             logger.info(f"Making LLM call for act {act_num + 1}...")
             enhanced_act_raw = await agent.query_chat(messages[1]['content'], messages[0]['content'], loop)
             logger.info(f"LLM call finished for act {act_num + 1}.")
-            
+
             if enhanced_act_raw is None:
                 logger.error(f"Failed to generate plot chapter for act {act_num + 1}")
                 all_messages.append(messages)
-                enhanced_acts.append(None)
+                enhanced_acts.append(plan[act_num])  # Keep the original act if enhancement fails
                 continue
 
-            logger.debug(f"Raw LLM response for act {act_num + 1}:\n{enhanced_act_raw}") # Log the raw response
+            logger.debug(f"Raw LLM response for act {act_num + 1}:\n{enhanced_act_raw}")
             try:
-                act_dict = Plan.parse_act_chapters(enhanced_act_raw) # Parse the chapter desc
-                if len(act_dict['chapters']) < 2:
-                    logger.warning(f"Failed to generate a usable act for act: {act_num + 1}, skipping")
+                act_dict = Plan.parse_act_chapters(enhanced_act_raw)
+
+                # Check if the number of chapters generated matches the expected number
+                if len(act_dict['chapters']) != num_chapters_in_act:
+                    logger.warning(f"Generated {len(act_dict['chapters'])} chapters for act {act_num + 1}, expected {num_chapters_in_act}. Using generated chapters.")
+
+                if len(act_dict['chapters']) < 1:
+                    logger.warning(f"Failed to generate chapters for act: {act_num + 1}, using original act")
                     logger.debug(f"Act {act_num + 1} raw response: {enhanced_act_raw}")
-                    enhanced_acts.append(None)
+                    enhanced_acts.append(plan[act_num])  # Keep the original act
                     continue
                 else:
                     enhanced_acts.append(act_dict)
@@ -91,29 +105,26 @@ async def create_chapters(agent, book_spec, plan, loop, output_manager):
                 logger.info(f"Chapter descriptions created for act {act_num + 1}")
 
             except Exception as e:
-                logger.warning(f"Failed to parse act dict in enhance plot chapters response: {e}")
+                logger.warning(f"Failed to parse act dict in enhance plot chapters response: {e}, using original act")
                 logger.debug(f"Act {act_num + 1} raw response: {enhanced_act_raw}")
                 all_messages.append(messages)
-                enhanced_acts.append(None)
+                enhanced_acts.append(plan[act_num])  # Keep the original act
                 continue
         except Exception as e:
-             logger.error(f"An error occurred during chapter creation for act {act_num + 1}: {e}")
+             logger.error(f"An error occurred during chapter creation for act {act_num + 1}: {e}, using original act")
              all_messages.append(messages)
-             enhanced_acts.append(None)
+             enhanced_acts.append(plan[act_num])  # Keep the original act
              continue
         logger.info(f"Finished chapter creation for act {act_num + 1}")
 
-    if any(act is None for act in enhanced_acts):
-        logger.warning("One or more acts failed to enhance, returning incomplete plan")
-        return all_messages, plan
-    else:
-        output_manager.save_output("plot_chapters", Plan.plan_2_str(enhanced_acts))
-        agent.embedding_manager.add_embedding("plot_chapters", Plan.plan_2_str(enhanced_acts))
-        logger.info("Chapter descriptions created and saved.")
-        return all_messages, enhanced_acts
+    output_manager.save_output("plot_chapters", Plan.plan_2_str(enhanced_acts))
+    agent.embedding_manager.add_embedding("plot_chapters", Plan.plan_2_str(enhanced_acts))
+    logger.info("Chapter descriptions created and saved.")
+    return all_messages, enhanced_acts
 
 async def enhance_plot_outline(agent, book_spec, plan, loop, output_manager):
-    """Enhances the plot outline by iteratively querying the LLM for each act.
+    """
+    Enhances the plot outline by iteratively querying the LLM for each act.
 
     Args:
         agent (StoryAgent): The main story agent instance.
@@ -126,52 +137,49 @@ async def enhance_plot_outline(agent, book_spec, plan, loop, output_manager):
         tuple: A tuple containing the messages and the enhanced plan, or (None, []).
     """
     logger.info("Enhancing plot outline...")
-    text_plan = Plan.plan_2_str(plan)
     all_messages = []
     enhanced_acts = []
+
     for act_num in range(len(plan)):
-        messages = agent.prompt_constructor.enhance_plot_chapters_messages(act_num, text_plan, book_spec, agent.form)
-        enhanced_act_raw = await agent.query_chat(messages[1]['content'], messages[0]['content'], loop)
-
-        if enhanced_act_raw is None:
-            logger.error(f"Failed to enhance plot chapter for act {act_num}")
-            all_messages.append(messages)
-            enhanced_acts.append(None)
-            continue
-
+        logger.info(f"Enhancing Act {act_num + 1}...")
         try:
-            act_dict = Plan.parse_act_chapters(enhanced_act_raw)
-            if len(act_dict['chapters']) < 2:
-                logger.warning(f"Failed to generate a usable act for act: {act_num}, skipping")
-                enhanced_acts.append(None)
-                continue
-            else:
-                enhanced_acts.append(act_dict)
+            # Prepare the prompt
+            messages = agent.prompt_constructor.enhance_plot_chapters_messages(act_num, Plan.plan_2_str(plan), book_spec, agent.form)
+            logger.info(f"Sending request for Act {act_num + 1}...")
+            enhanced_act_raw = await agent.query_chat(messages[1]['content'], messages[0]['content'], loop)
+            logger.info(f"Response received for Act {act_num + 1}.")
 
-            text_plan = Plan.plan_2_str(enhanced_acts) # Use the enhanced acts for the next iteration
-            agent.embedding_manager.add_embedding(f"enhanced_act_{act_num}", text_plan)
-            all_messages.append(messages)
+            if enhanced_act_raw is None:
+                logger.error(f"Failed to enhance Act {act_num + 1}.")
+                all_messages.append(messages)
+                enhanced_acts.append(plan[act_num])
+                continue
+
+            # Parse the enhanced act
+            try:
+                act_dict = Plan.parse_act_chapters(enhanced_act_raw)
+                if not act_dict['chapters']:
+                    logger.warning(f"Enhanced Act {act_num + 1} contains no chapters. Keeping the original act.")
+                    enhanced_acts.append(plan[act_num])
+                else:
+                    enhanced_acts.append(act_dict)
+                    logger.info(f"Successfully enhanced Act {act_num + 1}.")
+
+            except Exception as e:
+                logger.error(f"Failed to parse enhanced Act {act_num + 1}: {e}. Keeping the original act.")
+                enhanced_acts.append(plan[act_num])
 
         except Exception as e:
-            logger.warning(f'Failed to parse act dict in enhance plot chapters response: {e}')
-            all_messages.append(messages)
-            enhanced_acts.append(None)
-            continue
+            logger.error(f"An error occurred while enhancing Act {act_num + 1}: {e}. Keeping the original act.")
+            enhanced_acts.append(plan[act_num])
 
-    if any(act is None for act in enhanced_acts):
-        logger.warning("One or more acts failed to enhance, returning incomplete plan")
-        return all_messages, plan
-    else:
-        # Allow user to edit the enhanced plot outline
-        edited_plan_text = await edit_text_with_editor(Plan.plan_2_str(enhanced_acts), "Enhanced Plot Outline")
-        if edited_plan_text is None:
-            logger.warning("Enhanced plot outline editing cancelled.")
-            return all_messages, plan  # Return original plan if editing is cancelled
+        all_messages.append(messages)
 
-        enhanced_acts = Plan.parse_text_plan(edited_plan_text)
-        output_manager.save_output("enhanced_plot_chapters", Plan.plan_2_str(enhanced_acts))
-        logger.info("Plot outline enhanced and saved.")
-        return all_messages, enhanced_acts
+    # Save and return the enhanced plan
+    output_manager.save_output("enhanced_plot_outline", Plan.plan_2_str(enhanced_acts))
+    agent.embedding_manager.add_embedding("enhanced_plot_outline", Plan.plan_2_str(enhanced_acts))
+    logger.info("Enhanced plot outline saved.")
+    return all_messages, enhanced_acts
 
 async def split_into_scenes(agent, plan, loop, output_manager):
     """Splits chapters into scenes by querying the LLM.

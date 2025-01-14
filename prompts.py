@@ -25,10 +25,8 @@ scene_spec_format = (
     "Outcome: (Consequences)"
 )
 
-
 prev_scene_intro = "\n\nPrevious scene:\n"
 cur_scene_intro = "\n\nCurrent scene:\n"
-
 
 def init_book_spec_messages(topic, form):
     """
@@ -80,9 +78,8 @@ def enhance_book_spec_messages(book_spec, form):
     return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Enhance the existing {form} specification, strictly building upon all existing values. Deepen dark themes, erotic elements, imagery, and moral ambiguity. Do not add additional top level keys or alter the format.  The specification MUST BE EXACTLY the following:\n\"\"\"\n{book_spec_format}\"\"\"\nProvide only the enhanced specification, without any additional conversational text. Existing Specification:\n\"\"\"{book_spec}\"\"\""}
+         "content": f"Enhance the existing {form} specification, strictly building upon all existing values. Deepen dark themes, erotic elements, imagery, and moral ambiguity. Do not add additional top level keys or alter the format. The specification MUST BE EXACTLY the following:\n\"\"\"\n{book_spec_format}\"\"\"\nProvide only the enhanced specification, without any additional conversational text. Existing Specification:\n\"\"\"{book_spec}\"\"\""}
     ]
-
 
 def create_plot_chapters_messages(book_spec, form):
     """
@@ -101,6 +98,30 @@ def create_plot_chapters_messages(book_spec, form):
          "content": f"Create a three-act plot for a {form}, strictly adhering to the premise and other details of the specification. Each act should build to a point of moral compromise. Format:\nActs\n\nSpecification:\n\"\"\"{book_spec}\"\"\""}
     ]
 
+def create_chapters_messages(act_num, text_plan, book_spec, form, num_chapters_in_act):
+    """
+    Constructs a prompt for generating chapter descriptions for a specific act.
+
+    Args:
+        act_num (int): The act number for which to generate chapter descriptions.
+        text_plan (str): The existing text plan of the story.
+        book_spec (str): The book specification.
+        form (str): The story form (e.g., novel, novella).
+        num_chapters_in_act (int): The number of chapters to generate for this act.
+
+    Returns:
+        list: A list of messages for the prompt.
+    """
+    return [
+        {"role": "system", "content": ""},
+        {"role": "user",
+         "content": f"Generate descriptions for {num_chapters_in_act} chapters in Act {act_num + 1} of a {form}. "
+                    f"Each chapter should advance the plot, focusing on character development and building tension. "
+                    f"Strictly adhere to the existing plan and book specification. "
+                    f"Provide a concise description for each chapter, outlining key events and character interactions.\n\n"
+                    f"Existing Plan:\n\"\"\"{text_plan}\"\"\"\n\n"
+                    f"Book Specification:\n\"\"\"{book_spec}\"\"\""}
+    ]
 
 def enhance_plot_chapters_messages(act_num, text_plan, book_spec, form):
     """
@@ -113,15 +134,18 @@ def enhance_plot_chapters_messages(act_num, text_plan, book_spec, form):
         form: The story form (e.g. novel, novella, etc.).
 
     Returns:
-        A list of messages for the prompt, with the role of the first message set to "system" and the second message set to "user".
+        A list of messages for the prompt.
     """
-    act_num += 1
     return [
         {"role": "system", "content": ""},
         {"role": "user",
-         "content": f"Refine Act {act_num}, strictly building upon the existing outline. Each chapter should alternate between hope/escape and despair. Describe moral descent/erotic temptations. Maintain the original topic and premise as described in the specification. Provide a short description for each chapter. Existing outline:\n\"\"\"{text_plan}\"\"\"\nSpecification:\n\"\"\"{book_spec}\"\"\""}
+         "content": f"Enhance the following act from the plot outline, ensuring it aligns with the dark and morally ambiguous tone of the book specification. "
+                    f"Expand on the existing plot points, adding depth and complexity to character motivations and interactions. "
+                    f"The enhanced act should maintain the overall structure and progression of the original plot while enriching the narrative with more detailed and nuanced storytelling.\n\n"
+                    f"Act to Enhance: Act {act_num + 1}\n\n"
+                    f"Existing Plot Outline:\n\"\"\"{text_plan}\"\"\"\n\n"
+                    f"Book Specification:\n\"\"\"{book_spec}\"\"\""}
     ]
-
 
 def split_chapters_into_scenes_messages(act_num, text_act, form):
     """
@@ -137,7 +161,6 @@ def split_chapters_into_scenes_messages(act_num, text_act, form):
         {"role": "user",
          "content": f"Deconstruct each chapter in Act {act_num} into 3-5 scenes per chapter, using the format:\n\"\"\"{scene_spec_format}\"\"\"\nAct {act_num}:\n\"\"\"{text_act}\"\"\""}
     ]
-
 
 def scene_messages(scene, sc_num, ch_num, text_plan, form, plot_summary, characters, events, theme, prev_scene_summary, retrieved_context):
     """
