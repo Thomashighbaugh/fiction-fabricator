@@ -1,13 +1,2 @@
-__pycache__
-.output/*
-.output
-test*
-data
-output/* 
-output
-build
-*.DS_Store
-*egg-info
-*env
-.joblib_cache
-.joblib_cache/*
+.venv
+.vscode
