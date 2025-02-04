@@ -2,7 +2,7 @@
 import json
 import requests
 
-from  utils.config import config
+from utils.config import config
 from utils.logger import logger
 
 
@@ -55,8 +55,12 @@ class OllamaClient:
         Returns:
             str | None: The generated text if successful, None otherwise.
         """
-        url = f"{self.base_url}/api/chat"
-        data = {"model": model_name, "prompt": prompt, "stream": False}  # stream: False for single response
+        url = f"{self.base_url}/api/generate"
+        data = {
+            "model": model_name,
+            "prompt": prompt,
+            "stream": False,
+        }  # stream: False for single response
         try:
             response = requests.post(url, json=data)
             response.raise_for_status()
@@ -66,7 +70,9 @@ class OllamaClient:
                 logger.info(f"Text generated successfully using model '{model_name}'")
                 return generated_text
             else:
-                logger.error(f"No 'response' field found in Ollama API response: {response_json}")
+                logger.error(
+                    f"No 'response' field found in Ollama API response: {response_json}"
+                )
                 return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Error generating text with Ollama: {e}")

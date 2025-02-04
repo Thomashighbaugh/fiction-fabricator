@@ -9,6 +9,7 @@ from llm.prompt_manager import PromptManager
 from utils.logger import logger
 from pydantic import ValidationError
 from utils.config import config
+import streamlit as st
 
 
 class ContentGenerator:
@@ -46,7 +47,9 @@ class ContentGenerator:
             BookSpec | None: A BookSpec object if generation is successful, None otherwise.
         """
         prompt = self.prompt_manager.create_book_spec_prompt(idea)
-        generated_text = self.llm_client.generate_text(config.ollama_model_name, prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             try:
                 book_spec_data = json.loads(generated_text)
@@ -78,7 +81,9 @@ class ContentGenerator:
             BookSpec | None: An enhanced BookSpec object if successful, None otherwise.
         """
         prompt = self.prompt_manager.create_enhance_book_spec_prompt(current_spec)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             try:
                 book_spec_data = json.loads(generated_text)
@@ -92,7 +97,9 @@ class ContentGenerator:
                 logger.error(f"Error validating enhanced BookSpec: {e}")
                 logger.debug(f"Raw LLM response: {generated_text}")
             except Exception as e:
-                logger.error(f"Unexpected error processing enhanced BookSpec response: {e}")
+                logger.error(
+                    f"Unexpected error processing enhanced BookSpec response: {e}"
+                )
                 logger.debug(f"Raw LLM response: {generated_text}")
         return None
 
@@ -110,7 +117,9 @@ class ContentGenerator:
             PlotOutline | None: A PlotOutline object if successful, None otherwise.
         """
         prompt = self.prompt_manager.create_plot_outline_prompt(book_spec)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             try:
                 plot_outline = PlotOutline(act_one="", act_two="", act_three="")
@@ -120,7 +129,9 @@ class ContentGenerator:
                     plot_outline.act_two = acts[2].split("Act")[0].strip()
                     plot_outline.act_three = acts[3].strip()
                 else:
-                    logger.warning("Unexpected plot outline format from LLM, basic parsing failed.")
+                    logger.warning(
+                        "Unexpected plot outline format from LLM, basic parsing failed."
+                    )
                     plot_outline.act_one = generated_text
 
                 logger.info("Plot outline generated successfully.")
@@ -144,7 +155,9 @@ class ContentGenerator:
             PlotOutline | None: An enhanced PlotOutline object if successful, None otherwise.
         """
         prompt = self.prompt_manager.create_enhance_plot_outline_prompt(current_outline)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             try:
                 plot_outline = PlotOutline(act_one="", act_two="", act_three="")
@@ -154,7 +167,9 @@ class ContentGenerator:
                     plot_outline.act_two = acts[2].split("Act")[0].strip()
                     plot_outline.act_three = acts[3].strip()
                 else:
-                    logger.warning("Unexpected enhanced plot outline format from LLM, basic parsing failed.")
+                    logger.warning(
+                        "Unexpected enhanced plot outline format from LLM, basic parsing failed."
+                    )
                     plot_outline.act_one = generated_text
 
                 logger.info("Plot outline enhanced successfully.")
@@ -164,7 +179,9 @@ class ContentGenerator:
                 logger.debug(f"Raw LLM response: {generated_text}")
         return None
 
-    def generate_chapter_outlines(self, plot_outline: PlotOutline, num_chapters: int) -> List[ChapterOutline] | None:
+    def generate_chapter_outlines(
+        self, plot_outline: PlotOutline, num_chapters: int
+    ) -> List[ChapterOutline] | None:
         """
         Generates chapter outlines based on a PlotOutline and the desired number of chapters.
 
@@ -178,28 +195,40 @@ class ContentGenerator:
         Returns:
             List[ChapterOutline] | None: A list of ChapterOutline objects if successful, None otherwise.
         """
-        plot_outline_text = "\n".join([
-            "Act One:\n" + plot_outline.act_one,
-            "Act Two:\n" + plot_outline.act_two,
-            "Act Three:\n" + plot_outline.act_three
-        ])
-        prompt = self.prompt_manager.create_chapter_outlines_prompt(plot_outline_text, num_chapters)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        plot_outline_text = "\n".join(
+            [
+                "Act One:\n" + plot_outline.act_one,
+                "Act Two:\n" + plot_outline.act_two,
+                "Act Three:\n" + plot_outline.act_three,
+            ]
+        )
+        prompt = self.prompt_manager.create_chapter_outlines_prompt(
+            plot_outline_text, num_chapters
+        )
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             chapter_outlines = []
             try:
                 chapter_splits = generated_text.strip().split("Chapter ")
                 for i, chapter_text in enumerate(chapter_splits[1:], start=1):
                     chapter_summary = chapter_text.split("Chapter")[0].strip()
-                    chapter_outlines.append(ChapterOutline(chapter_number=i, summary=chapter_summary))
-                logger.info(f"{len(chapter_outlines)} chapter outlines generated successfully.")
+                    chapter_outlines.append(
+                        ChapterOutline(chapter_number=i, summary=chapter_summary)
+                    )
+                logger.info(
+                    f"{len(chapter_outlines)} chapter outlines generated successfully."
+                )
                 return chapter_outlines
             except Exception as e:
                 logger.error(f"Error processing ChapterOutline responses: {e}")
                 logger.debug(f"Raw LLM response: {generated_text}")
         return None
 
-    def enhance_chapter_outlines(self, current_outlines: List[ChapterOutline]) -> List[ChapterOutline] | None:
+    def enhance_chapter_outlines(
+        self, current_outlines: List[ChapterOutline]
+    ) -> List[ChapterOutline] | None:
         """
         Enhances existing chapter outlines using the LLM.
 
@@ -212,16 +241,24 @@ class ContentGenerator:
         Returns:
             List[ChapterOutline] | None: An enhanced list of ChapterOutline objects if successful, None otherwise.
         """
-        outline_texts = [f"Chapter {co.chapter_number}:\n{co.summary}" for co in current_outlines]
-        prompt = self.prompt_manager.create_enhance_chapter_outlines_prompt(outline_texts)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        outline_texts = [
+            f"Chapter {co.chapter_number}:\n{co.summary}" for co in current_outlines
+        ]
+        prompt = self.prompt_manager.create_enhance_chapter_outlines_prompt(
+            outline_texts
+        )
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             enhanced_chapter_outlines = []
             try:
                 chapter_splits = generated_text.strip().split("Chapter ")
                 for i, chapter_text in enumerate(chapter_splits[1:], start=1):
                     chapter_summary = chapter_text.split("Chapter")[0].strip()
-                    enhanced_chapter_outlines.append(ChapterOutline(chapter_number=i, summary=chapter_summary))
+                    enhanced_chapter_outlines.append(
+                        ChapterOutline(chapter_number=i, summary=chapter_summary)
+                    )
                 logger.info("Chapter outlines enhanced successfully.")
                 return enhanced_chapter_outlines
             except Exception as e:
@@ -229,7 +266,9 @@ class ContentGenerator:
                 logger.debug(f"Raw LLM response: {generated_text}")
         return None
 
-    def generate_scene_outlines(self, chapter_outline: ChapterOutline, num_scenes_per_chapter: int) -> List[SceneOutline] | None:
+    def generate_scene_outlines(
+        self, chapter_outline: ChapterOutline, num_scenes_per_chapter: int
+    ) -> List[SceneOutline] | None:
         """
         Generates scene outlines for a given chapter outline and desired number of scenes per chapter.
 
@@ -243,23 +282,33 @@ class ContentGenerator:
         Returns:
             List[SceneOutline] | None: A list of SceneOutline objects if successful, None otherwise.
         """
-        prompt = self.prompt_manager.create_scene_outlines_prompt(chapter_outline.summary, num_scenes_per_chapter)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        prompt = self.prompt_manager.create_scene_outlines_prompt(
+            chapter_outline.summary, num_scenes_per_chapter
+        )
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             scene_outlines = []
             try:
                 scene_splits = generated_text.strip().split("Scene ")
                 for i, scene_text in enumerate(scene_splits[1:], start=1):
                     scene_summary = scene_text.split("Scene")[0].strip()
-                    scene_outlines.append(SceneOutline(scene_number=i, summary=scene_summary))
-                logger.info(f"{len(scene_outlines)} scene outlines generated for chapter {chapter_outline.chapter_number} successfully.")
+                    scene_outlines.append(
+                        SceneOutline(scene_number=i, summary=scene_summary)
+                    )
+                logger.info(
+                    f"{len(scene_outlines)} scene outlines generated for chapter {chapter_outline.chapter_number} successfully."
+                )
                 return scene_outlines
             except Exception as e:
                 logger.error(f"Error processing SceneOutline responses: {e}")
                 logger.debug(f"Raw LLM response: {generated_text}")
         return None
 
-    def enhance_scene_outlines(self, current_outlines: List[SceneOutline]) -> List[SceneOutline] | None:
+    def enhance_scene_outlines(
+        self, current_outlines: List[SceneOutline]
+    ) -> List[SceneOutline] | None:
         """
         Enhances existing scene outlines using the LLM.
 
@@ -270,18 +319,24 @@ class ContentGenerator:
             current_outlines (List[SceneOutline]): The current list of SceneOutline objects to be enhanced.
 
         Returns:
-            List[SceneOutline] | None: An enhanced list of SceneOutline objects if successful, None otherwise.
+            List[SceneOutline] | None: A list of SceneOutline objects if successful, None otherwise.
         """
-        outline_texts = [f"Scene {so.scene_number}:\n{so.summary}" for so in current_outlines]
+        outline_texts = [
+            f"Scene {so.scene_number}:\n{so.summary}" for so in current_outlines
+        ]
         prompt = self.prompt_manager.create_enhance_scene_outlines_prompt(outline_texts)
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             enhanced_scene_outlines = []
             try:
                 scene_splits = generated_text.strip().split("Scene ")
                 for i, scene_text in enumerate(scene_splits[1:], start=1):
                     scene_summary = scene_text.split("Scene")[0].strip()
-                    enhanced_scene_outlines.append(SceneOutline(scene_number=i, summary=scene_summary))
+                    enhanced_scene_outlines.append(
+                        SceneOutline(scene_number=i, summary=scene_summary)
+                    )
                 logger.info("Scene outlines enhanced successfully.")
                 return enhanced_scene_outlines
             except Exception as e:
@@ -290,7 +345,12 @@ class ContentGenerator:
         return None
 
     def generate_scene_part(
-        self, scene_outline: SceneOutline, part_number: int, book_spec: BookSpec, chapter_outline: ChapterOutline, scene_outline_full: SceneOutline
+        self,
+        scene_outline: SceneOutline,
+        part_number: int,
+        book_spec: BookSpec,
+        chapter_outline: ChapterOutline,
+        scene_outline_full: SceneOutline,
     ) -> str | None:
         """
         Generates a part of a scene's text content using the LLM.
@@ -300,7 +360,7 @@ class ContentGenerator:
 
         Args:
             scene_outline (SceneOutline): The SceneOutline object for the current scene part.
-            part_number (int): The part number of the scene (e.g., 1, 2, 3).
+            part_number (int): The part number of the scene (e.g., 1, 2, 3 for beginning, middle, end).
             book_spec (BookSpec): The BookSpec object for overall context.
             chapter_outline (ChapterOutline): The ChapterOutline object for chapter context.
             scene_outline_full (SceneOutline): The full SceneOutline object for scene context.
@@ -309,16 +369,27 @@ class ContentGenerator:
             str | None: The generated text content for the scene part if successful, None otherwise.
         """
         prompt = self.prompt_manager.create_scene_part_prompt(
-            scene_outline.summary, part_number, book_spec, chapter_outline.summary, scene_outline_full.summary
+            scene_outline.summary,
+            part_number,
+            book_spec,
+            chapter_outline.summary,
+            scene_outline_full.summary,
         )
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             logger.info("Scene part %d generated successfully.", part_number)
             return generated_text
         return None
 
     def enhance_scene_part(
-        self, scene_part: str, part_number: int, book_spec: BookSpec, chapter_outline: ChapterOutline, scene_outline_full: SceneOutline
+        self,
+        scene_part: str,
+        part_number: int,
+        book_spec: BookSpec,
+        chapter_outline: ChapterOutline,
+        scene_outline_full: SceneOutline,
     ) -> str | None:
         """
         Enhances an existing scene part's text content using the LLM.
@@ -337,10 +408,15 @@ class ContentGenerator:
             str | None: The enhanced text content for the scene part if successful, None otherwise.
         """
         prompt = self.prompt_manager.create_enhance_scene_part_prompt(
-            scene_part, part_number, book_spec, chapter_outline.summary, scene_outline_full.summary
+            scene_part,
+            part_number,
+            book_spec,
+            chapter_outline.summary,
+            scene_outline_full.summary,
         )
-        generated_text = self.llm_client.generate_text(config.get_ollama_model_name(), prompt)
+        generated_text = self.llm_client.generate_text(
+            st.session_state.selected_model, prompt
+        )
         if generated_text:
             logger.info("Scene part %d enhanced successfully.", part_number)
             return generated_text
-        return None

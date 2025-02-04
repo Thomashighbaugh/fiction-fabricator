@@ -1,6 +1,7 @@
 {
     "[markdown]": {
         "editor.tabSize": 4,
-        "editor.wrappingIndent": "same"
+        "editor.wrappingIndent": "same",
+        "editor.cursorSurroundingLines": 0
     }
 }
