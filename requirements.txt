@@ -8,3 +8,5 @@ sphinx
 mypy
 requests
 tiktoken
+langchain
+langchain_community

@@ -28,6 +28,7 @@ class Config:
         Initializes the configuration by loading environment variables.
         """
         self.project_directory = os.getenv("PROJECT_DIRECTORY", "data")
+        # Force log level to DEBUG for debugging purposes
         self.log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         self.ollama_model_name = os.getenv("OLLAMA_MODEL_NAME", "llama2")
 
