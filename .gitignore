@@ -1,6 +1,8 @@
-**/*.pyc
-.venv 
-.venv/* 
-./.venv 
-
+.venv
+.vscode
 data
+data/*
+**/__pycache__
+**/__pycache__/*
+__pycache__
+__pycache__/*core/content_generator.py

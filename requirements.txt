@@ -1,11 +1,13 @@
-# requirements.txt
 streamlit
-openai
+ollama
 pydantic
 python-dotenv
 black
 pytest
-pydantic-settings
-aiohttp
+pydantic
+sphinx
+mypy
 requests
-numpy
+tiktoken
+aiohttp
+pydantic-settings

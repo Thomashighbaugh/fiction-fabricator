@@ -1,4 +1,4 @@
-# utils/config.py
+# /home/tlh/gui-fab-fict/utils/config.py
 import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,15 +15,15 @@ class Config(BaseSettings):
 
     project_directory: str = "data"
     log_level: str = "INFO"
-    ollama_model_name: str = "mistral"  # Default to Mistral as a common Ollama model
-    ollama_base_url: str = (
-        "http://localhost:11434"  # This is only used by the old client
+    ollama_model_name: str = (
+        "huggingface.co/DavidAU/Mistral-MOE-4X7B-Dark-MultiVerse-Uncensored-Enhanced32-24B-gguf:latest"
     )
-    openai_base_url: str = "http://localhost:11434/v1"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_timeout: float | None = None
 
     @field_validator("log_level")
-    @classmethod
-    def log_level_must_be_valid(cls, v: str) -> str:
+    @classmethod  # Correctly use @classmethod
+    def log_level_must_be_valid(cls, v: str) -> str:  # type: ignore
         allowed_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in allowed_levels:
             raise ValueError(
@@ -41,12 +41,12 @@ class Config(BaseSettings):
 
     def get_ollama_model_name(self) -> str:
         return self.ollama_model_name
-    
-    def get_openai_base_url(self) -> str:
-        return self.openai_base_url
 
     def get_ollama_base_url(self) -> str:
         return self.ollama_base_url
+
+    def get_ollama_timeout(self) -> float | None:
+        return self.ollama_timeout
 
     def set_ollama_model_name(self, model_name: str) -> None:
         self.ollama_model_name = model_name

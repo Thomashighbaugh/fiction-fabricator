@@ -1,119 +1,84 @@
 # llm/llm_client.py
 
-from typing import Optional
-
-
-import requests  # Import the requests library
+import asyncio
+import aiohttp
+import json
 
 from utils.config import config
 from utils.logger import logger
-from openai import (
-    AsyncOpenAI,
-    types,
-    APIError,
-    APIConnectionError,
-    RateLimitError,
-)  # Import error types
 
 
-class OpenAILLMClient:
+class OllamaClient:
     """
-    Client for interacting with a local OpenAI compatible instance.
+    Client for interacting with a local Ollama instance using aiohttp.
     """
 
-    def __init__(self, base_url: str = None):
+    def __init__(self, base_url: str = None, timeout: float = None):
         """
-        Initializes the OpenAI client.
-        """
-        self.base_url = base_url or config.get_openai_base_url()
-        self.client = AsyncOpenAI(
-            base_url=self.base_url, api_key="placeholder"
-        )  # Initialize OpenAI client
-        logger.debug("OpenAILLMClient initialized with base_url: %s", self.base_url)
+        Initializes the Ollama client.
 
-    async def list_models(self) -> Optional[list[str]]:
+        Args:
+            base_url (str): The base URL of the Ollama API.
+            timeout (float, optional): Timeout for requests in seconds.
+                Defaults to None (no timeout).
         """
-        Asynchronously fetches the list of available models from the OpenAI API.
-        Falls back to requests if openai library fails.
-        """
-        try:
-            response = await self.client.models.list()
-            model_names = [
-                model.id for model in response.data if isinstance(model, types.Model)
-            ]  # Use types.Model
-            logger.info(
-                "Successfully fetched models using openai library: {model_names}"
-            )
-            return model_names
-        except (APIError, APIConnectionError, RateLimitError) as openai_err:
-            logger.warning(
-                f"Error fetching models using openai library: {openai_err}. Trying requests fallback."
-            )
-            try:
-                url = f"{self.base_url}/models"  # Standard models endpoint
-                response = requests.get(url, timeout=0)
-                response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-                data = response.json()
-                # Adjust key based on typical API responses; 'data' or 'models' are common
-                models_data = data.get("data") or data.get("models", [])
-                model_names = [
-                    model["id"]
-                    for model in models_data
-                    if isinstance(model, dict) and "id" in model
-                ]
-                logger.info("Successfully fetched models using requests: {model_names}")
-                return model_names
-            except requests.RequestException as requests_err:
-                logger.error(
-                    "Error fetching models using requests fallback: {requests_err}"
-                )
-                return None
-
-    async def generate_text(self, model_name: str, prompt: str) -> Optional[str]:
-        """
-        Asynchronously generates text using the OpenAI API.
-        """
+        self.base_url = base_url or config.get_ollama_base_url()
+        self.timeout = timeout  # Store the timeout
         logger.debug(
-            f"Attempting to generate text with model: {model_name} to URL: {self.base_url}"
-        )  # Log model and URL
+            f"OllamaClient initialized with base_url: {self.base_url}, timeout: {self.timeout}"
+        )
+
+    async def list_models(self) -> list[str] | None:
+        """
+        Asynchronously fetches the list of available models.
+        """
+        url = f"{self.base_url}/api/tags"
+        try:
+            # Use self.timeout here
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout)
+            ) as session:
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    model_names = [model["name"] for model in data["models"]]
+                    logger.info(f"Successfully fetched models: {model_names}")
+                    return model_names
+        except aiohttp.ClientError as e:
+            logger.error(f"Error fetching model list from Ollama: {e}")
+            return None
+
+    async def generate_text(self, model_name: str, prompt: str) -> str | None:
+        """
+        Asynchronously generates text.
+        """
+        url = f"{self.base_url}/api/generate"
+        headers = {"Content-Type": "application/json"}
+        data = {"model": model_name, "prompt": prompt, "stream": False}
 
         try:
-            response = await self.client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-                max_tokens=800,
-            )
-            generated_text = response.choices[0].message.content
+            # Use self.timeout here
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout)
+            ) as session:
+                async with session.post(
+                    url, headers=headers, data=json.dumps(data)
+                ) as response:
+                    response.raise_for_status()
+                    response_data = await response.json()
+                    generated_text = response_data.get("response")
 
-            if generated_text:
-                logger.info(f"Text generated successfully using model '{model_name}'")
-                return generated_text
-            else:
-                logger.error(
-                    "No response from OpenAI API - empty content"
-                )  # More specific error message for empty response
-                return None
+                    if generated_text:
+                        logger.info(
+                            f"Text generated successfully using model '{model_name}'"
+                        )
+                        return generated_text
+                    else:
+                        logger.error(
+                            f"No 'response' field found in Ollama response: {response_data}"
+                        )
+                        return None
 
-        except APIError as e:
-            logger.error(f"OpenAI APIError: {e}")
-            logger.error(
-                f"Status code: {e.status_code}, Response: {e.response}"
-            )  # Include status and response
-            logger.exception(e)  # Log full exception including traceback
-            return None
-        except APIConnectionError as e:
-            logger.error(f"OpenAI APIConnectionError: {e}")
-            logger.exception(e)  # Log full exception including traceback
-            return None
-        except RateLimitError as e:
-            logger.error(f"OpenAI RateLimitError: {e}")
-            logger.exception(e)  # Log full exception including traceback
-            return None
-        except Exception as e:  # Catch-all for any other exceptions
-            logger.error(f"General error during OpenAI text generation: {e}")
-            logger.exception(e)  # Log full exception including traceback
+        except aiohttp.ClientError as e:
+            logger.error(f"Ollama text generation failed: {e}")
             return None

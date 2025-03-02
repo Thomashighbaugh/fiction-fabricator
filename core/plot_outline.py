@@ -1,4 +1,6 @@
-# core/plot_outline.py
+# fiction_fabricator/src/core/plot_outline.py
+from typing import List
+
 from pydantic import BaseModel
 
 

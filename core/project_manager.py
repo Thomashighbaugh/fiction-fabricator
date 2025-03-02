@@ -1,129 +1,84 @@
-# /home/tlh/refactored_gui_fict_fab/core/project_manager.py
+# core/project_manager.py
 import json
 import os
-from typing import Dict, Any, Optional
-
-from utils.file_handler import save_json, load_json
+from core.book_spec import BookSpec
+from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
 from utils.config import config
 from utils.logger import logger
 
 
 class ProjectManager:
     """
-    Manages project-related operations such as saving and loading project data.
+    Manages project saving and loading, now including story_idea.
     """
 
-    def __init__(self):
+    def __init__(self, book_spec: BookSpec = None):
         """
-        Initializes the ProjectManager with the project directory from config.
+        Initializes the ProjectManager.
         """
-        self.project_dir = config.get_project_directory()
-        os.makedirs(self.project_dir, exist_ok=True)  # Ensure project directory exists
-        logger.debug(
-            f"ProjectManager initialized, project directory: {self.project_dir}"
-        )
+        self.book_spec = book_spec
 
     def save_project(
         self,
         project_name: str,
-        story_idea: str,
-        book_spec: Any,  # BookSpec | None,
-        plot_outline: Any,  # PlotOutline | None,
-        chapter_outlines: list[Any],  # list[ChapterOutline] | None,
-        scene_outlines: Dict[int, list[Any]],  # Dict[int, list[SceneOutline]] | None,
-        scene_parts: Dict[int, Dict[int, Any]],  # Dict[int, Dict[int, str]] | None,
-        scene_parts_text: Dict[int, Dict[int, Dict[int, str]]],
-        book_text: Optional[str],
+        story_idea: str = None,
+        book_spec: BookSpec = None,
+        plot_outline: PlotOutline = None,
+        chapter_outlines: list[ChapterOutline] = None,
+        scene_outlines: dict[int, list[SceneOutline]] = None,
+        scene_parts: dict[int, dict[int, str]] = None,
     ) -> None:
         """
-        Saves the project data to a JSON file.
+        Saves the current project data to a JSON file, including story_idea.
         """
-        # Enforce lowercase project directory names:
-        project_dir_name = (
-            project_name.lower()
-        )  # Convert project name to lowercase for directory
-        project_dir = os.path.join(
-            self.project_dir, project_dir_name
-        )  # Use lowercase name for directory
-        os.makedirs(project_dir, exist_ok=True)  # Create project folder if not exists
-        project_filepath = os.path.join(
-            project_dir, f"{project_name}.json"
-        )  # Filename still uses original project_name
-
-        logger.debug(f"Saving project '{project_name}', filepath: {project_filepath}")
-
-        try:
-            # Convert Pydantic models to dictionaries
-            book_spec_data = book_spec.model_dump() if book_spec else None
-            plot_outline_data = plot_outline.model_dump() if plot_outline else None
-            chapter_outlines_data = (
+        project_data = {
+            "story_idea": story_idea,
+            "book_spec": book_spec.model_dump() if book_spec else None,
+            "plot_outline": plot_outline.model_dump() if plot_outline else None,
+            "chapter_outlines": (
                 [co.model_dump() for co in chapter_outlines]
                 if chapter_outlines
                 else None
-            )
-            scene_outlines_data = (
+            ),
+            "scene_outlines": (
                 {
                     chapter_num: [so.model_dump() for so in scene_outlines]
                     for chapter_num, scene_outlines in scene_outlines.items()
                 }
                 if scene_outlines
                 else None
-            )
+            ),
+            "scene_parts": scene_parts if scene_parts else None,
+        }
 
-            project_data: Dict[str, Any] = {
-                "story_idea": story_idea,
-                "book_spec": book_spec_data,
-                "plot_outline": plot_outline_data,
-                "chapter_outlines": chapter_outlines_data,
-                "scene_outlines": scene_outlines_data,
-                "scene_parts": scene_parts,
-                "scene_parts_text": scene_parts_text,
-                "book_text": book_text,
-            }
-            logger.debug(f"Project data before save_json: {project_data}")
+        project_dir = config.get_project_directory()
+        os.makedirs(project_dir, exist_ok=True)  # Ensure directory exists
+        filepath = os.path.join(project_dir, f"{project_name}.json")
 
-            save_json(project_data, project_filepath)
-            logger.info("Project '%s' saved successfully.", project_name)
-        except Exception as e:
-            logger.error("Error saving project '%s': %s", project_name, e)
-            raise
+        with open(filepath, "w") as f:
+            json.dump(project_data, f, indent=4)
+        logger.info(
+            f"Project '{project_name}' saved to '{filepath}' (including story_idea)"
+        )
 
-    def load_project(self, project_name: str) -> Optional[Dict[str, Any]]:
+    def load_project(self, project_name: str) -> dict | None:
         """
-        Loads project data from a JSON file.
+        Loads project data from a JSON file and returns project data including story_idea.
         """
-        # Enforce lowercase project directory names for loading as well:
-        project_dir_name = (
-            project_name.lower()
-        )  # Convert project name to lowercase for directory
-        project_dir = os.path.join(
-            self.project_dir, project_dir_name
-        )  # Use lowercase directory name
-        project_filepath = os.path.join(
-            project_dir, f"{project_name}.json"
-        )  # Filename still uses original project_name
-
-        logger.debug(f"Loading project '{project_name}', filepath: {project_filepath}")
-
-        if not os.path.exists(project_filepath):
-            logger.error(f"Project file NOT found at: {project_filepath}")
-            raise FileNotFoundError(f"Project file not found: {project_filepath}")
-
-        if not os.path.isfile(project_filepath):
-            logger.error(f"Path is not a file: {project_filepath}")
-            raise FileNotFoundError(f"Project file is not a file: {project_filepath}")
+        project_dir = config.get_project_directory()
+        filepath = os.path.join(project_dir, f"{project_name}.json")
 
         try:
-            project_data = load_json(project_filepath)
-            logger.info("Project '%s' loaded successfully.", project_name)
-            logger.debug(f"Project data after load_json: {project_data}")
+            with open(filepath, "r") as f:
+                project_data = json.load(f)
+            logger.info(f"Project '{project_name}' loaded from '{filepath}'")
             return project_data
         except FileNotFoundError:
-            logger.error(f"Project file not found: %s", project_filepath)
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Error decoding JSON from %s: %s", project_filepath, e)
-            raise
+            logger.warning(f"Project file '{filepath}' not found.")
+            return None
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from project file '{filepath}'.")
+            return None
         except Exception as e:
-            logger.error(f"Error loading project '%s': %s", project_name, e)
-            raise
+            logger.error(f"Error loading project from '{filepath}': {e}")
+            return None
