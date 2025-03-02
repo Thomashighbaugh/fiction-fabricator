@@ -4,6 +4,7 @@ Source Tree:
 
 ```
 gui-fab-fict
+├── prompt.txt
 ├── run
 ├── utils
 │   ├── config.py
