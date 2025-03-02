@@ -1,74 +1,55 @@
-# utils/config.py
+# /home/tlh/refactored_gui_fict_fab/utils/config.py
 import os
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # Load environment variables from .env file
 
 
-class Config:
+class Config(BaseSettings):
     """
     Configuration manager for the Fiction Fabricator application.
-
-    Loads configurations from environment variables and provides access
-    to them through getter methods. Uses a singleton pattern to ensure
-    only one configuration instance exists throughout the application.
     """
 
-    _instance = None
+    project_directory: str = "data"
+    log_level: str = "INFO"
+    ollama_model_name: str = "mistral"  # Default to Mistral as a common Ollama model
+    ollama_base_url: str = (
+        "http://localhost:11434"  # This is only used by the old client
+    )
+    openai_base_url: str = "http://localhost:11434/v1"
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Config, cls).__new__(cls)
-            cls._instance._initialize()
-        return cls._instance
+    @field_validator("log_level")
+    @classmethod
+    def log_level_must_be_valid(cls, v: str) -> str:
+        allowed_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in allowed_levels:
+            raise ValueError(
+                f"Invalid log level: {v}.  Must be one of: {allowed_levels}"
+            )
+        return v.upper()
 
-    def _initialize(self):
-        """
-        Initializes the configuration by loading environment variables.
-        """
-        self.project_directory = os.getenv("PROJECT_DIRECTORY", "data")
-        # Force log level to DEBUG for debugging purposes
-        self.log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-        self.ollama_model_name = os.getenv("OLLAMA_MODEL_NAME", "llama2")
-
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     def get_project_directory(self) -> str:
-        """
-        Returns the configured project directory.
-
-        Returns:
-            str: The directory where project data will be stored.
-        """
         return self.project_directory
 
     def get_log_level(self) -> str:
-        """
-        Returns the configured log level.
-
-        Returns:
-            str: The log level for the application (e.g., "DEBUG", "INFO", "WARNING").
-        """
         return self.log_level
 
     def get_ollama_model_name(self) -> str:
-        """
-        Returns the configured Ollama model name.
-
-        Returns:
-            str: The name of the Ollama model to be used.
-        """
         return self.ollama_model_name
+    
+    def get_openai_base_url(self) -> str:
+        return self.openai_base_url
+
+    def get_ollama_base_url(self) -> str:
+        return self.ollama_base_url
 
     def set_ollama_model_name(self, model_name: str) -> None:
-        """
-        Sets the configured Ollama model name.
-
-        Args:
-            str: The name of the Ollama model to be used.
-        """
         self.ollama_model_name = model_name
 
 
-# Instantiate the Config singleton
 config = Config()

@@ -1,0 +1,1 @@
+code2prompt .  --output prompt.txt --tokens --exclude-folders=.venv,data,.vscode --exclude-files=.gitignore,prompt.txt -e pyc

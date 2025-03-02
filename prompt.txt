@@ -1,0 +1,3915 @@
+Project Path: /home/tlh/refactored_gui_fict_fab
+
+Source Tree:
+
+```
+refactored_gui_fict_fab
+├── app.py
+├── prompt.txt
+├── run
+├── utils
+│   ├── config.py
+│   ├── file_handler.py
+│   ├── logger.py
+│   ├── data_validation.py
+│   └── async_utils.py
+├── requirements.txt
+├── setup-env.sh
+├── data
+│   ├── shroom
+│   │   └── shroom.json
+│   ├── Horizons
+│   │   └── Horizons.json
+│   ├── shroom.json
+│   ├── Horizon
+│   │   └── Horizon.json
+│   └── horizon
+│       └── horizon.json
+├── streamlit_app
+│   ├── components
+│   │   ├── book_spec_view.py
+│   │   ├── scene_part_view.py
+│   │   ├── plot_outline_view.py
+│   │   ├── scene_outline_view.py
+│   │   ├── book_text_view.py
+│   │   ├── __init__.py
+│   │   └── chapter_outline_view.py
+│   └── __init__.py
+├── core
+│   ├── content_generation
+│   │   ├── plot_outline_generator.py
+│   │   ├── scene_outline_generator.py
+│   │   ├── chapter_outline_generator.py
+│   │   ├── book_assembler.py
+│   │   ├── book_spec_generator.py
+│   │   ├── base_generator.py
+│   │   ├── scene_part_generator.py
+│   │   └── __init__.py
+│   ├── book_spec.py
+│   ├── plot_outline.py
+│   └── project_manager.py
+└── llm
+    ├── prompt_manager
+    │   ├── book_spec_prompts.py
+    │   ├── scene_part_prompts.py
+    │   ├── base_prompts.py
+    │   ├── plot_outline_prompts.py
+    │   ├── chapter_outline_prompts.py
+    │   ├── prompt_manager.py
+    │   ├── scene_outline_prompts.py
+    │   └── __init__.py
+    ├── llm_client.py
+    └── __init__.py
+
+```
+
+`/home/tlh/refactored_gui_fict_fab/app.py`:
+
+```````py
+# /home/tlh/refactored_gui_fict_fab/app.py
+import streamlit as st
+import asyncio
+import os
+import sys
+
+# Add the parent directory of 'llm' to the Python path
+llm_parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "llm"))
+if llm_parent_dir not in sys.path:
+    sys.path.insert(0, llm_parent_dir)
+
+# Ensure components are importable after moving app.py to root
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from streamlit_app.components.book_spec_view import book_spec_display
+from streamlit_app.components.plot_outline_view import plot_outline_display
+from streamlit_app.components.chapter_outline_view import chapter_outlines_display
+from streamlit_app.components.scene_outline_view import scene_outlines_display
+from streamlit_app.components.scene_part_view import scene_part_display
+from streamlit_app.components.book_text_view import book_text_display
+
+from core.content_generation.book_spec_generator import BookSpecGenerator
+from core.content_generation.plot_outline_generator import PlotOutlineGenerator
+from core.content_generation.chapter_outline_generator import ChapterOutlineGenerator
+from core.content_generation.scene_outline_generator import SceneOutlineGenerator
+from core.content_generation.scene_part_generator import ScenePartGenerator
+from core.content_generation.book_assembler import BookAssembler
+from core.project_manager import ProjectManager  # import statement here
+from llm.prompt_manager.prompt_manager import (
+    DynamicPromptManager,
+)  # changed import here
+from llm.llm_client import OpenAILLMClient  # Changed to OpenAILLMClient
+from utils.config import config
+from core.book_spec import BookSpec
+from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
+from utils.logger import logger
+
+
+def main():
+    """Main function to run the Streamlit Fiction Fabricator application."""
+    st.set_page_config(
+        page_title="Fiction Fabricator",
+        page_icon="🕉️",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    st.title("Fiction Fabricator")
+
+    # --- Initialize Session State ---
+    if "openai_client" not in st.session_state:  # Renamed client
+        st.session_state.openai_client = OpenAILLMClient()  # Changed client class
+    if "prompt_manager" not in st.session_state:
+        st.session_state.prompt_manager = DynamicPromptManager()  # changed class here
+    if "book_spec_generator" not in st.session_state:
+        st.session_state.book_spec_generator = BookSpecGenerator(
+            st.session_state.prompt_manager, config.get_ollama_model_name()
+        )
+    if "plot_outline_generator" not in st.session_state:
+        st.session_state.plot_outline_generator = PlotOutlineGenerator(
+            st.session_state.prompt_manager, config.get_ollama_model_name()
+        )
+    if "chapter_outline_generator" not in st.session_state:
+        st.session_state.chapter_outline_generator = ChapterOutlineGenerator(
+            st.session_state.prompt_manager, config.get_ollama_model_name()
+        )
+    if "scene_outline_generator" not in st.session_state:
+        st.session_state.scene_outline_generator = SceneOutlineGenerator(
+            st.session_state.prompt_manager, config.get_ollama_model_name()
+        )
+    if "scene_part_generator" not in st.session_state:
+        st.session_state.scene_part_generator = ScenePartGenerator(
+            st.session_state.prompt_manager, config.get_ollama_model_name()
+        )
+    if "book_assembler" not in st.session_state:
+        st.session_state.book_assembler = BookAssembler()
+    if "project_manager" not in st.session_state:
+        st.session_state.project_manager = ProjectManager()
+    if "available_models" not in st.session_state:
+        # Model listing no longer supported with openai, use default from config
+        st.session_state.available_models = [config.get_ollama_model_name()]
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = config.get_ollama_model_name()
+    st.session_state.story_idea = st.session_state.get("story_idea", "")
+    st.session_state.book_spec = st.session_state.get("book_spec", None)
+    st.session_state.plot_outline = st.session_state.get("plot_outline", None)
+    st.session_state.chapter_outlines = st.session_state.get("chapter_outlines", [])
+    st.session_state.scene_outlines = st.session_state.get("scene_outlines", {})
+    st.session_state.scene_parts = st.session_state.get("scene_parts", {})
+    st.session_state.project_name = st.session_state.get("project_name", "")
+    st.session_state.num_chapters = st.session_state.get("num_chapters", 10)
+    st.session_state.max_scenes_per_chapter = st.session_state.get(
+        "max_scenes_per_chapter", 3
+    )
+    st.session_state.scene_parts_text = st.session_state.get("scene_parts_text", {})
+    st.session_state.book_text = st.session_state.get("book_text", None)
+    st.session_state.project_error = st.session_state.get(
+        "project_error", None
+    )  # Add project error
+
+    # --- Sidebar ---
+    with st.sidebar:
+        st.header("Settings & Project")
+
+        # **Model Selection (MANDATORY FIRST STEP)**
+        # Removed model selection dropdown as list_models is not supported, using config model
+        st.write(f"**Selected Model:** `{st.session_state.selected_model}`")
+
+        # **Project Management (Available after Model Selection)**
+        if (
+            st.session_state.selected_model
+        ):  # Only show project options if model is selected
+            st.sidebar.subheader("Project Management")
+            project_dir = config.get_project_directory()
+            project_files = [
+                f[:-5] for f in os.listdir(project_dir) if f.endswith(".json")
+            ]
+            project_options = ["New Project"] + project_files
+            selected_project = st.selectbox(
+                "Select Project", project_options, key="project_selectbox"
+            )
+
+            if selected_project == "New Project":
+                project_name = st.text_input(
+                    "New Project Name", value="", key="new_project_name_input"
+                )
+            else:
+                project_name = selected_project
+
+            st.session_state.project_name = st.text_input(
+                "Project Name", value=project_name
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Save Project", key="save_project_button"):
+                    if st.session_state.project_name:
+                        try:
+                            st.session_state.project_manager.save_project(
+                                st.session_state.project_name,
+                                st.session_state.story_idea,
+                                st.session_state.book_spec,
+                                st.session_state.plot_outline,
+                                st.session_state.chapter_outlines,
+                                st.session_state.scene_outlines,
+                                st.session_state.scene_parts,
+                                st.session_state.scene_parts_text,
+                                st.session_state.book_text,
+                            )
+                            st.success(
+                                f"Project '{st.session_state.project_name}' saved!"
+                            )
+                            st.session_state.project_name = project_name
+                            st.session_state.project_error = (
+                                None  # Clear any prior errors
+                            )
+                        except (IOError, TypeError, ValueError) as e:
+                            st.session_state.project_error = (
+                                f"Error saving project: {e}"  # Save the error in session state
+                            )
+                    else:
+                        st.warning("Please enter a project name to save.")
+            with col2:
+                if st.button("Load Project", key="load_project_button"):
+                    if (
+                        st.session_state.project_name
+                        and st.session_state.project_name != "New Project"
+                    ):
+                        try:
+                            # **AGGRESSIVELY CLEAR book_spec BEFORE LOADING**
+                            st.session_state.book_spec = None
+
+                            loaded_data = st.session_state.project_manager.load_project(
+                                st.session_state.project_name
+                            )
+                            if loaded_data:
+                                st.session_state.project_name = project_name
+                                st.session_state.story_idea = loaded_data.get(
+                                    "story_idea", ""
+                                )
+                                st.session_state.book_spec = (
+                                    BookSpec(**loaded_data["book_spec"])
+                                    if loaded_data.get("book_spec")
+                                    else None
+                                )
+                                st.session_state.plot_outline = (
+                                    PlotOutline(**loaded_data["plot_outline"])
+                                    if loaded_data.get("plot_outline")
+                                    else None
+                                )
+                                st.session_state.chapter_outlines = [
+                                    ChapterOutline(**co)
+                                    for co in (loaded_data.get("chapter_outlines") or [])
+                                ]
+                                scene_outlines_data = loaded_data.get(
+                                    "scene_outlines", {}
+                                )
+                                st.session_state.scene_outlines = {
+                                    int(chapter_num): [
+                                        SceneOutline(**so) for so in scene_outlines
+                                    ]
+                                    for chapter_num, scene_outlines in (
+                                        scene_outlines_data or {}
+                                    ).items()
+                                }
+                                st.session_state.scene_parts = loaded_data.get(
+                                    "scene_parts", {}
+                                )
+                                st.session_state.scene_parts_text = loaded_data.get(
+                                    "scene_parts_text", {}
+                                )
+                                st.session_state.book_text = loaded_data.get(
+                                    "book_text", None
+                                )
+                                st.success(
+                                    f"Project '{st.session_state.project_name}' loaded!"
+                                )
+                                st.session_state.project_error = (
+                                    None  # Clear any prior errors
+                                )
+                            else:
+                                st.warning(
+                                    f"No project data loaded for '{st.session_state.project_name}'."
+                                )
+                        except FileNotFoundError:
+                            st.error(
+                                f"Project file '{st.session_state.project_name}.json' not found."
+                            )
+                            st.session_state.project_error = f"Project file '{st.session_state.project_name}.json' not found."
+                        except Exception as e:
+                            st.error(f"Error loading project: {e}")
+                            st.session_state.project_error = f"Error loading project: {e}"
+                    else:
+                        st.warning("Please enter a project name to load.")
+
+    # --- Main Panel ---
+    if (
+        st.session_state.selected_model
+    ):  # Only show workflow if model is selected
+        col_workflow, col_display = st.columns([1, 1], gap="large")
+
+        with col_workflow:
+            st.header("Novel Generation Workflow")
+
+            # 0. Display Project Error, if any
+            if st.session_state.project_error:
+                st.error(st.session_state.project_error)
+
+            # 1. Story Idea
+            with st.container():
+                st.subheader("1. Story Idea")
+                st.session_state.story_idea = st.text_area(
+                    "Enter your story idea:",
+                    value=st.session_state.story_idea,
+                    height=100,
+                    key="story_idea_textarea",
+                    on_change=None,  # removed the callback here
+                )
+
+                # Autogenerate Book Spec
+                if st.session_state.story_idea and not st.session_state.book_spec:
+                    with st.spinner("Generating Book Specification..."):
+                        generated_spec = asyncio.run(
+                            st.session_state.book_spec_generator.generate(
+                                st.session_state.story_idea, st.session_state.project_name
+                            )
+                        )
+                    if generated_spec:
+                        st.session_state.book_spec = generated_spec
+                        # Autosave project after generation
+                        st.session_state.project_manager.save_project(
+                            st.session_state.project_name,
+                            st.session_state.story_idea,
+                            st.session_state.book_spec,
+                            st.session_state.plot_outline,
+                            st.session_state.chapter_outlines,
+                            st.session_state.scene_outlines,
+                            st.session_state.scene_parts,
+                            st.session_state.scene_parts_text,
+                            st.session_state.book_text,
+                        )
+                        st.success(
+                            "Book Specification Generated and Project Autosaved!"
+                        )
+                        st.rerun()  # Refresh to show the generated spec
+                    else:
+                        st.error("Failed to generate Book Specification.")
+
+            # 2. Book Specification
+            with st.container():
+                book_spec_display(
+                    st.session_state.book_spec, st.session_state.book_spec_generator
+                )
+
+            # 3. Plot Outline
+            if st.session_state.book_spec:
+                with st.container():
+                    plot_outline_display(
+                        st.session_state.plot_outline,
+                        st.session_state.plot_outline_generator,
+                    )
+
+            # 4. Chapter Outlines
+            if st.session_state.plot_outline:
+                with st.container():
+                    chapter_outlines_display(
+                        st.session_state.chapter_outlines,
+                        st.session_state.chapter_outline_generator,
+                    )
+
+            # 5. Scene Outlines
+            if st.session_state.chapter_outlines:
+                with st.container():
+                    scene_outlines_display(
+                        st.session_state.scene_outlines,
+                        st.session_state.scene_outline_generator,
+                    )
+
+            # 6. Scene Parts
+            if st.session_state.scene_outlines:
+                with st.container():
+                    scene_part_display(
+                        st.session_state.scene_parts_text,  # Corrected argument order
+                        st.session_state.scene_part_generator,
+                        st.session_state.book_spec,
+                        st.session_state.chapter_outlines,
+                        st.session_state.scene_outlines,
+                    )
+
+            # 7. Assemble Book Text
+            if st.session_state.scene_parts_text:
+                with st.container():
+                    st.subheader("7. Assemble Book Text")
+                    if st.button(
+                        "Assemble Book Text",
+                        disabled=not st.session_state.scene_parts_text,
+                        key="assemble_book_button",
+                    ):
+                        with st.spinner("Assembling Book Text..."):
+                            st.session_state.book_text = (
+                                st.session_state.book_assembler.assemble_book_text(
+                                    st.session_state.scene_parts_text
+                                )
+                            )
+                        if st.session_state.book_text:
+                            st.success("Book text assembled!")
+                            st.download_button(
+                                label="Download Book Text",
+                                data=st.session_state.book_text,
+                                file_name="book_text.txt",
+                                mime="text/plain",
+                            )
+                        else:
+                            st.error("Failed to assemble book text.")
+
+        with col_display:
+            st.header("Project Data Display")
+            # 0. Display Project Error, if any
+            if st.session_state.project_error:
+                st.error(st.session_state.project_error)
+
+            st.subheader("Story Idea")
+            st.write(st.session_state.story_idea)
+
+            if st.session_state.book_spec:
+                book_spec_display(
+                    st.session_state.book_spec, st.session_state.book_spec_generator
+                )
+            if st.session_state.plot_outline:
+                plot_outline_display(
+                    st.session_state.plot_outline,
+                    st.session_state.plot_outline_generator,
+                )
+            if st.session_state.chapter_outlines:
+                chapter_outlines_display(
+                    st.session_state.chapter_outlines,
+                    st.session_state.chapter_outline_generator,
+                )
+            if st.session_state.scene_outlines:
+                scene_outlines_display(
+                    st.session_state.scene_outlines,
+                    st.session_state.scene_outline_generator,
+                )
+            if st.session_state.scene_parts_text:
+                scene_part_display( # Corrected argument order
+                    st.session_state.scene_parts_text,
+                    st.session_state.scene_part_generator,
+                    st.session_state.book_spec,
+                    st.session_state.chapter_outlines,
+                    st.session_state.scene_outlines,
+                )
+            if st.session_state.book_text:
+                book_text_display(st.session_state.book_text)
+    else:  # If no model selected, display message
+        st.warning("Please select an Ollama model in the sidebar to begin.")
+
+
+if __name__ == "__main__":
+    main()
+```````
+
+`/home/tlh/refactored_gui_fict_fab/run`:
+
+```````
+#!/usr/bin/env bash
+source .venv/bin/activate
+.venv/bin/streamlit run app.py
+```````
+
+`/home/tlh/refactored_gui_fict_fab/utils/config.py`:
+
+```````py
+# /home/tlh/refactored_gui_fict_fab/utils/config.py
+import os
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+
+
+class Config(BaseSettings):
+    """
+    Configuration manager for the Fiction Fabricator application.
+    """
+
+    project_directory: str = "data"
+    log_level: str = "INFO"
+    ollama_model_name: str = "mistral"  # Default to Mistral as a common Ollama model
+    ollama_base_url: str = (
+        "http://localhost:11434"  # This is only used by the old client
+    )
+    openai_base_url: str = "http://localhost:11434/v1"
+
+    @field_validator("log_level")
+    @classmethod
+    def log_level_must_be_valid(cls, v: str) -> str:
+        allowed_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in allowed_levels:
+            raise ValueError(
+                f"Invalid log level: {v}.  Must be one of: {allowed_levels}"
+            )
+        return v.upper()
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    def get_project_directory(self) -> str:
+        return self.project_directory
+
+    def get_log_level(self) -> str:
+        return self.log_level
+
+    def get_ollama_model_name(self) -> str:
+        return self.ollama_model_name
+    
+    def get_openai_base_url(self) -> str:
+        return self.openai_base_url
+
+    def get_ollama_base_url(self) -> str:
+        return self.ollama_base_url
+
+    def set_ollama_model_name(self, model_name: str) -> None:
+        self.ollama_model_name = model_name
+
+
+config = Config()
+```````
+
+`/home/tlh/refactored_gui_fict_fab/utils/file_handler.py`:
+
+```````py
+# utils/file_handler.py
+import json
+import os
+
+from utils.logger import logger
+
+
+def save_json(data: dict, filepath: str) -> None:
+    """
+    Saves data to a JSON file.
+    """
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)  # Ensure directory exists
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)  # Save JSON with indentation for readability
+        logger.info("JSON data saved to: %s", filepath)  # Lazy format
+    except Exception as e:
+        logger.error("Error saving JSON to %s: %s", filepath, e)  # Lazy format
+        raise  # Re-raise the exception for handling higher up if needed
+
+
+def load_json(filepath: str) -> dict:
+    """
+    Loads data from a JSON file.
+    """
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        logger.info("JSON data loaded from: %s", filepath)  # Lazy format
+        return data
+    except FileNotFoundError:
+        logger.error("JSON file not found: %s", filepath)  # Lazy format
+        raise
+    except json.JSONDecodeError as e:
+        logger.error("Error decoding JSON from %s: %s", filepath, e)  # Lazy format
+        raise
+    except Exception as e:
+        logger.error("Error loading JSON from %s: %s", filepath, e)  # Lazy format
+        raise
+
+
+def save_markdown(text: str, filepath: str) -> None:
+    """
+    Saves text content to a Markdown file.
+    """
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)  # Ensure directory exists
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(text)
+        logger.info("Markdown content saved to: %s", filepath)  # Lazy format
+    except Exception as e:
+        logger.error("Error saving Markdown to %s: %s", filepath, e)  # Lazy format
+        raise  # Re-raise the exception
+```````
+
+`/home/tlh/refactored_gui_fict_fab/utils/logger.py`:
+
+```````py
+# utils/logger.py
+import logging
+import sys
+
+from utils.config import config  # Import the config object
+
+
+def setup_logger() -> logging.Logger:
+    """
+    Sets up and configures a logger for the Fiction Fabricator application.
+    """
+    app_logger = logging.getLogger(__name__)
+    log_level_str = config.get_log_level()  # Access the log level
+
+    log_levels = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+
+    log_level = log_levels.get(log_level_str, logging.INFO)
+    app_logger.setLevel(log_level)
+
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(module)s - %(message)s"
+    )
+    console_handler.setFormatter(formatter)
+    app_logger.addHandler(console_handler)
+
+    return app_logger
+
+
+logger = setup_logger()
+```````
+
+`/home/tlh/refactored_gui_fict_fab/utils/data_validation.py`:
+
+```````py
+# utils/data_validation.py
+"""
+Utility functions for data validation.
+
+This module is designed to house custom data validation functions
+that go beyond the basic validation provided by Pydantic. It's 
+intended to encapsulate more complex or application-specific 
+validation logic, ensuring data integrity and consistency 
+within the Fiction Fabricator application.
+"""
+
+from typing import List, Dict, Any
+from utils.logger import logger
+
+
+def validate_scene_outline_consistency(
+    chapter_outlines: List[Dict[str, Any]],
+    scene_outlines: Dict[int, List[Dict[str, Any]]],
+) -> bool:
+    """
+    Validates consistency between chapter outlines and scene outlines.
+
+    Checks:
+    1.  That every chapter number referenced in `scene_outlines` has a
+        corresponding entry in `chapter_outlines`.
+    2.  That scene numbers within each chapter are sequential and start from 1.
+    """
+    consistent = True
+    chapter_numbers = {co["chapter_number"] for co in chapter_outlines}
+
+    for chapter_num, scenes in scene_outlines.items():
+        if chapter_num not in chapter_numbers:
+            logger.warning(
+                "Scene outlines exist for chapter %s, but no corresponding chapter outline found.",
+                chapter_num,
+            )
+            consistent = False
+
+        expected_scene_num = 1
+        for scene in scenes:
+            if scene["scene_number"] != expected_scene_num:
+                logger.warning(
+                    "Scene number mismatch in chapter %s. Expected %s, got %s.",
+                    chapter_num,
+                    expected_scene_num,
+                    scene["scene_number"],
+                )
+                consistent = False
+            expected_scene_num += 1
+    return consistent
+
+
+def validate_scene_part_text_structure(
+    scene_parts_text: Dict[int, Dict[int, Dict[int, str]]]
+) -> bool:
+    """
+    Validates structure of the scene_parts_text
+    """
+    consistent = True
+
+    if not isinstance(scene_parts_text, dict):
+        logger.error("Scene_parts_text is not a dictionary")
+        return False
+
+    for chapter_num, chapter_data in scene_parts_text.items():
+        if not isinstance(chapter_num, int):
+            logger.warning(
+                "scene_parts_text chapter number is not an int: %s", type(chapter_num)
+            )
+            consistent = False
+
+        if not isinstance(chapter_data, dict):
+            logger.warning(
+                "scene_parts_text chapter data is not a dict: %s", type(chapter_data)
+            )
+            consistent = False
+            continue
+
+        for scene_num, scene_data in chapter_data.items():
+            if not isinstance(scene_num, int):
+                logger.warning(
+                    "scene_parts_text scene number is not an int: %s", type(scene_num)
+                )
+                consistent = False
+
+            if not isinstance(scene_data, dict):
+                logger.warning(
+                    "scene_parts_text scene data is not a dict: %s", type(scene_data)
+                )
+                consistent = False
+                continue
+
+            for part_num, part_text in scene_data.items():
+                if not isinstance(part_num, int):
+                    logger.warning(
+                        "scene_parts_text part number is not an int: %s", type(part_num)
+                    )
+                    consistent = False
+
+                if not isinstance(part_text, str):
+                    logger.warning(
+                        "scene_parts_text part data is not a string: %s",
+                        type(part_text),
+                    )
+                    consistent = False
+
+    return consistent
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/utils/async_utils.py`:
+
+```````py
+# utils/async_utils.py
+import asyncio
+from typing import Coroutine, Any, Optional
+
+
+async def timeout_wrapper(
+    coro: Coroutine, timeout: Optional[float] = None, default_timeout: float = 60.0
+) -> Any:
+    """
+    Wraps an async coroutine with a timeout.
+    """
+    try:
+        if timeout is None:
+            timeout = default_timeout
+        return await asyncio.wait_for(coro, timeout=timeout)
+    except asyncio.TimeoutError:
+        raise  # Re-raise the TimeoutError to be handled by the caller
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/requirements.txt`:
+
+```````txt
+# /home/tlh/refactored_gui_fict_fab/requirements.txt
+streamlit
+openai
+pydantic
+python-dotenv
+black
+pytest
+pydantic-settings
+aiohttp
+```````
+
+`/home/tlh/refactored_gui_fict_fab/setup-env.sh`:
+
+```````sh
+#!/usr/bin/env bash
+
+# Create virtual environment
+if ! python -m venv .venv; then
+  echo "Error: Failed to create virtual environment."
+  exit 1
+fi
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install dependencies
+if ! pip install -r requirements.txt; then
+  echo "Error: Failed to install dependencies. Make sure 'requirements.txt' exists."
+  exit 1
+fi
+
+echo "Virtual environment created and dependencies installed successfully."
+echo "Activate the virtual environment in your current shell using: source .venv/bin/activate"
+echo "Then run the application using the './run' script."
+
+    
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/book_spec_view.py`:
+
+```````py
+# streamlit_app/components/book_spec_view.py
+import streamlit as st
+import asyncio
+from core.book_spec import BookSpec
+from typing import Optional
+from core.content_generation.book_spec_generator import BookSpecGenerator
+from utils.logger import logger
+
+
+def book_spec_display(
+    book_spec: Optional[BookSpec], book_spec_generator: BookSpecGenerator
+):
+    """
+    Displays the BookSpec data, provides editing capabilities, and automatically generates the book spec upon entering a story idea.
+    """
+    st.subheader("Book Specification")
+
+    story_idea_input = st.session_state.story_idea  # Get story idea from session state
+
+    if book_spec:  # If book_spec exists, display the editable fields
+        st.write("### Edit Book Specification")
+
+        # Initialize individual component states if they don't exist
+        if "book_spec_title" not in st.session_state:
+            st.session_state.book_spec_title = book_spec.title
+        if "book_spec_genre" not in st.session_state:
+            st.session_state.book_spec_genre = book_spec.genre
+        if "book_spec_setting" not in st.session_state:
+            st.session_state.book_spec_setting = book_spec.setting
+        if "book_spec_themes" not in st.session_state:
+            st.session_state.book_spec_themes = ", ".join(book_spec.themes)
+        if "book_spec_tone" not in st.session_state:
+            st.session_state.book_spec_tone = book_spec.tone
+        if "book_spec_point_of_view" not in st.session_state:
+            st.session_state.book_spec_point_of_view = book_spec.point_of_view
+        if "book_spec_characters" not in st.session_state:
+            st.session_state.book_spec_characters = "\n".join(book_spec.characters)
+        if "book_spec_premise" not in st.session_state:
+            st.session_state.book_spec_premise = book_spec.premise
+
+        # Create input fields for each spec element
+        st.session_state.book_spec_title = st.text_input(
+            "Title", value=st.session_state.book_spec_title, key="title_input"
+        )
+        st.session_state.book_spec_genre = st.text_input(
+            "Genre", value=st.session_state.book_spec_genre, key="genre_input"
+        )
+        st.session_state.book_spec_setting = st.text_area(
+            "Setting",
+            value=st.session_state.book_spec_setting,
+            height=100,
+            key="setting_input",
+        )
+        st.session_state.book_spec_themes = st.text_input(
+            "Themes (comma-separated)",
+            value=st.session_state.book_spec_themes,
+            key="themes_input",
+        )
+        st.session_state.book_spec_tone = st.text_input(
+            "Tone", value=st.session_state.book_spec_tone, key="tone_input"
+        )
+        st.session_state.book_spec_point_of_view = st.text_input(
+            "Point of View",
+            value=st.session_state.book_spec_point_of_view,
+            key="point_of_view_input",
+        )
+        st.session_state.book_spec_characters = st.text_area(
+            "Characters (one description per line)",
+            value=st.session_state.book_spec_characters,
+            height=150,
+            key="characters_input",
+        )
+        st.session_state.book_spec_premise = st.text_area(
+            "Premise",
+            value=st.session_state.book_spec_premise,
+            height=100,
+            key="premise_input",
+        )
+
+        col_save, _ = st.columns([1, 3])  # Removed enhance column
+        with col_save:
+            if st.button("Save Book Spec (Manual Edit)", key="save_book_spec_button"):
+                # Update book_spec with current input values
+                st.session_state.book_spec = BookSpec(
+                    title=st.session_state.book_spec_title,
+                    genre=st.session_state.book_spec_genre,
+                    setting=st.session_state.book_spec_setting,
+                    themes=[
+                        theme.strip()
+                        for theme in st.session_state.book_spec_themes.split(",")
+                    ],
+                    tone=st.session_state.book_spec_tone,
+                    point_of_view=st.session_state.book_spec_point_of_view,
+                    characters=[
+                        char.strip()
+                        for char in st.session_state.book_spec_characters.splitlines()
+                    ],
+                    premise=st.session_state.book_spec_premise,
+                )
+                # Autosave project after manual edit save
+                st.session_state.project_manager.save_project(
+                    st.session_state.project_name,
+                    st.session_state.story_idea,
+                    st.session_state.book_spec,
+                    st.session_state.plot_outline,
+                    st.session_state.chapter_outlines,
+                    st.session_state.scene_outlines,
+                    st.session_state.scene_parts,
+                    st.session_state.scene_parts_text,
+                    st.session_state.book_text,
+                )
+                st.success(
+                    "Book Specification Saved (Manual Edit) and Project Autosaved!"
+                )
+
+        st.json(
+            st.session_state.book_spec.model_dump()
+            if st.session_state.book_spec
+            else {}
+        )
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/scene_part_view.py`:
+
+```````py
+# /home/tlh/refactored_gui_fict_fab/streamlit_app/components/scene_part_view.py
+import streamlit as st
+import asyncio
+from typing import Optional, Dict, List
+from core.content_generation.scene_part_generator import ScenePartGenerator
+from core.plot_outline import ChapterOutline, SceneOutline
+from core.book_spec import BookSpec
+
+
+def scene_part_display(
+    scene_parts_text: Dict[int, Dict[int, Dict[int, str]]], # Moved to first
+    scene_part_generator: ScenePartGenerator,
+    book_spec: Optional[BookSpec],
+    chapter_outlines: Optional[List[ChapterOutline]],
+    scene_outlines: Optional[Dict[int, List[SceneOutline]]],
+):
+    """
+    Displays and manages scene parts text generation and enhancement
+    with autosave functionality. Relies on st.session_state.scene_parts_text directly.
+    """
+    st.subheader("Scene Parts - Text Generation")
+
+    if st.button(
+        "Generate Scene Parts Text (All Scenes)",
+        key="generate_scene_parts_button",
+        disabled=st.session_state.scene_parts_text
+        or not st.session_state.scene_outlines,
+    ):
+        if (
+            st.session_state.scene_outlines
+            and scene_part_generator
+            and book_spec
+            and chapter_outlines
+        ):
+            with st.spinner("Generating Scene Parts Text... This may take a while."):
+                generated_scene_parts_text = {}
+                for (
+                    chapter_number,
+                    scene_outlines_chapter,
+                ) in st.session_state.scene_outlines.items():
+                    generated_scene_parts_text[chapter_number] = {}
+                    chapter_outline = next(
+                        (
+                            co
+                            for co in chapter_outlines
+                            if co.chapter_number == chapter_number
+                        ),
+                        ChapterOutline(
+                            chapter_number=chapter_number,
+                            summary="Placeholder Chapter Outline",
+                        ),
+                    )
+
+                    for scene_outline in scene_outlines_chapter:
+                        generated_scene_parts_text[chapter_number][
+                            scene_outline.scene_number
+                        ] = {}
+                        num_parts = 3
+                        for part_number in range(1, num_parts + 1):
+                            generated_part = asyncio.run(
+                                scene_part_generator.generate(
+                                    scene_outline,
+                                    part_number,
+                                    book_spec,
+                                    chapter_outline,
+                                    scene_outline,
+                                )
+                            )
+                            if generated_part:
+                                generated_scene_parts_text[chapter_number][
+                                    scene_outline.scene_number
+                                ][part_number] = generated_part
+                            else:
+                                st.error(
+                                    f"Failed to generate part {part_number} of Scene {scene_outline.scene_number}, Chapter {chapter_number}."
+                                )
+                st.session_state.scene_parts_text = generated_scene_parts_text
+                st.session_state.project_manager.save_project(
+                    st.session_state.project_name,
+                    st.session_state.story_idea,
+                    st.session_state.book_spec,
+                    st.session_state.plot_outline,
+                    st.session_state.chapter_outlines,
+                    st.session_state.scene_outlines,
+                    st.session_state.scene_parts,
+                    st.session_state.scene_parts_text,
+                    st.session_state.book_text,
+                )
+                st.success(
+                    "Scene parts generated for all scenes and Project Autosaved!"
+                )
+                st.rerun()
+        else:
+            st.warning(
+                "Scene Outlines, Book Specification, and Chapter Outlines are required to generate Scene Parts."
+            )
+
+    if st.session_state.scene_parts_text:
+        with st.expander("Enhance Scene Parts", expanded=False):
+            chapter_numbers = list(st.session_state.scene_parts_text.keys())
+            if chapter_numbers:
+                selected_chapter = st.selectbox(
+                    "Select Chapter for Enhancement",
+                    chapter_numbers,
+                    key="chapter_selectbox_enhance_part",
+                )
+                scene_numbers = list(
+                    st.session_state.scene_parts_text.get(selected_chapter, {}).keys()
+                )
+
+                if scene_numbers:
+                    selected_scene = st.selectbox(
+                        "Select Scene for Enhancement",
+                        scene_numbers,
+                        key="scene_selectbox_enhance_part",
+                    )
+                    part_numbers = list(
+                        st.session_state.scene_parts_text.get(selected_chapter, {})
+                        .get(selected_scene, {})
+                        .keys()
+                    )
+
+                    if part_numbers:
+                        selected_part = st.selectbox(
+                            "Select Part for Enhancement",
+                            part_numbers,
+                            key="part_selectbox_enhance_part",
+                        )
+
+                        if st.button(
+                            f"Enhance Part {selected_part} of Scene {selected_scene}, Chapter {selected_chapter}",
+                            key="enhance_single_scene_part_button",
+                        ):
+                            if (
+                                scene_part_generator
+                                and book_spec
+                                and chapter_outlines
+                                and scene_outlines
+                            ):
+                                with st.spinner(
+                                    f"Enhancing Part {selected_part} of Scene {selected_scene}, Chapter {selected_chapter}..."
+                                ):
+                                    current_part_text = (
+                                        st.session_state.scene_parts_text[
+                                            selected_chapter
+                                        ][selected_scene][selected_part]
+                                    )
+
+                                    chapter_outline = next(
+                                        (
+                                            co
+                                            for co in chapter_outlines
+                                            if co.chapter_number == selected_chapter
+                                        ),
+                                        ChapterOutline(
+                                            chapter_number=selected_chapter,
+                                            summary="Placeholder Chapter Outline",
+                                        ),
+                                    )
+
+                                    scene_outline_full = next(
+                                        (
+                                            so
+                                            for so in scene_outlines.get(
+                                                selected_chapter, []
+                                            )
+                                            if so.scene_number == selected_scene
+                                        ),
+                                        SceneOutline(
+                                            scene_number=selected_scene,
+                                            summary="Placeholder Scene Outline",
+                                        ),
+                                    )
+
+                                    enhanced_part = asyncio.run(
+                                        scene_part_generator.enhance(
+                                            current_part_text,
+                                            selected_part,
+                                            book_spec,
+                                            chapter_outline,
+                                            scene_outline_full,
+                                        )
+                                    )
+
+                                    if enhanced_part:
+                                        st.session_state.scene_parts_text[
+                                            selected_chapter
+                                        ][selected_scene][selected_part] = enhanced_part
+                                        st.session_state.project_manager.save_project(
+                                            st.session_state.project_name,
+                                            st.session_state.story_idea,
+                                            st.session_state.book_spec,
+                                            st.session_state.plot_outline,
+                                            st.session_state.chapter_outlines,
+                                            st.session_state.scene_outlines,
+                                            st.session_state.scene_parts,
+                                            st.session_state.scene_parts_text,
+                                            st.session_state.book_text,
+                                        )
+                                        st.success(
+                                            f"Part {selected_part} of Scene {selected_scene}, Chapter {selected_chapter} enhanced and Project Autosaved!"
+                                        )
+                                        st.rerun()
+                                    else:
+                                        st.error(
+                                            f"Failed to enhance Part {selected_part} of Scene {selected_scene}, Chapter {selected_chapter}."
+                                        )
+                            else:
+                                st.error(
+                                    "Generator or context data not properly initialized."
+                                )
+                    else:
+                        st.write("No parts available to enhance in this scene yet.")
+                else:
+                    st.write("No scenes available to enhance in this chapter yet.")
+            else:
+                st.write("No chapters with scene parts available to enhance yet.")
+
+    if st.session_state.scene_parts_text:
+        st.subheader("Scene Parts Text (Generated)")
+        for (
+            chapter_number,
+            scene_parts_chapter,
+        ) in st.session_state.scene_parts_text.items():
+            st.markdown(f"**Chapter {chapter_number}**")
+            for scene_number, scene_parts in scene_parts_chapter.items():
+                st.markdown(f"  **Scene {scene_number}:**")
+                for part_number, part_text in scene_parts.items():
+                    st.markdown(f"    **Part {part_number}:**")
+                    st.write(part_text)
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/plot_outline_view.py`:
+
+```````py
+# streamlit_app/components/plot_outline_view.py
+import streamlit as st
+import asyncio
+from core.plot_outline import PlotOutline
+from typing import Optional
+from core.content_generation.plot_outline_generator import PlotOutlineGenerator
+
+
+def plot_outline_display(
+    plot_outline: Optional[PlotOutline], plot_outline_generator: PlotOutlineGenerator
+):
+    """
+    Displays the Plot Outline data, provides editing capabilities,
+    and includes "Generate" and "Enhance" buttons with autosave.
+    """
+    st.subheader("Plot Outline")
+
+    if not plot_outline:
+        if st.button(
+            "Generate Plot Outline",
+            key="generate_plot_outline_button",
+            disabled=st.session_state.plot_outline is not None
+            or st.session_state.book_spec is None,
+        ):
+            if st.session_state.book_spec and plot_outline_generator:
+                with st.spinner("Generating Plot Outline..."):
+                    generated_outline = asyncio.run(
+                        plot_outline_generator.generate(st.session_state.book_spec)
+                    )
+                if generated_outline:
+                    st.session_state.plot_outline = generated_outline
+                    # Autosave project after generation
+                    st.session_state.project_manager.save_project(
+                        st.session_state.project_name,
+                        st.session_state.story_idea,
+                        st.session_state.book_spec,
+                        st.session_state.plot_outline,
+                        st.session_state.chapter_outlines,
+                        st.session_state.scene_outlines,
+                        st.session_state.scene_parts,
+                        st.session_state.scene_parts_text,
+                        st.session_state.book_text,
+                    )
+                    st.success("Plot Outline Generated and Project Autosaved!")
+                    st.rerun()
+                else:
+                    st.error("Failed to generate Plot Outline.")
+            else:
+                st.warning(
+                    "Book Specification is required to generate Plot Outline. Please generate Book Spec first."
+                )
+    else:
+        with st.expander("Edit Plot Outline", expanded=True):
+            with st.form("plot_outline_form"):
+                plot_outline.act_one = st.text_area(
+                    "Act One: Setup",
+                    plot_outline.act_one,
+                    height=150,
+                    key="act_one_input",
+                )
+                plot_outline.act_two = st.text_area(
+                    "Act Two: Confrontation",
+                    plot_outline.act_two,
+                    height=200,
+                    key="act_two_input",
+                )
+                plot_outline.act_three = st.text_area(
+                    "Act Three: Resolution",
+                    plot_outline.act_three,
+                    height=150,
+                    key="act_three_input",
+                )
+
+                col_save_enhance, _ = st.columns([3, 1])
+                with col_save_enhance:
+                    if st.form_submit_button(
+                        "Save Plot Outline (Manual Edit)",
+                        key="save_plot_outline_button",
+                    ):
+                        st.session_state.plot_outline = PlotOutline(
+                            act_one=plot_outline.act_one,
+                            act_two=plot_outline.act_two,
+                            act_three=plot_outline.act_three,
+                        )
+                        # Autosave project after manual edit save
+                        st.session_state.project_manager.save_project(
+                            st.session_state.project_name,
+                            st.session_state.story_idea,
+                            st.session_state.book_spec,
+                            st.session_state.plot_outline,
+                            st.session_state.chapter_outlines,
+                            st.session_state.scene_outlines,
+                            st.session_state.scene_parts,
+                            st.session_state.scene_parts_text,
+                            st.session_state.book_text,
+                        )
+                        st.success(
+                            "Plot Outline Saved (Manual Edit) and Project Autosaved!"
+                        )
+                with _:
+                    if st.form_submit_button(
+                        "Enhance Plot Outline", key="enhance_plot_outline_button"
+                    ):
+                        if plot_outline and plot_outline_generator:
+                            with st.spinner("Enhancing Plot Outline..."):
+                                enhanced_outline_raw = asyncio.run(
+                                    plot_outline_generator.enhance(
+                                        "\n".join(
+                                            [
+                                                "Act One:\n" + plot_outline.act_one,
+                                                "Act Two:\n" + plot_outline.act_two,
+                                                "Act Three:\n" + plot_outline.act_three,
+                                            ]
+                                        )
+                                    )
+                                )
+                            if enhanced_outline_raw:
+                                st.session_state.plot_outline = enhanced_outline_raw
+                                # Autosave project after enhancement
+                                st.session_state.project_manager.save_project(
+                                    st.session_state.project_name,
+                                    st.session_state.story_idea,
+                                    st.session_state.book_spec,
+                                    st.session_state.plot_outline,
+                                    st.session_state.chapter_outlines,
+                                    st.session_state.scene_outlines,
+                                    st.session_state.scene_parts,
+                                    st.session_state.scene_parts_text,
+                                    st.session_state.book_text,
+                                )
+                                st.success(
+                                    "Plot Outline Enhanced and Project Autosaved!"
+                                )
+                                st.rerun()
+                            else:
+                                st.error("Failed to enhance Plot Outline.")
+                        else:
+                            st.warning("No Plot Outline available to enhance.")
+
+        st.write("Plot Outline:")
+        if plot_outline:
+            st.text(
+                f"Act One: {plot_outline.act_one}\n\n"
+                f"Act Two: {plot_outline.act_two}\n\n"
+                f"Act Three: {plot_outline.act_three}"
+            )
+        else:
+            st.info("No Plot Outline generated yet.")
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/scene_outline_view.py`:
+
+```````py
+# streamlit_app/components/scene_outline_view.py
+import streamlit as st
+import asyncio
+from core.plot_outline import SceneOutline
+from typing import List, Optional, Dict
+from core.content_generation.scene_outline_generator import SceneOutlineGenerator
+import random
+
+
+def scene_outlines_display(
+    scene_outlines: Optional[Dict[int, List[SceneOutline]]],
+    scene_outline_generator: SceneOutlineGenerator,
+):
+    """
+    Displays SceneOutlines and provides UI for generation and enhancement
+    with autosave functionality.
+    """
+    st.subheader("Scene Outlines")
+
+    if not scene_outlines:
+        max_scenes_per_chapter = st.number_input(
+            "Maximum Scenes per Chapter",
+            min_value=2,
+            max_value=10,
+            value=(
+                st.session_state.max_scenes_per_chapter
+                if "max_scenes_per_chapter" in st.session_state
+                else 3
+            ),
+            key="max_scenes_per_chapter_input",
+        )
+        st.session_state.max_scenes_per_chapter = int(max_scenes_per_chapter)
+
+        if st.button(
+            "Generate Scene Outlines (All Chapters)",
+            key="generate_all_scene_outlines_button",
+            disabled=st.session_state.scene_outlines
+            or not st.session_state.chapter_outlines,
+        ):
+            if st.session_state.chapter_outlines and scene_outline_generator:
+                with st.spinner("Generating Scene Outlines for All Chapters..."):
+                    generated_scene_outlines = {}
+                    for chapter_outline in st.session_state.chapter_outlines:
+                        num_scenes = random.randint(
+                            2, st.session_state.max_scenes_per_chapter
+                        )
+                        chapter_scene_outlines = asyncio.run(
+                            scene_outline_generator.generate(
+                                chapter_outline, num_scenes
+                            )
+                        )
+                        if chapter_scene_outlines:
+                            generated_scene_outlines[chapter_outline.chapter_number] = (
+                                chapter_scene_outlines
+                            )
+                    st.session_state.scene_outlines = generated_scene_outlines
+                    # Autosave project after generation
+                    st.session_state.project_manager.save_project(
+                        st.session_state.project_name,
+                        st.session_state.story_idea,
+                        st.session_state.book_spec,
+                        st.session_state.plot_outline,
+                        st.session_state.chapter_outlines,
+                        st.session_state.scene_outlines,
+                        st.session_state.scene_parts,
+                        st.session_state.scene_parts_text,
+                        st.session_state.book_text,
+                    )
+                    st.success(
+                        f"Scene Outlines Generated for All Chapters (up to {st.session_state.max_scenes_per_chapter} scenes per chapter) and Project Autosaved!"
+                    )
+                    st.rerun()
+            else:
+                st.error("Failed to generate Scene Outlines.")
+        else:
+            st.warning("Chapter Outlines are required to generate Scene Outlines.")
+
+    else:
+        for chapter_number, outlines in scene_outlines.items():
+            with st.expander(
+                f"Edit Scene Outlines - Chapter {chapter_number}", expanded=True
+            ):
+                edited_scene_outlines = [so.model_copy() for so in outlines]
+                with st.form(f"scene_outlines_form_chapter_{chapter_number}"):
+                    st.markdown(f"**Chapter {chapter_number}**")
+                    for i, scene_outline in enumerate(edited_scene_outlines):
+                        edited_summary = st.text_area(
+                            f"Scene {i + 1} Outline",
+                            scene_outline.summary,
+                            height=80,
+                            key=f"scene_outline_{chapter_number}_{i}",
+                        )
+                        edited_scene_outlines[i].summary = edited_summary
+
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        if st.form_submit_button(
+                            f"Save Scene Outlines (Manual Edit - Chapter {chapter_number})",
+                            key=f"save_scene_outlines_chapter_{chapter_number}_button",
+                        ):
+                            st.session_state.scene_outlines[chapter_number] = (
+                                edited_scene_outlines
+                            )
+                            # Autosave project after manual edit save
+                            st.session_state.project_manager.save_project(
+                                st.session_state.project_name,
+                                st.session_state.story_idea,
+                                st.session_state.book_spec,
+                                st.session_state.plot_outline,
+                                st.session_state.chapter_outlines,
+                                st.session_state.scene_outlines,
+                                st.session_state.scene_parts,
+                                st.session_state.scene_parts_text,
+                                st.session_state.book_text,
+                            )
+                            st.success(
+                                f"Scene Outlines Saved (Manual Edit - Chapter {chapter_number}) and Project Autosaved!"
+                            )
+                    with col2:
+                        if st.form_submit_button(
+                            f"Enhance Scene Outlines (Chapter {chapter_number})",
+                            key=f"enhance_scene_outlines_chapter_{chapter_number}_button",
+                        ):
+                            if scene_outline_generator:
+                                with st.spinner(
+                                    f"Enhancing Scene Outlines for Chapter {chapter_number}..."
+                                ):
+                                    enhanced_scene_outlines = asyncio.run(
+                                        scene_outline_generator.enhance(
+                                            edited_scene_outlines
+                                        )
+                                    )
+                                if enhanced_scene_outlines:
+                                    st.session_state.scene_outlines[chapter_number] = (
+                                        enhanced_scene_outlines
+                                    )
+                                    # Autosave project after enhancement
+                                    st.session_state.project_manager.save_project(
+                                        st.session_state.project_name,
+                                        st.session_state.story_idea,
+                                        st.session_state.book_spec,
+                                        st.session_state.plot_outline,
+                                        st.session_state.chapter_outlines,
+                                        st.session_state.scene_outlines,
+                                        st.session_state.scene_parts,
+                                        st.session_state.scene_parts_text,
+                                        st.session_state.book_text,
+                                    )
+                                    st.success(
+                                        f"Scene Outlines Enhanced for Chapter {chapter_number} and Project Autosaved!"
+                                    )
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        f"Failed to enhance Scene Outlines for Chapter {chapter_number}."
+                                    )
+                            else:
+                                st.error("Scene Outline Generator not initialized.")
+
+            st.markdown(f"**Chapter {chapter_number} Scenes:**")
+            for scene_outline in outlines:
+                st.markdown(f"  **Scene {scene_outline.scene_number}:**")
+                st.write(scene_outline.summary)
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/book_text_view.py`:
+
+```````py
+# streamlit_app/components/book_text_view.py
+import streamlit as st
+from typing import Optional, Dict
+import zipfile
+import io
+import re  # Import the regular expression library
+
+
+def book_text_display(book_text: Optional[str]):
+    """
+    Displays the assembled book text and provides a save function
+    to save the book in markdown format (chapters in separate files, zipped),
+    using the book title for naming.
+    """
+    st.subheader("Generated Book Text")
+    if book_text:
+        st.markdown(book_text)
+
+        if st.button("Save Book as Markdown"):
+            if (
+                book_text and st.session_state.book_spec
+            ):  # Ensure book_text and book_spec are available
+                book_title = st.session_state.book_spec.title
+                if not book_title:
+                    book_title = (
+                        "untitled_book"  # Default title if book_spec.title is missing
+                    )
+                else:
+                    book_title = sanitize_filename(
+                        book_title
+                    )  # Sanitize title for filename
+
+                # Split book text into chapters
+                chapters = split_book_into_chapters(book_text)
+
+                # Create in-memory zip file
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zipf:
+                    for chapter_num, chapter_text in chapters.items():
+                        # Create markdown file for each chapter in memory
+                        chapter_markdown = io.StringIO()
+                        chapter_markdown.write(chapter_text)
+                        chapter_filename = f"{book_title}_chapter_{chapter_num}.md"  # Filename with book title
+                        zipf.writestr(chapter_filename, chapter_markdown.getvalue())
+
+                zip_file = zip_buffer.getvalue()
+
+                st.download_button(
+                    label="Download Book Chapters (ZIP)",
+                    data=zip_file,
+                    file_name=f"{book_title}_chapters.zip",  # Zip filename with book title
+                    mime="application/zip",
+                    on_click=None,
+                    disabled=False,
+                )
+            else:
+                st.warning(
+                    "No book text or book specification available to save."
+                )  # Inform user if book_spec is missing
+
+    else:
+        st.info(
+            "No book text generated yet. Generate scene parts and assemble the book to view it here."
+        )
+
+
+def split_book_into_chapters(book_text: str) -> Dict[int, str]:
+    """
+    Splits the full book text into a dictionary of chapters,
+    keyed by chapter number.
+    """
+    chapters = {}
+    chapter_split = book_text.split("# Chapter ")
+    for i, chapter_content in enumerate(
+        chapter_split[1:], start=1
+    ):  # Start from 1 to skip preamble and number chapters from 1
+        chapter_number_str, chapter_text = chapter_content.split(
+            "\n", 1
+        )  # split at the first newline to separate chapter number from text
+        try:
+            chapter_number = int(
+                chapter_number_str.strip()
+            )  # chapter number is the first line
+        except ValueError:
+            chapter_number = (
+                i  # if chapter number is not properly parsed, use index as fallback
+            )
+        chapters[chapter_number] = (
+            f"# Chapter {chapter_number}\n" + chapter_text.strip()
+        )  # Re-add chapter heading to each chapter
+
+    return chapters
+
+
+def sanitize_filename(title: str) -> str:
+    """
+    Sanitizes a string to be used as a filename by replacing spaces and
+    non-alphanumeric characters with underscores.
+    """
+    sanitized_title = re.sub(r"\s+", "_", title)  # Replace spaces with underscores
+    sanitized_title = re.sub(
+        r"[^\w.-]", "", sanitized_title
+    )  # Remove non-alphanumeric, period, hyphen chars
+    return sanitized_title
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/__init__.py`:
+
+```````py
+# streamlit_app/components/__init__.py
+
+"""
+Package initializer for the streamlit_app.components package.
+
+This package is intended to house reusable Streamlit components 
+for the Fiction Fabricator application. 
+
+Currently, it is minimally populated as the application's UI 
+is primarily managed within app.py. However, this package is 
+structured to facilitate future expansion and organization 
+of UI elements into reusable components, should the complexity 
+of the application grow.
+
+As the application evolves, specific UI components like custom 
+input forms, display panels, or interactive elements can be 
+modularized and placed within this package to improve code 
+organization and maintainability of the Streamlit application.
+"""
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/components/chapter_outline_view.py`:
+
+```````py
+# streamlit_app/components/chapter_outline_view.py
+import streamlit as st
+import asyncio
+from core.plot_outline import ChapterOutline
+from typing import List, Optional
+from core.content_generation.chapter_outline_generator import ChapterOutlineGenerator
+
+
+def chapter_outlines_display(
+    chapter_outlines: Optional[List[ChapterOutline]],
+    chapter_outline_generator: ChapterOutlineGenerator,
+):
+    """
+    Displays ChapterOutlines and provides UI for generation and enhancement
+    with autosave functionality.
+    """
+    st.subheader("Chapter Outlines")
+
+    if not chapter_outlines:
+        num_chapters = st.number_input(
+            "Number of Chapters",
+            min_value=3,
+            max_value=50,
+            value=(
+                st.session_state.num_chapters
+                if "num_chapters" in st.session_state
+                else 10
+            ),
+            key="num_chapters_input",
+        )
+        st.session_state.num_chapters = int(num_chapters)
+        if st.button(
+            "Generate Chapter Outlines",
+            disabled=st.session_state.chapter_outlines
+            or not st.session_state.plot_outline,
+            key="generate_chapter_outlines_button",
+        ):
+            if st.session_state.plot_outline and chapter_outline_generator:
+                with st.spinner("Generating Chapter Outlines..."):
+                    generated_outlines = asyncio.run(
+                        chapter_outline_generator.generate(
+                            st.session_state.plot_outline, st.session_state.num_chapters
+                        )
+                    )
+                if generated_outlines:
+                    st.session_state.chapter_outlines = generated_outlines
+                    # Autosave project after generation
+                    st.session_state.project_manager.save_project(
+                        st.session_state.project_name,
+                        st.session_state.story_idea,
+                        st.session_state.book_spec,
+                        st.session_state.plot_outline,
+                        st.session_state.chapter_outlines,
+                        st.session_state.scene_outlines,
+                        st.session_state.scene_parts,
+                        st.session_state.scene_parts_text,
+                        st.session_state.book_text,
+                    )
+                    st.success(
+                        f"Chapter Outlines Generated for {len(st.session_state.chapter_outlines)} chapters and Project Autosaved!"
+                    )
+                    st.rerun()
+                else:
+                    st.error("Failed to generate Chapter Outlines.")
+            else:
+                st.warning("Plot Outline is required to generate Chapter Outlines.")
+
+    else:
+        with st.expander("Edit Chapter Outlines", expanded=True):
+            edited_chapter_outlines = [co.model_copy() for co in chapter_outlines]
+            with st.form("chapter_outlines_form"):
+                for i, chapter_outline in enumerate(edited_chapter_outlines):
+                    st.markdown(f"**Chapter {chapter_outline.chapter_number}:**")
+                    edited_summary = st.text_area(
+                        "Summary",
+                        chapter_outline.summary,
+                        height=100,
+                        key=f"chapter_{i}_summary",
+                    )
+                    edited_chapter_outlines[i].summary = edited_summary
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    if st.form_submit_button(
+                        "Save Chapter Outlines (Manual Edit)",
+                        key="save_chapter_outlines_button",
+                    ):
+                        st.session_state.chapter_outlines = edited_chapter_outlines
+                        # Autosave project after manual edit save
+                        st.session_state.project_manager.save_project(
+                            st.session_state.project_name,
+                            st.session_state.story_idea,
+                            st.session_state.book_spec,
+                            st.session_state.plot_outline,
+                            st.session_state.chapter_outlines,
+                            st.session_state.scene_outlines,
+                            st.session_state.scene_parts,
+                            st.session_state.scene_parts_text,
+                            st.session_state.book_text,
+                        )
+                        st.success(
+                            "Chapter Outlines Saved (Manual Edit) and Project Autosaved!"
+                        )
+                with col2:
+                    if st.form_submit_button(
+                        "Enhance Chapter Outlines",
+                        key="enhance_chapter_outlines_button",
+                    ):
+                        with st.spinner("Enhancing Chapter Outlines..."):
+                            enhanced_chapter_outlines = asyncio.run(
+                                chapter_outline_generator.enhance(
+                                    edited_chapter_outlines
+                                )
+                            )
+                        if enhanced_chapter_outlines:
+                            st.session_state.chapter_outlines = (
+                                enhanced_chapter_outlines
+                            )
+                            # Autosave project after enhancement
+                            st.session_state.project_manager.save_project(
+                                st.session_state.project_name,
+                                st.session_state.story_idea,
+                                st.session_state.book_spec,
+                                st.session_state.plot_outline,
+                                st.session_state.chapter_outlines,
+                                st.session_state.scene_outlines,
+                                st.session_state.scene_parts,
+                                st.session_state.scene_parts_text,
+                                st.session_state.book_text,
+                            )
+                            st.success(
+                                "Chapter Outlines Enhanced and Project Autosaved!"
+                            )
+                            st.rerun()
+                        else:
+                            st.error("Failed to enhance Chapter Outlines.")
+
+        for chapter_outline in chapter_outlines:
+            st.markdown(f"**Chapter {chapter_outline.chapter_number}:**")
+            st.write(chapter_outline.summary)
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/streamlit_app/__init__.py`:
+
+```````py
+# streamlit_app/__init__.py
+
+"""
+Package initializer for the streamlit_app package.
+
+This package contains all the modules and components for the Streamlit
+web application of the Fiction Fabricator. It is responsible for:
+
+- app.py: The main script for running the Streamlit application. 
+  This file sets up the user interface, manages application state, 
+  and orchestrates the content generation workflow.
+- components/: A directory intended to house reusable Streamlit 
+  components. While currently minimally used, this structure is in 
+  place for future expansion and organization of UI elements. 
+
+The streamlit_app package is the primary user interface for the 
+Fiction Fabricator, providing an interactive and visual way for users 
+to create and refine their fictional content.
+"""
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/plot_outline_generator.py`:
+
+```````py
+# core/content_generation/plot_outline_generator.py
+from typing import Optional
+
+from core.book_spec import BookSpec
+from core.content_generation.base_generator import BaseContentGenerator
+from core.plot_outline import PlotOutline
+from llm.prompt_manager.plot_outline_prompts import PlotOutlinePrompts
+from utils.logger import logger
+
+
+class PlotOutlineGenerator(BaseContentGenerator):
+    """
+    Content generator for PlotOutline objects.
+
+    Inherits from BaseContentGenerator and provides specific functionality
+    for generating and enhancing plot outlines.
+    """
+
+    def __init__(self, prompt_manager, model_name: str):
+        """
+        Initializes PlotOutlineGenerator with prompt manager and model name.
+        """
+        super().__init__(prompt_manager, model_name)
+        self.prompts = PlotOutlinePrompts(
+            prompt_manager
+        )  # Initialize plot outline specific prompts
+
+    async def generate(self, book_spec: BookSpec) -> Optional[PlotOutline]:
+        """
+        Generates a PlotOutline based on a BookSpec.
+        """
+        generation_prompt_template = (
+            self.prompts.create_plot_outline_generation_prompt()
+        )
+        variables = {"book_spec_json": book_spec.model_dump_json(indent=4)}
+        generated_text = await self._generate_content_from_prompt(
+            generation_prompt_template, variables
+        )
+        if not generated_text:
+            return None
+
+        structure_check_prompt_template = (
+            self.prompts.create_plot_outline_structure_check_prompt()
+        )
+        structure_fix_prompt_template = (
+            self.prompts.create_plot_outline_structure_fix_prompt()
+        )
+        validated_text = await self._structure_check_and_fix(
+            generated_text,
+            structure_check_prompt_template,
+            structure_fix_prompt_template,
+        )
+        if not validated_text:
+            return None
+
+        return self._parse_response(validated_text)
+
+    async def enhance(
+        self, current_content: PlotOutline
+    ) -> Optional[PlotOutline]:  # Parameter name consistent with base class
+        """
+        Enhances an existing plot outline.
+        """
+        critique_prompt_template = self.prompts.create_plot_outline_critique_prompt()
+        rewrite_prompt_template = self.prompts.create_plot_outline_rewrite_prompt()
+        variables = {
+            "current_outline": "\n".join(
+                [
+                    f"Act One:\n{current_content.act_one}",
+                    f"Act Two:\n{current_content.act_two}",
+                    f"Act Three:\n{current_content.act_three}",
+                ]
+            )
+        }  # Pass string for critique
+
+        critique_text = await self._generate_content_from_prompt(
+            critique_prompt_template, variables
+        )
+        if not critique_text:
+            return None
+
+        rewrite_variables = {**variables, "critique": critique_text}
+        enhanced_outline_text = await self._generate_content_from_prompt(
+            rewrite_prompt_template, rewrite_variables
+        )
+        if not enhanced_outline_text:
+            return None
+
+        return self._parse_response(enhanced_outline_text)
+
+    def _parse_response(self, response_text: str) -> Optional[PlotOutline]:
+        """
+        Parses the LLM response text into a PlotOutline object.
+        """
+        try:
+            plot_outline = PlotOutline(act_one="", act_two="", act_three="")
+            acts = response_text.split("Act ")
+            if len(acts) >= 4:
+                plot_outline.act_one = acts[1].split("Act")[0].strip()
+                plot_outline.act_two = acts[2].split("Act")[0].strip()
+                plot_outline.act_three = acts[3].strip()
+            else:
+                logger.warning(
+                    "Unexpected plot outline format from LLM, basic parsing failed."
+                )
+                plot_outline.act_one = (
+                    response_text  # Fallback: use the whole response as act_one
+                )
+            return plot_outline
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # More specific exception catching
+            logger.error("Error parsing PlotOutline response: %s", e)  # Lazy format
+            logger.debug("Raw LLM response: %s", response_text)  # Lazy format
+            logger.exception(e)  # Log full exception details
+            return None
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/scene_outline_generator.py`:
+
+```````py
+# core/content_generation/scene_outline_generator.py
+from typing import List, Optional
+
+from core.content_generation.base_generator import BaseContentGenerator
+from core.plot_outline import ChapterOutline, SceneOutline
+from llm.prompt_manager.scene_outline_prompts import SceneOutlinePrompts
+from utils.logger import logger
+
+
+class SceneOutlineGenerator(BaseContentGenerator):
+    """
+    Content generator for SceneOutline objects.
+
+    Inherits from BaseContentGenerator and specializes in generating
+    and enhancing scene outlines for each chapter.
+    """
+
+    def __init__(self, prompt_manager, model_name: str):
+        """
+        Initializes SceneOutlineGenerator with prompt manager and model name.
+        """
+        super().__init__(prompt_manager, model_name)
+        self.prompts = SceneOutlinePrompts(
+            prompt_manager
+        )  # Initialize scene outline specific prompts
+
+    async def generate(
+        self, chapter_outline: ChapterOutline, num_scenes: int
+    ) -> Optional[List[SceneOutline]]:
+        """
+        Generates a list of SceneOutlines for a given ChapterOutline.
+        """
+        generation_prompt_template = (
+            self.prompts.create_scene_outlines_generation_prompt()
+        )
+        variables = {
+            "chapter_outline": chapter_outline.summary,
+            "num_scenes_per_chapter": str(num_scenes),
+        }
+        generated_text = await self._generate_content_from_prompt(
+            generation_prompt_template, variables
+        )
+        if not generated_text:
+            return None
+
+        structure_check_prompt_template = (
+            self.prompts.create_scene_outlines_structure_check_prompt()
+        )
+        structure_fix_prompt_template = (
+            self.prompts.create_scene_outlines_structure_fix_prompt()
+        )
+        validated_text = await self._structure_check_and_fix(
+            generated_text,
+            structure_check_prompt_template,
+            structure_fix_prompt_template,
+        )
+        if not validated_text:
+            return None
+
+        return self._parse_response(validated_text)
+
+    async def enhance(
+        self,
+        current_content: List[
+            SceneOutline
+        ],  # Parameter name consistent with base class
+    ) -> Optional[List[SceneOutline]]:
+        """
+        Enhances a list of existing SceneOutline objects.
+        """
+        # Convert SceneOutline objects to text for critique and rewrite prompts
+        outline_texts = [
+            f"Scene {so.scene_number}:\n{so.summary}" for so in current_content
+        ]
+        current_outlines_text = "\n\n".join(outline_texts)
+
+        critique_prompt_template = self.prompts.create_scene_outlines_critique_prompt()
+        rewrite_prompt_template = self.prompts.create_scene_outlines_rewrite_prompt()
+        variables = {"current_outlines": current_outlines_text}
+
+        critique_text = await self._generate_content_from_prompt(
+            critique_prompt_template, variables
+        )
+        if not critique_text:
+            return None
+
+        rewrite_variables = {**variables, "critique": critique_text}
+        enhanced_outlines_text = await self._generate_content_from_prompt(
+            rewrite_prompt_template, rewrite_variables
+        )
+        if not enhanced_outlines_text:
+            return None
+
+        # Parse and return enhanced scene outlines
+        return self._parse_response(enhanced_outlines_text)
+
+    def _parse_response(self, response_text: str) -> Optional[List[SceneOutline]]:
+        """
+        Parses the LLM response text into a list of SceneOutline objects.
+        """
+        scene_outlines: List[SceneOutline] = []
+        try:
+            scene_splits = response_text.strip().split("Scene ")
+            for i, scene_text in enumerate(scene_splits[1:], start=1):
+                scene_summary = scene_text.split("Scene")[
+                    0
+                ].strip()  # Split again in case "Scene" is in summary text
+                if scene_summary:
+                    scene_outlines.append(
+                        SceneOutline(scene_number=i, summary=scene_summary)
+                    )
+                else:
+                    logger.warning(
+                        "Skipping empty scene outline in LLM response."
+                    )  # No lazy format - simple string
+                    # logger.warning("%s", "Skipping empty scene outline in LLM response.") # Lazy format - but no variable to pass
+
+            if not scene_outlines:
+                logger.error(
+                    "No scene outlines parsed from LLM response."
+                )  # No lazy format - simple string
+                # logger.error("%s", "No scene outlines parsed from LLM response.") # Lazy format - but no variable to pass
+                return None
+            return scene_outlines
+
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # Specific exception handling
+            logger.error("Error parsing SceneOutline responses: %s", e)  # Lazy format
+            logger.debug("Raw LLM response: %s", response_text)  # Lazy format
+            logger.exception(e)  # Log full exception details
+            return None
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/chapter_outline_generator.py`:
+
+```````py
+# core/content_generation/chapter_outline_generator.py
+from typing import List, Optional
+
+from core.content_generation.base_generator import BaseContentGenerator
+from core.plot_outline import ChapterOutline, PlotOutline
+from llm.prompt_manager.chapter_outline_prompts import ChapterOutlinePrompts
+from utils.logger import logger
+
+
+class ChapterOutlineGenerator(BaseContentGenerator):
+    """
+    Content generator for ChapterOutline objects.
+
+    Extends BaseContentGenerator to provide specific functionality for
+    generating and enhancing chapter outlines for a novel.
+    """
+
+    def __init__(self, prompt_manager, model_name: str):
+        """
+        Initializes ChapterOutlineGenerator with prompt manager and model name.
+        """
+        super().__init__(prompt_manager, model_name)
+        self.prompts = ChapterOutlinePrompts(
+            prompt_manager
+        )  # Initialize chapter outline specific prompts
+
+    async def generate(
+        self, plot_outline: PlotOutline, num_chapters: int
+    ) -> Optional[List[ChapterOutline]]:
+        """
+        Generates a list of ChapterOutlines based on a PlotOutline.
+        """
+        generation_prompt_template = (
+            self.prompts.create_chapter_outlines_generation_prompt()
+        )
+        variables = {
+            "plot_outline": "\n".join(
+                [
+                    "Act One:\n" + plot_outline.act_one,
+                    "Act Two:\n" + plot_outline.act_two,
+                    "Act Three:\n" + plot_outline.act_three,
+                ]
+            ),
+            "num_chapters": str(num_chapters),
+        }
+        generated_text = await self._generate_content_from_prompt(
+            generation_prompt_template, variables
+        )
+        if not generated_text:
+            return None
+
+        structure_check_prompt_template = (
+            self.prompts.create_chapter_outlines_structure_check_prompt()
+        )
+        structure_fix_prompt_template = (
+            self.prompts.create_chapter_outlines_structure_fix_prompt()
+        )
+        validated_text = await self._structure_check_and_fix(
+            generated_text,
+            structure_check_prompt_template,
+            structure_fix_prompt_template,
+        )
+        if not validated_text:
+            return None
+
+        return self._parse_response(validated_text, num_chapters)
+
+    async def enhance(
+        self,
+        current_content: List[
+            ChapterOutline
+        ],  # Parameter name consistent with base class
+    ) -> Optional[List[ChapterOutline]]:
+        """
+        Enhances a list of existing ChapterOutline objects.
+        """
+        # Convert ChapterOutline objects to text for critique and rewrite prompts
+        outline_texts = [
+            f"Chapter {co.chapter_number}:\n{co.summary}" for co in current_content
+        ]
+        current_outlines_text = "\n\n".join(outline_texts)
+
+        critique_prompt_template = (
+            self.prompts.create_chapter_outlines_critique_prompt()
+        )
+        rewrite_prompt_template = self.prompts.create_chapter_outlines_rewrite_prompt()
+        variables = {"current_outlines": current_outlines_text}
+
+        critique_text = await self._generate_content_from_prompt(
+            critique_prompt_template, variables
+        )
+        if not critique_text:
+            return None
+
+        rewrite_variables = {**variables, "critique": critique_text}
+        enhanced_outlines_text = await self._generate_content_from_prompt(
+            rewrite_prompt_template, rewrite_variables
+        )
+        if not enhanced_outlines_text:
+            return None
+
+        # Parse and return enhanced chapter outlines
+        return self._parse_response(enhanced_outlines_text, len(current_content))
+
+    def _parse_response(
+        self, response_text: str, num_chapters: int
+    ) -> Optional[List[ChapterOutline]]:
+        """
+        Parses the LLM response text into a list of ChapterOutline objects.
+        """
+        chapter_outlines: List[ChapterOutline] = []
+        try:
+            chapter_splits = response_text.strip().split("Chapter ")
+            logger.debug(
+                "Number of chapter splits found: %s, expected chapters: %s",
+                len(chapter_splits) - 1,
+                num_chapters,  # Lazy format
+            )
+            for i, chapter_text in enumerate(
+                chapter_splits[1:], start=1
+            ):  # Start from 1 to skip intro, enumerate for chapter number
+                if i > num_chapters:
+                    logger.warning(
+                        "Parsed more chapters than requested (%s). Stopping after %s chapters.",
+                        num_chapters,
+                        num_chapters,  # Lazy format
+                    )
+                    break  # Limit chapters to requested number
+
+                chapter_summary = chapter_text.split("Chapter")[
+                    0
+                ].strip()  # Split again in case "Chapter" is in summary text
+                if chapter_summary:
+                    chapter_outlines.append(
+                        ChapterOutline(chapter_number=i, summary=chapter_summary)
+                    )
+                    logger.debug(
+                        "Parsed chapter %s outline: %s...",
+                        i,
+                        chapter_summary[:50],  # Lazy format
+                    )
+            if not chapter_outlines:
+                logger.error("No chapter outlines parsed from LLM response.")
+                return None
+            return chapter_outlines
+
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # More specific exception catching
+            logger.error("Error parsing ChapterOutline responses: %s", e)  # Lazy format
+            logger.debug("Raw LLM response: %s", response_text)  # Lazy format
+            logger.exception(e)  # Log full exception details
+            return None
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/book_assembler.py`:
+
+```````py
+# core/content_generation/book_assembler.py
+from typing import Dict
+
+
+class BookAssembler:
+    """
+    Assembles the generated scene parts into a complete book text, ordered by chapter, scene, and part number.
+    """
+
+    def assemble_book_text(
+        self, scene_parts_text: Dict[int, Dict[int, Dict[int, str]]]
+    ) -> str:
+        """
+        Assembles scene parts into a formatted book text.
+        """
+        full_book_text = ""
+        for chapter_num in sorted(scene_parts_text.keys()):
+            full_book_text += f"# Chapter {chapter_num}\n\n"  # Chapter heading
+
+            scene_parts_chapter = scene_parts_text[chapter_num]
+            for scene_num in sorted(scene_parts_chapter.keys()):
+                full_book_text += f"## Scene {scene_num}\n\n"  # Scene heading
+
+                scene_parts = scene_parts_chapter[scene_num]
+                for part_num in sorted(scene_parts.keys()):
+                    part_text = scene_parts[part_num]
+                    full_book_text += part_text + "\n\n"  # Add part text and spacing
+
+        return full_book_text.strip()  # Remove leading/trailing whitespace
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/book_spec_generator.py`:
+
+```````py
+# core/content_generation/book_spec_generator.py
+import json
+from typing import Optional
+
+from pydantic import ValidationError
+
+from core.book_spec import BookSpec
+from core.content_generation.base_generator import BaseContentGenerator
+from llm.prompt_manager.prompt_manager import DynamicPromptManager # type: ignore
+from utils.logger import logger
+
+
+class BookSpecGenerator(BaseContentGenerator):
+    """
+    Content generator for BookSpec objects.
+
+    Inherits from BaseContentGenerator and implements specific logic
+    for generating and enhancing BookSpec content.
+    """
+
+    def __init__(self, prompt_manager, model_name: str):
+        """
+        Initializes BookSpecGenerator with prompt manager and model name.
+        """
+        super().__init__(prompt_manager, model_name)
+        self.prompts = prompt_manager
+        logger.debug("prompt: %s...", self.prompts)
+
+    async def generate(
+        self, idea: str, project_name: str = "Untitled"
+    ) -> Optional[BookSpec]:  # Add type hint for the return type
+        """
+        Generates a BookSpec based on a story idea.
+
+        Args:
+            idea (str): The initial story idea to generate a BookSpec from.
+            project_name (str): The name of the project, used as a default title.
+
+        Returns:
+            Optional[BookSpec]: The generated BookSpec object, or None if generation fails.
+        """
+        logger.debug(f"Generating BookSpec with idea: {idea}")
+        generation_prompt_template = self.prompts.get_prompt("book_spec_generation_prompt")
+        logger.debug("generation_prompt_template: %s...", generation_prompt_template)
+        variables = {"idea": idea, "project_name": project_name}
+        generated_text = await self._generate_content_from_prompt(
+            generation_prompt_template, variables
+        )
+        if not generated_text:
+            logger.error("Initial content generation failed.")
+            return None
+
+
+        book_spec = self._parse_response(generated_text)
+        if not book_spec:
+             logger.error("Parsing failed.")
+             return None
+
+        logger.debug("Parsing successful.  Returning BookSpec.")
+        return book_spec
+
+    async def enhance(
+        self, current_content: BookSpec, enhance_target: str
+    ) -> Optional[BookSpec]:  # Renamed parameter to current_content
+        """
+        Enhances an existing BookSpec object.
+        """
+        critique_prompt_template = self.prompts.get_prompt("book_spec_critique_prompt")
+        rewrite_prompt_template = self.prompts.get_prompt("book_spec_rewrite_prompt")
+        variables = {
+            "title": current_content.title,
+            "genre": current_content.genre,
+            "setting": current_content.setting,
+            "themes": ", ".join(current_content.themes),
+            "tone": current_content.tone,
+            "point_of_view": current_content.point_of_view,
+            "characters": ", ".join(current_content.characters),
+            "premise": current_content.premise
+        }  # Now using current_content
+
+        critique_text = await self._generate_content_from_prompt(
+            critique_prompt_template, variables
+        )
+        if not critique_text:
+            return None
+
+        rewrite_variables = {**variables, "critique": critique_text}
+        enhanced_spec_json = await self._generate_content_from_prompt(
+            rewrite_prompt_template, rewrite_variables
+        )
+        if not enhanced_spec_json:
+            return None
+
+        return self._parse_response(enhanced_spec_json)
+
+    def _parse_response(self, response_text: str) -> Optional[BookSpec]:
+        """
+        Parses the JSON response from the LLM and validates it against the BookSpec model.
+        """
+        try:
+            book_spec_data = json.loads(response_text)
+            return BookSpec(**book_spec_data)
+        except json.JSONDecodeError as e:
+            logger.error("JSONDecodeError: %s", e)  # Lazy format
+            logger.debug("Problematic JSON string: %s", response_text)  # Lazy format
+            return None
+        except ValidationError as e:
+            logger.error("ValidationError: %s", e)  # Lazy format
+            logger.debug(
+                "Problematic JSON data: %s",
+                (
+                    book_spec_data
+                    if "book_spec_data" in locals()
+                    else "JSON data not parsed"
+                ),
+            )  # Lazy format
+            return None
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # Catch specific operational errors
+            logger.error(
+                "Operational error during parsing BookSpec JSON: %s", e
+            )  # Lazy format
+            logger.exception(e)  # Log full exception details
+            return None
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/base_generator.py`:
+
+```````py
+# /home/tlh/refactored_gui_fict_fab/llm/llm_client.py
+import json
+from typing import Optional
+
+import aiohttp
+
+from utils.config import config
+from utils.logger import logger
+from openai import AsyncOpenAI  # Import OpenAI
+
+
+class OpenAILLMClient:
+    """
+    Client for interacting with a local OpenAI compatible instance using aiohttp.
+    """
+
+    def __init__(self, base_url: str = None):
+        """
+        Initializes the OpenAI client.
+        """
+        self.base_url = base_url or config.get_openai_base_url()
+        self.client = AsyncOpenAI(
+            base_url=self.base_url, api_key="placeholder"
+        )  # Initialize OpenAI client
+        logger.debug(
+            "OpenAILLMClient initialized with base_url: %s", self.base_url
+        )  # Lazy formatting
+
+    async def list_models(self) -> Optional[list[str]]:
+        """OpenAI does not support listing models via localhost."""
+        return None
+
+    async def generate_text(self, model_name: str, prompt: str) -> Optional[str]:
+        """
+        Asynchronously generates text using the OpenAI API.
+        """
+        try:
+            response = await self.client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.7,
+                max_tokens=800,
+            )
+            generated_text = response.choices[0].message.content
+
+            if generated_text:
+                logger.info(
+                    "Text generated successfully using model '%s'", model_name
+                )  # Lazy formatting
+                return generated_text
+            else:
+                logger.error("No response from OpenAI API")
+                return None
+
+        except Exception as e:  # General exception to handle OpenAI and other errors
+            logger.error("OpenAI text generation failed: %s", e)  # Lazy formatting
+            return None
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/scene_part_generator.py`:
+
+```````py
+# core/content_generation/scene_part_generator.py
+from typing import Optional
+
+from core.content_generation.base_generator import BaseContentGenerator
+from core.plot_outline import SceneOutline, ChapterOutline
+from core.book_spec import BookSpec
+from llm.prompt_manager.scene_part_prompts import ScenePartPrompts
+from utils.logger import logger
+
+
+class ScenePartGenerator(BaseContentGenerator):
+    """
+    Content generator for scene parts, which are sections of text within a scene.
+
+    Inherits from BaseContentGenerator and provides functionality to generate
+    and enhance individual parts of a scene's narrative.
+    """
+
+    def __init__(self, prompt_manager, model_name: str):
+        """
+        Initializes ScenePartGenerator with prompt manager and model name.
+        """
+        super().__init__(prompt_manager, model_name)
+        self.prompts = ScenePartPrompts(
+            prompt_manager
+        )  # Initialize scene part specific prompts
+
+    async def generate(
+        self,
+        scene_outline: SceneOutline,
+        part_number: int,
+        book_spec: BookSpec,
+        chapter_outline: ChapterOutline,
+        scene_outline_full: SceneOutline,
+    ) -> Optional[str]:
+        """
+        Generates a part of a scene's text content.
+        """
+        generation_prompt_template = self.prompts.create_scene_part_generation_prompt()
+        variables = {
+            "scene_outline": scene_outline.summary,
+            "part_number": str(part_number),
+            "book_spec_text": book_spec.model_dump_json(indent=4),
+            "chapter_outline": chapter_outline.summary,
+            "scene_outline_full": scene_outline_full.summary,
+        }
+        generated_text = await self._generate_content_from_prompt(
+            generation_prompt_template, variables
+        )
+        if not generated_text:
+            return None
+
+        structure_check_prompt_template = (
+            self.prompts.create_scene_part_structure_check_prompt()
+        )
+        structure_fix_prompt_template = (
+            self.prompts.create_scene_part_structure_fix_prompt()
+        )
+        validated_text = await self._structure_check_and_fix(
+            generated_text,
+            structure_check_prompt_template,
+            structure_fix_prompt_template,
+        )
+        if not validated_text:
+            return None
+
+        return self._parse_response(validated_text)
+
+    async def enhance(
+        self,
+        current_content: str,  # Parameter name consistent with base class - now current_content
+        part_number: int,
+        book_spec: BookSpec,
+        chapter_outline: ChapterOutline,
+        scene_outline_full: SceneOutline,
+    ) -> Optional[str]:
+        """
+        Enhances an existing scene part's text content.
+        """
+        critique_prompt_template = self.prompts.create_scene_part_critique_prompt()
+        rewrite_prompt_template = self.prompts.create_scene_part_rewrite_prompt()
+        variables = {
+            "book_spec": book_spec.model_dump_json(indent=4),
+            "chapter_outline": chapter_outline.summary,
+            "scene_outline_full": scene_outline_full.summary,
+            "part_number": str(part_number),
+        }
+        critique_variables = {
+            **variables,
+            "content": current_content,
+        }  # Now using current_content
+
+        critique_text = await self._generate_content_from_prompt(
+            critique_prompt_template, critique_variables
+        )
+        if not critique_text:
+            return None
+
+        rewrite_variables = {
+            **variables,
+            "critique": critique_text,
+            "content": current_content,  # Now using current_content
+        }
+        enhanced_part_text = await self._generate_content_from_prompt(
+            rewrite_prompt_template, rewrite_variables
+        )
+        if not enhanced_part_text:
+            return None
+
+        return self._parse_response(enhanced_part_text)
+
+    def _parse_response(self, response_text: str) -> Optional[str]:
+        """
+        Parses the LLM response text for a scene part.
+        """
+        if (
+            response_text and response_text.strip()
+        ):  # Check for non-empty and non-whitespace
+            return response_text.strip()  # Return text content, stripping whitespace
+        else:
+            logger.warning(
+                "LLM response for scene part was empty or only whitespace."
+            )  # warning style
+
+            return None  # Handle empty or whitespace-only response
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/content_generation/__init__.py`:
+
+```````py
+# core/content_generator/__init__.py
+
+"""
+Package initializer for the content_generator package.
+
+This package is responsible for generating different types of content
+for the Fiction Fabricator application, including:
+
+- Book Specifications (book_spec_generator.py)
+- Plot Outlines (plot_outline_generator.py)
+- Chapter Outlines (chapter_outline_generator.py)
+- Scene Outlines (scene_outline_generator.py)
+- Scene Parts (scene_part_generator.py)
+
+It also provides a base class, BaseContentGenerator (base_generator.py), 
+which defines common functionalities and an interface for all content generators 
+within this package, promoting code reuse and consistency.
+"""
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/book_spec.py`:
+
+```````py
+# core/book_spec.py
+from pydantic import BaseModel
+
+
+class BookSpec(BaseModel):
+    """
+    Represents the specification for a novel.
+
+    This Pydantic model defines the structure for storing and validating
+    the book specification, including title, genre, setting, themes, tone,
+    point of view, characters, and premise.
+    """
+
+    title: str
+    """The title of the novel."""
+    genre: str
+    """The genre and subgenres of the novel (e.g., Dark Fantasy, Erotic Thriller)."""
+    setting: str
+    """Detailed description of the novel's setting(s), including location and time period."""
+    themes: list[str] # changed to list[str] to remove need for import
+    """List of major themes explored in the novel, particularly dark and erotic themes."""
+    tone: str
+    """The overall tone of the novel (e.g., gritty, suspenseful, sensual, melancholic)."""
+    point_of_view: str
+    """The narrative point of view (e.g., first-person, third-person limited, third-person omniscient)."""
+    characters: list[str] # changed to list[str] to remove need for import
+    """Detailed descriptions of 2-3 main characters, including motivations and flaws related to dark and erotic elements."""
+    premise: str
+    """A concise and intriguing premise that sets up the central conflict and hints at the dark and erotic nature of the story."""
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/plot_outline.py`:
+
+```````py
+# core/plot_outline.py
+from pydantic import BaseModel
+
+
+class PlotOutline(BaseModel):
+    """
+    Represents a three-act plot outline for a novel.
+
+    This Pydantic model defines the structure for storing the three acts
+    of a plot outline: Act One (Setup), Act Two (Confrontation), and
+    Act Three (Resolution). Each act is represented as a string containing
+    a summary of the plot points within that act.
+    """
+
+    act_one: str
+    """Summary of Act One: Setup - Introduction of characters, setting, and initial conflict."""
+    act_two: str
+    """Summary of Act Two: Confrontation - Development of conflict, rising stakes, and obstacles."""
+    act_three: str
+    """Summary of Act Three: Resolution - Climax, resolution of conflict, and thematic closure."""
+
+
+class ChapterOutline(BaseModel):
+    """
+    Represents an outline for a single chapter in the novel.
+
+    This Pydantic model defines the structure for a chapter outline,
+    including the chapter number and a summary of the chapter's events.
+    """
+
+    chapter_number: int
+    """The chapter number (e.g., 1, 2, 3...)."""
+    summary: str
+    """A summary of the key events and developments within this chapter."""
+
+
+class SceneOutline(BaseModel):
+    """
+    Represents an outline for a single scene within a chapter.
+
+    This Pydantic model defines the structure for a scene outline,
+    including the scene number and a summary of the scene's events,
+    setting, and characters involved.
+    """
+
+    scene_number: int
+    """The scene number within the chapter (e.g., 1, 2, 3...)."""
+    summary: str
+    """A summary of the key events, setting, and characters in this scene."""
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/core/project_manager.py`:
+
+```````py
+# core/project_manager.py
+import json
+import os
+from typing import Dict, Any, Optional
+
+from utils.file_handler import save_json, load_json
+from utils.config import config
+from utils.logger import logger
+
+class ProjectManager:
+    """
+    Manages project-related operations such as saving and loading project data.
+    """
+
+    def __init__(self):
+        """
+        Initializes the ProjectManager with the project directory from config.
+        """
+        self.project_dir = config.get_project_directory()
+        os.makedirs(self.project_dir, exist_ok=True)  # Ensure project directory exists
+
+    def save_project(
+        self,
+        project_name: str,
+        story_idea: str,
+        book_spec: Any,  # BookSpec | None,
+        plot_outline: Any,  # PlotOutline | None,
+        chapter_outlines: list[Any],  # list[ChapterOutline] | None,
+        scene_outlines: Dict[int, list[Any]],  # Dict[int, list[SceneOutline]] | None,
+        scene_parts: Dict[int, Dict[int, Any]],  # Dict[int, Dict[int, str]] | None,
+        scene_parts_text: Dict[int, Dict[int, Dict[int, str]]],
+        book_text: Optional[str],
+    ) -> None:
+        """
+        Saves the project data to a JSON file.
+        """
+        project_dir = os.path.join(self.project_dir, project_name) # Create project folder
+        os.makedirs(project_dir, exist_ok=True)  # Create project folder if not exists
+        project_filepath = os.path.join(project_dir, f"{project_name}.json") # Add project name to the path
+        try:
+            # Convert Pydantic models to dictionaries
+            book_spec_data = book_spec.model_dump() if book_spec else None
+            plot_outline_data = plot_outline.model_dump() if plot_outline else None
+            chapter_outlines_data = [co.model_dump() for co in chapter_outlines] if chapter_outlines else None
+            scene_outlines_data = {
+                chapter_num: [so.model_dump() for so in scene_outlines]
+                for chapter_num, scene_outlines in scene_outlines.items()
+            } if scene_outlines else None
+
+            project_data: Dict[str, Any] = {
+                "story_idea": story_idea,
+                "book_spec": book_spec_data,
+                "plot_outline": plot_outline_data,
+                "chapter_outlines": chapter_outlines_data,
+                "scene_outlines": scene_outlines_data,
+                "scene_parts": scene_parts,
+                "scene_parts_text": scene_parts_text,
+                "book_text": book_text,
+            }
+
+            save_json(project_data, project_filepath)
+            logger.info("Project '%s' saved successfully.", project_name)
+        except Exception as e:
+            logger.error("Error saving project '%s': %s", project_name, e)
+            raise
+
+    def load_project(self, project_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Loads project data from a JSON file.
+        """
+        project_dir = os.path.join(self.project_dir, project_name) # added to the start so it reads the correct directory
+        project_filepath = os.path.join(project_dir, f"{project_name}.json")
+        try:
+            project_data = load_json(project_filepath)
+            logger.info("Project '%s' loaded successfully.", project_name)
+            return project_data
+        except FileNotFoundError:
+            logger.error("Project file not found: %s", project_filepath)
+            raise
+        except Exception as e:
+            logger.error("Error loading project '%s': %s", project_name, e)
+            raise
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/book_spec_prompts.py`:
+
+```````py
+# llm/prompt_manager/book_spec_prompts.py
+from llm.prompt_manager.base_prompts import (
+    COMMON_INSTRUCTIONS_NOVELIST,
+    JSON_OUTPUT_FORMAT_INSTRUCTIONS,
+    STRUCTURE_CHECK_INSTRUCTIONS,
+    STRUCTURE_FIX_PROMPT_TEMPLATE,
+    CRITIQUE_PROMPT_TEMPLATE,
+    REWRITE_PROMPT_TEMPLATE,
+)
+
+
+class BookSpecPrompts:
+    """
+    Encapsulates prompt templates for BookSpec operations.
+
+    Provides methods to retrieve specific prompt templates for
+    generating, structure checking, fixing, critiquing, and rewriting BookSpecs.
+    """
+
+    def __init__(self, prompt_manager=None):
+        """
+        Initializes BookSpecPrompts.
+        Prompt manager is currently not used, but included for potential future use or consistency.
+        """
+        self.prompt_manager = prompt_manager
+
+    def create_book_spec_generation_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a new BookSpec from a story idea.
+        """
+        json_structure = """
+        {
+            "title": "string",
+            "genre": "string",
+            "setting": "string",
+            "themes": ["string", "string", "string"],
+            "tone": "string",
+            "point_of_view": "string",
+            "characters": ["string", "string", "string"],
+            "premise": "string"
+        }
+        """
+        prompt_template = f"""
+        {COMMON_INSTRUCTIONS_NOVELIST.format(task="generate detailed book specifications based on short story ideas")}
+
+        Generate a detailed book specification for a novel based on the following idea: "{{idea}}".
+
+        The novel should have a strong focus on dark themes.
+
+        Include the following elements in the book specification:
+        - Title (Compelling and evocative)
+        - Genre (Specify the genre and subgenres - be specific, e.g., Dark Fantasy, Erotic Thriller)
+        - Setting(s) (Detailed description of locations and time period, make it vivid)
+        - Themes (List of 3-5 major themes explored in the novel, particularly dark and erotic themes)
+        - Tone (Describe the overall tone of the novel - e.g., gritty, suspenseful, melancholic, sensual, noir, gothic)
+        - Point of View (Specify the narrative perspective - e.g., first-person, third-person limited, third-person omniscient)
+        - Characters (Detailed descriptions of 2-3 main characters, including their motivations, flaws, backstories, and key personality traits.  Focus on aspects related to dark and erotic elements. Each character description should be a single string, detailed and evocative.)
+        - Premise (A concise and intriguing premise that sets up the central conflict and hints at the dark and erotic nature of the story. Make it immediately captivating.)
+
+        Ensure the book specification is well-structured, creative, and clearly reflects the dark focus.  Be expansive and detailed in your descriptions.
+
+        {JSON_OUTPUT_FORMAT_INSTRUCTIONS.format(json_structure=json_structure)}
+
+        Do not include any explanation or introductory text, just the valid JSON.
+        """
+        return prompt_template
+
+    def create_book_spec_structure_check_prompt(self) -> str:
+        """
+        Returns the prompt template for checking the structure of a BookSpec JSON.
+        """
+        prompt_template = f"""
+        {STRUCTURE_CHECK_INSTRUCTIONS}
+
+        Here is the BookSpec in JSON format:
+        ```json
+        {{content}}
+        ```
+
+        Specifically, check that:
+        - The JSON is valid and parsable.
+        - All fields are present: title, genre, setting, themes, tone, point_of_view, characters, premise.
+        - All values are strings, EXCEPT for 'themes' and 'characters', which must be lists of strings.
+        - The lists 'themes' and 'characters' contain at least one item.
+
+        If the BookSpec adheres to the correct structure, respond with 'STRUCTURE_OK'.
+        If there are any structural issues, respond with a detailed explanation of the problems and how to fix them.
+        """
+        return prompt_template
+
+    def create_book_spec_structure_fix_prompt(self) -> str:
+        """
+        Returns the prompt template for fixing structural issues in a BookSpec JSON.
+        """
+        json_structure = """
+        {
+            "title": "string",
+            "genre": "string",
+            "setting": "string",
+            "themes": ["string", "string", "string"],
+            "tone": "string",
+            "point_of_view": "string",
+            "characters": ["string", "string", "string"],
+            "premise": "string"
+        }
+        """
+        prompt_template = f"""
+        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(json_structure=json_structure, content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}")}
+
+        Your task is to modify the JSON to adhere to the correct structure as outlined below and fix the structural problems described:
+
+        ```json
+        {json_structure}
+        ```
+
+        Return only valid JSON, without deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
+        """
+        return prompt_template
+
+    def create_book_spec_critique_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a critique of a BookSpec.
+        """
+        prompt_template = f"""
+        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
+
+        Focus your critique on:
+        - **Clarity and Detail:** Are all sections sufficiently detailed and clear? Could any section be expanded or made more specific?
+        - **Cohesion and Consistency:** Does the BookSpec present a unified and coherent vision for the novel? Are all elements consistent with each other?
+        - **Strength of Dark Themes:** How effectively does the BookSpec establish and emphasize the dark and erotic themes of the novel? Is the premise intriguing and suggestive of the novel's nature?
+        - **Character Depth:** Are the character descriptions compelling and insightful? Do they adequately explore motivations and flaws related to the dark and erotic elements?
+        - **Overall Impact:** How compelling and well-defined is the BookSpec as a foundation for writing a novel? What are its strongest and weakest points?
+        """
+        return prompt_template
+
+    def create_book_spec_rewrite_prompt(self) -> str:
+        """
+        Returns the prompt template for rewriting a BookSpec based on critique.
+        """
+        json_structure = """
+        {
+            "title": "string",
+            "genre": "string",
+            "setting": "string",
+            "themes": ["string", "string", "string"],
+            "tone": "string",
+            "point_of_view": "string",
+            "characters": ["string", "string", "string"],
+            "premise": "string"
+        }
+        """
+        prompt_template = f"""
+        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
+
+        When rewriting, specifically focus on:
+        - **Addressing all points raised in the critique** directly and thoroughly.
+        - **Enhancing detail and clarity** in all sections, especially those identified as weak in the critique.
+        - **Strengthening the dark and erotic themes** throughout the specification.
+        - **Deepening character descriptions** to add more psychological insight and compelling motivations.
+        - **Ensuring overall cohesion and impact** of the BookSpec as a robust foundation for novel writing.
+
+        Output the ENTIRE revised BookSpec in JSON format.
+
+        {JSON_OUTPUT_FORMAT_INSTRUCTIONS.format(json_structure=json_structure)}
+        """
+        return prompt_template
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/scene_part_prompts.py`:
+
+```````py
+# llm/prompt_manager/scene_part_prompts.py
+
+"""
+Prompt templates for ScenePart generation and enhancement.
+
+This module defines the prompt templates used by the ScenePartGenerator
+to generate and enhance ScenePart objects. It utilizes base templates
+from base_prompts.py for consistency and reduced redundancy.
+"""
+
+from llm.prompt_manager.base_prompts import (
+    COMMON_INSTRUCTIONS_NOVELIST,
+    STRUCTURE_CHECK_INSTRUCTIONS,
+    STRUCTURE_FIX_PROMPT_TEMPLATE,
+    CRITIQUE_PROMPT_TEMPLATE,
+    REWRITE_PROMPT_TEMPLATE,
+)
+
+
+class ScenePartPrompts:
+    """
+    Encapsulates prompt templates for ScenePart operations.
+
+    Provides methods to retrieve specific prompt templates for
+    generating, structure checking, fixing, critiquing, and rewriting SceneParts.
+    """
+
+    def __init__(self, prompt_manager=None):
+        """
+        Initializes ScenePartPrompts.
+        Prompt manager is currently not used, but included for potential future use or consistency.
+        """
+        self.prompt_manager = prompt_manager
+
+    def create_scene_part_generation_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a ScenePart.
+        """
+        prompt_template = f"""
+        {COMMON_INSTRUCTIONS_NOVELIST.format(task="generate specific parts of scenes from scene outlines, creating vivid and engaging narrative text")}
+
+        Generate part {{part_number}} of the text for the following scene, based on the provided book specification, chapter outline, and scene outline. Focus on writing compelling prose that brings the scene to life.
+
+        Book Specification:
+        ```json
+        {{book_spec_text}}
+        ```
+
+        Chapter Outline:
+        ```
+        {{chapter_outline}}
+        ```
+
+        Scene Outline:
+        ```
+        {{scene_outline_full}}
+        ```
+
+        Specifically for Part {{part_number}} of the scene, focusing on the following outline points:
+        ```
+        {{scene_outline}}
+        ```
+
+        Write this part of the scene in a compelling and descriptive manner, consistent with the tone, themes, and characters established in the book specification. Emphasize the dark and erotic elements as appropriate for this scene and the overall novel, but ensure that these elements are integrated tastefully and contribute to the narrative's depth and complexity, rather than being gratuitous. Focus on vivid sensory descriptions, engaging dialogue that reveals character and advances the plot, and actions that move the scene forward dynamically.
+
+        The generated text should be suitable for inclusion in a novel and should seamlessly connect with the preceding and subsequent parts of the scene (if applicable), creating a cohesive and immersive reading experience.
+
+        Your response MUST be ONLY the text for scene part {{part_number}}. Do not include any preamble or concluding remarks, just the scene part text itself.
+        """
+        return prompt_template
+
+    def create_scene_part_structure_check_prompt(self) -> str:
+        """
+        Returns the prompt template for checking the structure of a ScenePart.
+        """
+        prompt_template = f"""
+        {STRUCTURE_CHECK_INSTRUCTIONS}
+
+        Here is the scene part text:
+        ```
+        {{content}}
+        ```
+
+        Your task is to ensure that the scene part:
+        - Is written in grammatically correct English with proper sentence structure and punctuation.
+        - Is formatted as plain text, without any structural elements like headings, bullet points, or scene breaks within the part.
+        - Is coherent and reads smoothly as a part of a narrative, logically connecting to the surrounding parts of the scene (even though the context of surrounding parts is not provided here).
+        - Maintains a consistent tone and style appropriate for a dark and erotic novel, as established in the Book Specification (even though the Book Specification itself is not provided here).
+
+        If the scene part adheres to these basic structural and grammatical criteria, and is presented as plain, coherent text, respond with 'STRUCTURE_OK'.
+        If there are any structural issues, such as grammatical errors, formatting issues, incoherence, or significant deviations in tone, provide a detailed explanation of the problems and how to fix them.
+        """
+        return prompt_template
+
+    def create_scene_part_structure_fix_prompt(self) -> str:
+        """
+        Returns the prompt template for fixing structural issues in a ScenePart.
+        """
+        prompt_template = f"""
+        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}", json_structure="")}
+
+        Your task is to modify the scene part text to correct the identified structural and grammatical issues. Specifically:
+        - Correct any grammatical errors, punctuation mistakes, and awkward sentence structures to ensure the text is grammatically sound and easy to read.
+        - Ensure the text is formatted as plain text, removing any unintended structural elements like headings or bullet points. The scene part should be a continuous block of narrative text.
+        - Improve coherence and flow to ensure the scene part reads smoothly and logically. Enhance transitions and connections within the text as needed.
+        - Adjust the tone and style to ensure consistency with the established tone for a dark and erotic novel, aligning with the overall project guidelines.
+
+        Return ONLY the corrected scene part text, without any preamble or concluding remarks. The corrected scene part should be grammatically correct, formatted as plain text, and structurally sound.
+        """
+        return prompt_template
+
+    def create_scene_part_critique_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a critique of a ScenePart.
+        """
+        prompt_template = f"""
+        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
+
+        Focus your critique on:
+        - **Descriptive Writing and Imagery:** How vivid and engaging are the descriptions? Does the writing effectively use sensory details to immerse the reader in the scene's setting and atmosphere? Could the imagery be stronger or more evocative?
+        - **Character Voice and Dialogue:** If dialogue is present, how effective is it in revealing character and advancing the plot? Is the character voice distinct and believable? Is the dialogue engaging and natural?
+        - **Pacing and Engagement:** Is the pacing of the scene part effective? Does it maintain reader engagement and interest? Is there a sense of dramatic tension or emotional depth? Could the pacing be improved to enhance impact?
+        - **Integration of Dark and Erotic Themes:** If applicable, how well are the dark and erotic themes integrated into this scene part? Are these elements handled tastefully and effectively contribute to the narrative, or do they feel gratuitous or underdeveloped?
+        - **Consistency with Book/Chapter/Scene Outlines:** How well does this scene part realize the potential of the provided Book Specification, Chapter Outline, and Scene Outline? Does it effectively capture the intended events, tone, and purpose of this part of the scene?
+        - **Overall Writing Quality and Impact:** Evaluate the overall quality of the writing in this scene part. What are its strengths and weaknesses? How could it be improved to be more compelling, immersive, and impactful for the reader?
+        """
+        return prompt_template
+
+    def create_scene_part_rewrite_prompt(self) -> str:
+        """
+        Returns the prompt template for rewriting a ScenePart based on critique.
+        """
+        prompt_template = f"""
+        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
+
+        When rewriting the scene part, specifically focus on:
+        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised scene part text.
+        - **Enhancing descriptive writing and imagery** to create a more vivid and immersive experience for the reader. Strengthen sensory details, atmosphere, and setting descriptions.
+        - **Refining character voice and dialogue** to make it more engaging, revealing, and impactful. Improve the believability and distinctiveness of character voices and ensure dialogue effectively serves the narrative.
+        - **Adjusting pacing and engagement** to optimize the scene part's impact. Enhance dramatic tension, emotional depth, and overall reader interest through pacing adjustments and more compelling prose.
+        - **Improving the integration of dark and erotic themes**, if applicable, ensuring these elements are handled tastefully and contribute meaningfully to the narrative's complexity and depth. Avoid gratuitous or underdeveloped portrayals of these themes; instead, aim for nuanced and impactful integration.
+        - **Ensuring stronger consistency with the Book Specification, Chapter Outline, and Scene Outline**, aligning the scene part more closely with the established guidelines and intended purpose. Enhance the realization of the outlined events, tone, and objectives within the scene part text.
+
+        Rewrite the ENTIRE scene part text, focusing on enhancing its descriptive quality, character voice, pacing, thematic integration, and overall writing quality to create a more compelling and immersive narrative.
+
+        Return ONLY the revised scene part text, without any preamble or concluding remarks.
+        """
+        return prompt_template
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/base_prompts.py`:
+
+```````py
+# llm/prompt_manager/base_prompts.py
+
+"""
+Base prompt templates and utility functions for prompt management.
+
+This module defines common prompt snippets and helper functions
+that are reused across different prompt modules to ensure consistency and
+reduce redundancy in prompt definitions.
+"""
+
+COMMON_INSTRUCTIONS_NOVELIST = """
+You are a world-class novelist, skilled in crafting compelling narratives
+with rich detail and engaging prose. Your expertise lies in generating
+high-quality, long-form fictional content based on provided specifications.
+Your goal is to produce creative and well-structured outputs that adhere
+to all instructions and specifications given.
+"""
+
+STRUCTURE_CHECK_INSTRUCTIONS = """
+You are a meticulous editor, expert in ensuring that generated content
+adheres to a specific structure and format. Your task is to review the
+content provided and verify if it correctly follows the required structure.
+If the structure is correct, you should respond with 'STRUCTURE_OK'.
+If there are structural issues, you must provide a detailed explanation
+of the problems and clearly indicate how to fix them. Be specific and actionable in your feedback.
+"""
+
+JSON_OUTPUT_FORMAT_INSTRUCTIONS = """
+Critically important: Your ENTIRE response MUST be valid JSON.
+Adhere strictly to the JSON format specified below, ensuring correct
+data types, proper syntax, and valid structure. The JSON object should be:
+```json
+{json_structure}
+```
+Do not include any explanatory text or introductory phrases before
+or after the JSON block. Just output valid JSON. Ensure that the JSON is
+properly formatted with correct escaping of special characters as needed.
+"""
+
+CRITIQUE_PROMPT_TEMPLATE = """
+You are a world-class editor, providing concise and actionable feedback
+to improve the quality and structure of the provided content.
+Your goal is to identify specific areas for improvement and offer
+constructive criticism that will guide the writer to enhance their work.
+
+Please provide a critique of the following content:
+```
+{content}
+```
+
+Your critique should be:
+- **Concise:**  Limited to 2-3 sentences maximum.
+- **Actionable:** Focus on specific, concrete areas for improvement.
+- **Constructive:**  Frame feedback in a positive and encouraging tone.
+- **Focused:** Address aspects such as clarity, detail, coherence, pacing,
+  narrative flow, character development (if applicable), and thematic resonance.
+"""
+
+REWRITE_PROMPT_TEMPLATE = """
+You are a world-class novelist, now acting as a reviser, tasked with
+improving and refining the provided content based on editor feedback.
+Your goal is to rewrite the content, addressing the critique provided
+and enhancing its overall quality, impact, and adherence to the project's specifications.
+
+Here is the content to be revised:
+```
+{content}
+```
+
+Here is the editor's critique:
+```
+{critique}
+```
+
+Based on the critique, rewrite the content to address the identified issues
+and enhance its strengths. Focus on:
+- Directly responding to the critique points.
+- Improving clarity, detail, and engagement.
+- Strengthening the narrative, pacing, and thematic elements.
+- Ensuring the rewritten content is of the highest possible quality and
+  effectively serves its purpose within the overall project.
+"""
+
+STRUCTURE_FIX_PROMPT_TEMPLATE = """
+You are a meticulous editor tasked with fixing structural issues in a BookSpec object.
+
+Here is the flawed BookSpec in JSON format:
+```json
+{content_with_structure_problems}
+```
+
+Here is a detailed list of structural problems and how to fix them:
+```
+{structure_problems}
+```
+
+Your task is to modify the JSON to adhere to the correct structure as outlined below:
+
+```json
+{json_structure}
+```
+
+Return only valid JSON, without deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
+"""
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/plot_outline_prompts.py`:
+
+```````py
+# llm/prompt_manager/plot_outline_prompts.py
+
+"""
+Prompt templates for PlotOutline generation and enhancement.
+
+This module defines the prompt templates used by the PlotOutlineGenerator
+to generate and enhance PlotOutline objects. It utilizes base templates
+from base_prompts.py for consistency and reduced redundancy.
+"""
+
+from llm.prompt_manager.base_prompts import (
+    COMMON_INSTRUCTIONS_NOVELIST,
+    STRUCTURE_CHECK_INSTRUCTIONS,
+    STRUCTURE_FIX_PROMPT_TEMPLATE,
+    CRITIQUE_PROMPT_TEMPLATE,
+    REWRITE_PROMPT_TEMPLATE,
+)
+
+
+class PlotOutlinePrompts:
+    """
+    Encapsulates prompt templates for PlotOutline operations.
+
+    Provides methods to retrieve specific prompt templates for
+    generating, structure checking, fixing, critiquing, and rewriting PlotOutlines.
+    """
+
+    def __init__(self, prompt_manager=None):
+        """
+        Initializes PlotOutlinePrompts.
+        Prompt manager is currently not used, but included for potential future use or consistency.
+        """
+        self.prompt_manager = prompt_manager  # Currently not used
+
+    def create_plot_outline_generation_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a PlotOutline from a BookSpec.
+        """
+        prompt_template = f"""
+        {COMMON_INSTRUCTIONS_NOVELIST.format(task="create compelling and detailed 3-act plot outlines from book specifications")}
+
+        Create a detailed and compelling three-act plot outline for a novel based on the following book specification. Ensure a balanced story arc with substantial plot points in each act.
+
+        Book Specification:
+        ```json
+        {{book_spec_json}}
+        ```
+
+        **IMPORTANT:** The plot outline you create MUST be directly based on and consistent with the Book Specification provided above.
+        Specifically, ensure the plot outline strongly reflects the:
+        - Genre and Themes
+        - Setting
+        - Premise and Characters defined in the Book Specification.
+
+        The plot outline MUST be structured in three acts, with roughly 3-5 major plot points described in each act:
+        - **Act One: Setup** - Introduce the characters, setting, and premise from the Book Spec in a captivating way. Establish the initial conflict and the protagonist's primary goals and motivations, all consistent with the Book Spec. Detail at least 3-5 significant plot points that drive the story forward and establish the world as described in the Book Spec. This act should build intrigue and set the stage for the rising action, firmly within the boundaries of the Book Spec.
+
+        - **Act Two: Confrontation** - Develop the central conflict with rising stakes. The protagonist faces significant obstacles and challenges, leading to a major turning point. Explore the dark and erotic themes through specific plot events and character interactions. Detail at least 3-5 major plot points showcasing the escalating conflict, including a midpoint twist or revelation that changes the protagonist's course.
+
+        - **Act Three: Resolution** - The climax of the story, where the central conflict reaches its peak. The main conflict is resolved, and the protagonist experiences a significant transformation or realization. Address the consequences of the dark and erotic elements explored throughout the novel, leading to thematic closure. Detail at least 3-5 major plot points that lead to the resolution, including the climax itself and the immediate aftermath/denouement. Each point should show clear consequences of previous actions.
+
+        The plot outline should be detailed enough to provide a clear and robust roadmap for writing the novel, with specific and impactful plot points driving significant character developments in each act. Each act should feel substantial and necessary to the overall narrative. Ensure the outline effectively incorporates and develops the themes from the book specification, avoiding superficial plot points.
+
+        Your response MUST be ONLY the plot outline, structured into Act One, Act Two, and Act Three, with clear headings for each act and bullet points or numbered lists for plot points within each act.  Do not include any preamble or concluding remarks, only the plot outline itself.
+        """
+        return prompt_template
+
+    def create_plot_outline_structure_check_prompt(self) -> str:
+        """
+        Returns the prompt template for checking the structure of a PlotOutline.
+        """
+        prompt_template = f"""
+        {STRUCTURE_CHECK_INSTRUCTIONS}
+
+        Here is the PlotOutline:
+        ```
+        {{content}}
+        ```
+
+        Your task is to ensure that the plot outline is structured in three acts, with clear headings for each act:
+
+        - Act One: Setup
+        - Act Two: Confrontation
+        - Act Three: Resolution
+
+        Each act should contain a reasonable number of plot points (ideally 3-5). Check if all three acts are present and clearly delineated.
+
+        If the PlotOutline adheres to the correct 3-act structure with clear act headings, respond with 'STRUCTURE_OK'.
+        If there are any structural issues, such as missing acts, unclear headings, or if it's not clearly divided into three acts, provide a detailed explanation of the problems and how to fix them.
+        """
+        return prompt_template
+
+    def create_plot_outline_structure_fix_prompt(self) -> str:
+        """
+        Returns the prompt template for fixing structural issues in a PlotOutline.
+        """
+        prompt_template = f"""
+        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}")}
+
+        Your task is to modify the plot outline to ensure that it is correctly structured in three acts, with clear headings for each act:
+
+        - Act One: Setup
+        - Act Two: Confrontation
+        - Act Three: Resolution
+
+        Each act should contain a reasonable number of plot points (ideally 3-5). Ensure all three acts are present and clearly delineated with proper headings.
+
+        Return ONLY the corrected plot outline, without any preamble or concluding remarks. The corrected plot outline should strictly adhere to the 3-act structure.
+        """
+        return prompt_template
+
+    def create_plot_outline_critique_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a critique of a PlotOutline.
+        """
+        prompt_template = f"""
+        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
+
+        Focus your critique on:
+        - **Plot Structure and Pacing:** Is the 3-act structure clearly defined and effectively used? Is the pacing appropriate across the acts? Does each act have a clear beginning, middle, and end in terms of plot progression?
+        - **Clarity and Detail of Plot Points:** Are the plot points within each act clearly described and sufficiently detailed? Is it easy to understand the sequence of events and their impact on the story?
+        - **Rising Action and Conflict:** Is there a clear sense of rising action in Act Two? Is the central conflict effectively developed and escalated? Are the stakes high enough?
+        - **Resolution and Thematic Closure:** Does Act Three provide a satisfying resolution to the central conflict? Is there a sense of thematic closure? Are the consequences of earlier events adequately addressed?
+        - **Consistency with Book Specification:** Does the plot outline consistently and effectively implement the elements defined in the Book Specification (genre, themes, setting, characters, premise)?
+        - **Overall Compellingness:** How compelling and engaging is the plot outline? Does it create anticipation for the full story? What are its strengths and weaknesses in terms of making the reader want to know more?
+        """
+        return prompt_template
+
+    def create_plot_outline_rewrite_prompt(self) -> str:
+        """
+        Returns the prompt template for rewriting a PlotOutline based on critique.
+        """
+        prompt_template = f"""
+        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
+
+        When rewriting the plot outline, specifically focus on:
+        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised plot outline.
+        - **Strengthening the 3-act structure** to ensure a clear and effective narrative arc. Enhance the pacing within and between acts to build tension and maintain reader engagement.
+        - **Adding detail and clarity to plot points**, making sure each point is well-defined and contributes to the overall plot progression. Expand on plot points that were identified as too vague or underdeveloped.
+        - **Escalating the conflict in Act Two** to raise the stakes and increase dramatic tension. Ensure that the confrontation is significant and leads to a clear turning point.
+        - **Ensuring a satisfying resolution in Act Three** that provides thematic closure and addresses all major plot threads. Make sure the resolution feels earned and consistent with the preceding acts.
+        - **Improving consistency with the Book Specification**, double-checking that all elements of the plot outline align with and develop the genre, themes, setting, characters, and premise established in the Book Specification.
+
+        Rewrite the ENTIRE plot outline, ensuring it is well-structured in three acts (Act One: Setup, Act Two: Confrontation, Act Three: Resolution) with clear headings for each act and detailed plot points within each.
+
+        Return ONLY the revised plot outline, without any preamble or concluding remarks.
+        """
+        return prompt_template
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/chapter_outline_prompts.py`:
+
+```````py
+# llm/prompt_manager/chapter_outline_prompts.py
+
+"""
+Prompt templates for ChapterOutline generation and enhancement.
+
+This module defines the prompt templates used by the ChapterOutlineGenerator
+to generate and enhance ChapterOutline objects. It utilizes base templates
+from base_prompts.py for consistency and reduced redundancy.
+"""
+
+from llm.prompt_manager.base_prompts import (
+    COMMON_INSTRUCTIONS_NOVELIST,
+    STRUCTURE_CHECK_INSTRUCTIONS,
+    STRUCTURE_FIX_PROMPT_TEMPLATE,
+    CRITIQUE_PROMPT_TEMPLATE,
+    REWRITE_PROMPT_TEMPLATE,
+    JSON_OUTPUT_FORMAT_INSTRUCTIONS,
+)
+
+
+class ChapterOutlinePrompts:
+    """
+    Encapsulates prompt templates for ChapterOutline operations.
+
+    Provides methods to retrieve specific prompt templates for
+    generating, structure checking, fixing, critiquing, and rewriting ChapterOutlines.
+    """
+
+    def __init__(self, prompt_manager=None):
+        """
+        Initializes ChapterOutlinePrompts.
+        Prompt manager is currently not used, but included for potential future use or consistency.
+        """
+        self.prompt_manager = prompt_manager
+
+    def create_chapter_outlines_generation_prompt(self) -> str:
+        """
+        Returns the prompt template for generating ChapterOutlines from a PlotOutline.
+        """
+        prompt_template = f"""
+        {COMMON_INSTRUCTIONS_NOVELIST.format(task="create comprehensive chapter outlines based on a 3-act plot outline")}
+
+        Based on the following three-act plot outline, generate exactly {{num_chapters}} detailed chapter outlines. I need precisely {{num_chapters}} chapters, no fewer, no more. Divide the plot events roughly equally across these {{num_chapters}} chapters, ensuring a logical flow and pacing.
+
+        Plot Outline:
+        ```
+        {{plot_outline}}
+        ```
+
+        For each chapter, provide a concise outline (2-3 paragraphs) summarizing the key events and developments that occur within that chapter. The chapter outlines should:
+        - Clearly advance the overall plot as described in the three-act outline.
+        - Maintain the established tone and themes, especially the dark and erotic elements.
+        - Create anticipation for subsequent chapters and maintain reader engagement.
+        - Be numbered sequentially (Chapter 1, Chapter 2, etc.).
+        - **Crucially, for Chapter 1, provide an exposition-focused summary that introduces the main characters, setting, and central conflict as if the reader knows nothing about them. Avoid referring to characters as if they are already known. This chapter should set the stage for the rest of the novel.**
+
+        Ensure the chapter outlines collectively cover the entire plot outline and provide a solid structure for writing the full novel.
+
+        Your response MUST be ONLY the chapter outlines, with each chapter clearly numbered (e.g., "Chapter 1:", "Chapter 2:", etc.) followed by its outline. Do not include any preamble or concluding remarks, just the chapter outlines themselves.
+        """
+        return prompt_template
+
+    def create_chapter_outlines_structure_check_prompt(self) -> str:
+        """
+        Returns the prompt template for checking the structure of ChapterOutlines.
+        """
+        prompt_template = f"""
+        {STRUCTURE_CHECK_INSTRUCTIONS}
+
+        Here are the chapter outlines:
+        ```
+        {{content}}
+        ```
+
+        Your task is to ensure that each chapter outline:
+        - Is clearly numbered and sequentially ordered (Chapter 1, Chapter 2, Chapter 3, etc.).
+        - Provides a concise summary of the key events and developments within that chapter.
+        - Clearly advances the overall plot as outlined in the provided 3-act plot outline.
+        - Is approximately 2-3 paragraphs in length.
+
+        If the chapter outlines adhere to the correct structure and numbering, and each provides a relevant summary, respond with 'STRUCTURE_OK'.
+        If there are any structural issues, such as incorrect numbering, missing chapters, summaries that are too short or too long, or outlines that do not clearly relate to the plot outline, provide a detailed explanation of the problems and how to fix them.
+        """
+        return prompt_template
+
+    def create_chapter_outlines_structure_fix_prompt(self) -> str:
+        """
+        Returns the prompt template for fixing structural issues in ChapterOutlines.
+        """
+        prompt_template = f"""
+        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}", json_structure="")}
+
+        Your task is to modify the chapter outlines to ensure that they are correctly structured and formatted. Specifically:
+        - Ensure each chapter outline is clearly numbered and sequentially ordered (Chapter 1, Chapter 2, Chapter 3, etc.).
+        - Ensure each chapter outline provides a concise and relevant summary of the chapter's events.
+        - Adjust the length of summaries to be approximately 2-3 paragraphs for each chapter.
+        - Verify that all chapter outlines logically follow and advance the provided 3-act plot outline.
+
+        Return ONLY the corrected chapter outlines, with each chapter clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks. The corrected chapter outlines should strictly adhere to the specified numbering and formatting.
+        """
+        return prompt_template
+
+    def create_chapter_outlines_critique_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a critique of ChapterOutlines.
+        """
+        prompt_template = f"""
+        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
+
+        Focus your critique on:
+        - **Chapter to Chapter Flow:** Do the chapter outlines flow logically from one to the next, creating a smooth and coherent progression of the story? Are the transitions between chapters effective?
+        - **Pacing and Plot Progression:** Is the pacing appropriate across the chapter outlines? Does each chapter outline advance the plot effectively, building upon previous chapters and setting up future developments?
+        - **Coverage of Plot Outline:** Do the chapter outlines collectively cover all the key plot points from the provided 3-act plot outline? Are there any significant plot points missing or glossed over?
+        - **Chapter Summary Detail and Clarity:** Are the summaries for each chapter sufficiently detailed and clear? Do they provide a good sense of the chapter's main events, character developments, and contributions to the overall story?
+        - **Thematic Consistency:** Do the chapter outlines maintain consistency in tone and themes with the Book Specification and Plot Outline, particularly regarding the dark and erotic elements of the novel?
+        - **Engagement and Intrigue:** Do the chapter outlines, as a set, create a sense of anticipation and engagement? Do they make you want to read the full novel? What are their strongest and weakest points in terms of capturing reader interest?
+        """
+        return prompt_template
+
+    def create_chapter_outlines_rewrite_prompt(self) -> str:
+        """
+        Returns the prompt template for rewriting ChapterOutlines based on critique.
+        """
+        prompt_template = f"""
+        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
+
+        When rewriting the chapter outlines, specifically focus on:
+        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised chapter outlines.
+        - **Improving chapter-to-chapter flow and transitions** to create a smoother and more coherent narrative progression. Strengthen the logical connections between consecutive chapters.
+        - **Refining pacing and plot progression** to ensure that the story advances at an engaging and effective rate across the chapters. Adjust the distribution of plot points across chapters as needed.
+        - **Ensuring comprehensive coverage of the Plot Outline**, verifying that all key plot points from the 3-act plot outline are adequately addressed within the chapter outlines. Add detail or expand summaries where necessary to fully incorporate all essential plot elements.
+        - **Enhancing detail and clarity in chapter summaries**, providing richer descriptions of events, character actions, and setting to give a stronger sense of each chapter's content.
+        - **Maintaining thematic consistency** with the Book Specification and Plot Outline. Ensure that the dark and erotic themes are appropriately integrated and consistently present throughout the chapter outlines.
+
+        Rewrite the ENTIRE set of chapter outlines, ensuring each chapter is clearly numbered and provides a detailed and engaging summary that logically advances the plot and maintains thematic consistency.
+
+        Return ONLY the revised set of chapter outlines, with each chapter clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks.
+        """
+        return prompt_template
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/prompt_manager.py`:
+
+```````py
+#/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/prompt_manager.py
+import logging
+from typing import Dict, Protocol, runtime_checkable
+
+from utils.logger import logger  # Assuming you have a logger configured
+
+from llm.prompt_manager.book_spec_prompts import BookSpecPrompts
+from llm.prompt_manager.plot_outline_prompts import PlotOutlinePrompts
+from llm.prompt_manager.chapter_outline_prompts import ChapterOutlinePrompts
+from llm.prompt_manager.scene_outline_prompts import SceneOutlinePrompts
+from llm.prompt_manager.scene_part_prompts import ScenePartPrompts
+
+
+
+@runtime_checkable
+class PromptManagerInterface(Protocol):
+    """
+    Defines the interface for PromptManager classes.
+    """
+
+    """
+    Retrieves a specific prompt by its name.
+
+    Args:
+        prompt_name (str): The name identifier of the prompt to retrieve.
+
+    Returns:
+        str: The requested prompt text.
+
+    Raises:
+        NotImplementedError: This is an abstract method that must be implemented by subclasses.
+    """
+
+    def get_prompt(self, prompt_name: str) -> str: ...  # Abstract method
+
+
+class DynamicPromptManager(PromptManagerInterface):
+    """
+    Manages prompts dynamically, defining them directly in code.
+    """
+
+    def __init__(self):
+        """
+        Initializes the DynamicPromptManager by defining prompts.
+        """
+        self.book_spec_prompts = BookSpecPrompts()
+        self.plot_outline_prompts = PlotOutlinePrompts()
+        self.chapter_outline_prompts = ChapterOutlinePrompts()
+        self.scene_outline_prompts = SceneOutlinePrompts()
+        self.scene_part_prompts = ScenePartPrompts()
+
+
+
+    def get_prompt(self, prompt_name: str) -> str:
+        """
+        Retrieves a prompt by its name.
+
+        Args:
+            prompt_name (str): The name of the prompt to retrieve.
+
+        Returns:
+            str: The prompt text. Raises an exception if the prompt is not found.
+        """
+        if prompt_name.startswith("book_spec"):
+            prompt_text =  getattr(self.book_spec_prompts, f"create_{prompt_name}")()
+        elif prompt_name.startswith("plot_outline"):
+            prompt_text = getattr(self.plot_outline_prompts, f"create_{prompt_name}")()
+        elif prompt_name.startswith("chapter_outlines"):
+            prompt_text =  getattr(self.chapter_outline_prompts, f"create_{prompt_name}")()
+        elif prompt_name.startswith("scene_outlines"):
+            prompt_text = getattr(self.scene_outline_prompts, f"create_{prompt_name}")()
+        elif prompt_name.startswith("scene_part"):
+            prompt_text = getattr(self.scene_part_prompts, f"create_{prompt_name}")()
+        else:
+            raise ValueError(f"couldnt find {prompt_name}")
+        
+        if prompt_text:
+            logger.debug("Retrieved prompt: {prompt_name}")
+            return prompt_text
+        else:
+            logger.warning("Prompt not found: {prompt_name}")
+            raise ValueError("Prompt not found: {prompt_name}")
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/scene_outline_prompts.py`:
+
+```````py
+# llm/prompt_manager/scene_outline_prompts.py
+
+"""
+Prompt templates for SceneOutline generation and enhancement.
+
+This module defines the prompt templates used by the SceneOutlineGenerator
+to generate and enhance SceneOutline objects. It utilizes base templates
+from base_prompts.py for consistency and reduced redundancy.
+"""
+
+from llm.prompt_manager.base_prompts import (
+    COMMON_INSTRUCTIONS_NOVELIST,
+    STRUCTURE_CHECK_INSTRUCTIONS,
+    STRUCTURE_FIX_PROMPT_TEMPLATE,
+    CRITIQUE_PROMPT_TEMPLATE,
+    REWRITE_PROMPT_TEMPLATE,
+    JSON_OUTPUT_FORMAT_INSTRUCTIONS,
+)
+
+
+class SceneOutlinePrompts:
+    """
+    Encapsulates prompt templates for SceneOutline operations.
+
+    Provides methods to retrieve specific prompt templates for
+    generating, structure checking, fixing, critiquing, and rewriting SceneOutlines.
+    """
+
+    def __init__(self, prompt_manager=None):
+        """
+        Initializes SceneOutlinePrompts.
+        Prompt manager is currently not used, but included for potential future use or consistency.
+        """
+        self.prompt_manager = prompt_manager
+
+    def create_scene_outlines_generation_prompt(self) -> str:
+        """
+        Returns the prompt template for generating SceneOutlines from a ChapterOutline.
+        """
+        prompt_template = f"""
+        {COMMON_INSTRUCTIONS_NOVELIST.format(task="break down chapter outlines into comprehensive lists of scene outlines")}
+
+        Based on the following chapter outline, create detailed outlines for {{num_scenes_per_chapter}} scenes within this chapter. Ensure the scenes logically break down the chapter's events and contribute to the overall narrative.
+
+        Chapter Outline:
+        ```
+        {{chapter_outline}}
+        ```
+
+        For each scene, provide a concise outline (1-2 paragraphs) summarizing the key events, setting, characters present, and purpose of the scene within the chapter and overall story. The scene outlines should:
+        - Logically break down the events described in the chapter outline into smaller, manageable scene units.
+        - Detail the setting (location, time of day, atmosphere) and characters involved in each scene.
+        - Clearly indicate the purpose of each scene in advancing the plot, developing characters, enhancing themes, or building suspense (especially regarding dark and erotic themes).
+        - Be numbered sequentially within the chapter (Scene 1, Scene 2, etc.).
+        - Collectively, the scene outlines should comprehensively cover all key events and narrative beats of the chapter outline.
+
+        Your response MUST be ONLY the scene outlines, with each scene clearly numbered (e.g., "Scene 1:", "Scene 2:", etc.) followed by its outline. Do not include any preamble or concluding remarks, just the scene outlines themselves.
+        """
+        return prompt_template
+
+    def create_scene_outlines_structure_check_prompt(self) -> str:
+        """
+        Returns the prompt template for checking the structure of SceneOutlines.
+        """
+        prompt_template = f"""
+        {STRUCTURE_CHECK_INSTRUCTIONS}
+
+        Here are the scene outlines:
+        ```
+        {{content}}
+        ```
+
+        Your task is to ensure that each scene outline:
+        - Is clearly numbered and sequentially ordered within the chapter (Scene 1, Scene 2, Scene 3, etc.).
+        - Provides a concise summary of the key events, setting, and characters present in the scene.
+        - Clearly indicates the purpose of the scene in advancing the plot, developing characters, or enhancing themes.
+        - Is approximately 1-2 paragraphs in length.
+
+        If the scene outlines adhere to the correct structure, numbering, and each provides a relevant summary and purpose, respond with 'STRUCTURE_OK'.
+        If there are any structural issues, such as incorrect numbering, missing scenes, summaries that are too short or too long, lack of clear purpose, or outlines that do not logically break down the chapter outline, provide a detailed explanation of the problems and how to fix them.
+        """
+        return prompt_template
+
+    def create_scene_outlines_structure_fix_prompt(self) -> str:
+        """
+        Returns the prompt template for fixing structural issues in SceneOutlines.
+        """
+        prompt_template = f"""
+        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}", json_structure="")}
+
+        Your task is to modify the scene outlines to ensure that they are correctly structured and formatted. Specifically:
+        - Ensure each scene outline is clearly numbered and sequentially ordered within the chapter (Scene 1, Scene 2, Scene 3, etc.).
+        - Ensure each scene outline provides a concise summary of the scene's key elements: events, setting, characters, and purpose.
+        - Adjust the length of summaries to be approximately 1-2 paragraphs for each scene.
+        - Verify that all scene outlines logically break down and comprehensively cover the provided chapter outline.
+        - Ensure each scene outline clearly articulates its purpose within the chapter and overall narrative.
+
+        Return ONLY the corrected scene outlines, with each scene clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks. The corrected scene outlines should strictly adhere to the specified numbering and formatting.
+        """
+        return prompt_template
+
+    def create_scene_outlines_critique_prompt(self) -> str:
+        """
+        Returns the prompt template for generating a critique of SceneOutlines.
+        """
+        prompt_template = f"""
+        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
+
+        Focus your critique on:
+        - **Scene to Scene Flow within Chapter:** Do the scene outlines flow logically within the chapter, creating a coherent and well-paced sequence of events? Are the transitions between scenes effective?
+        - **Contribution to Chapter Objectives:** Does each scene outline clearly contribute to the objectives of the chapter as defined in the chapter outline? Is the purpose of each scene evident and meaningful within the chapter's context?
+        - **Scene Detail and Clarity:** Are the summaries for each scene sufficiently detailed and clear? Do they provide a good sense of the scene's setting, characters' actions, and key events? Is the purpose of each scene clearly articulated?
+        - **Pacing and Dramatic Tension within Chapter:** Does the set of scene outlines create effective pacing and build dramatic tension within the chapter? Are there variations in scene length and intensity to maintain reader engagement?
+        - **Thematic and Tone Consistency:** Do the scene outlines maintain consistency in tone and themes with the Book Specification, Plot Outline, and Chapter Outline, particularly regarding the dark and erotic elements of the novel?
+        - **Overall Effectiveness as Scene Breakdown:** How effective are these scene outlines as a blueprint for writing the actual scenes of the chapter? Do they provide a solid and inspiring foundation for scene writing? What are its strengths and weaknesses in guiding the scene-writing process?
+        """
+        return prompt_template
+
+    def create_scene_outlines_rewrite_prompt(self) -> str:
+        """
+        Returns the prompt template for rewriting SceneOutlines based on critique.
+        """
+        prompt_template = f"""
+        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
+
+        When rewriting the scene outlines, specifically focus on:
+        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised scene outlines.
+        - **Improving scene-to-scene flow and transitions within the chapter** to create a smoother and more coherent reading experience. Strengthen the logical connections between scenes and ensure effective transitions.
+        - **Ensuring each scene outline clearly contributes to chapter objectives**, verifying that every scene serves a purpose within the chapter's narrative and overall plot progression. Enhance the articulation of each scene's purpose for greater clarity.
+        - **Adding detail and clarity to scene summaries**, providing richer descriptions of settings, character actions, and key events to give a stronger sense of each scene's content and atmosphere.
+        - **Refining pacing and dramatic tension** across the chapter's scene outlines. Adjust scene lengths, intensity, and placement to optimize pacing and build dramatic tension effectively.
+        - **Maintaining thematic and tone consistency** with the established Book Specification, Plot Outline, and Chapter Outline. Ensure that the dark and erotic themes are appropriately and consistently integrated into the scene outlines.
+
+        Rewrite the ENTIRE set of scene outlines, ensuring each scene is clearly numbered and provides a detailed and purposeful summary that logically contributes to the chapter's objectives and maintains thematic consistency.
+
+        Return ONLY the revised set of scene outlines, with each scene clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks.
+        """
+        return prompt_template
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/__init__.py`:
+
+```````py
+# llm/prompt_manager/__init__.py
+
+"""
+Package initializer for the prompt_manager package.
+
+This package is dedicated to managing and organizing prompts for
+the Fiction Fabricator application. It includes modules for:
+
+- base_prompts.py: Defines common prompt templates and potentially 
+  utility functions shared across different prompt modules.
+- book_spec_prompts.py: Contains prompt templates specifically for 
+  generating and enhancing BookSpec objects.
+- plot_outline_prompts.py: Contains prompt templates for generating and 
+  enhancing PlotOutline objects.
+- chapter_outline_prompts.py: Contains prompt templates for generating and 
+  enhancing ChapterOutline objects.
+- scene_outline_prompts.py: Contains prompt templates for generating and 
+  enhancing SceneOutline objects.
+- scene_part_prompts.py: Contains prompt templates for generating and 
+  enhancing ScenePart objects.
+
+Each module within this package is responsible for encapsulating the 
+prompts related to a specific content generation stage, promoting 
+organization and maintainability of the prompt engineering aspects 
+of the application.
+"""
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/llm_client.py`:
+
+```````py
+# llm/llm_client.py
+import json 
+from typing import Optional  
+
+import aiohttp  
+
+from utils.config import config  
+from utils.logger import logger
+
+
+class OllamaClient:
+    """
+    Client for interacting with a local Ollama instance using aiohttp.
+    """
+
+    def __init__(self, base_url: str = None):
+        """
+        Initializes the Ollama client.
+        """
+        self.base_url = base_url or config.get_ollama_base_url()
+        logger.debug(
+            "OllamaClient initialized with base_url: %s", self.base_url
+        )  # Lazy formatting
+
+    async def list_models(self) -> Optional[list[str]]:
+        """
+        Asynchronously fetches the list of available models from the Ollama API.
+        """
+        url = f"{self.base_url}/api/tags"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    model_names = [model["name"] for model in data.get("models", [])]
+                    logger.info(
+                        "Successfully fetched models: %s", model_names
+                    )  # Lazy formatting
+                    return model_names
+        except aiohttp.ClientError as e:  # Catch specific aiohttp ClientError
+            logger.error(
+                "Error fetching model list from Ollama: %s", e
+            )  # Lazy formatting
+            return None
+        except json.JSONDecodeError as e:  # Catch specific json.JSONDecodeError
+            logger.error(
+                "Error decoding JSON response from Ollama: %s", e
+            )  # Lazy formatting
+            return None
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # Catch data processing errors
+            logger.error("Error processing model list data: %s", e)  # Lazy formatting
+            logger.exception(e)  # Log full exception details
+            return None
+
+    async def generate_text(self, model_name: str, prompt: str) -> Optional[str]:
+        """
+        Asynchronously generates text using the Ollama API.
+        """
+        url = f"{self.base_url}/api/generate"
+        headers = {"Content-Type": "application/json"}
+        data = {"model": model_name, "prompt": prompt, "stream": False}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url, headers=headers, data=json.dumps(data)
+                ) as response:
+                    response.raise_for_status()
+                    response_data = await response.json()
+                    generated_text = response_data.get("response")
+
+                    if generated_text:
+                        logger.info(
+                            "Text generated successfully using model '%s'",
+                            model_name,  # Lazy formatting
+                        )
+                        return generated_text
+                    else:
+                        logger.error(
+                            "No 'response' field found in Ollama response: %s",
+                            response_data,  # Lazy formatting
+                        )
+                        return None
+
+        except aiohttp.ClientError as e:  # Catch specific aiohttp ClientError
+            logger.error("Ollama text generation failed: %s", e)  # Lazy formatting
+            return None
+        except json.JSONDecodeError as e:  # Catch specific json.JSONDecodeError
+            logger.error(
+                "Error decoding JSON response from Ollama: %s", e
+            )  # Lazy formatting
+            return None
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # Catch data processing errors
+            logger.error(
+                "Error processing text response data: %s", e
+            )  # Lazy formatting
+            logger.exception(e)  # Log full exception details
+            return None
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/llm/__init__.py`:
+
+```````py
+"""
+llm package initializer.
+
+This package contains modules for interacting with Language Models,
+specifically Ollama in this project. It includes:
+
+    llm_client.py: Defines the OllamaClient for making API calls to Ollama.
+
+    prompt_manager/: A directory containing modules for managing and
+    organizing prompts used for different content generation stages.
+
+"""
+```````

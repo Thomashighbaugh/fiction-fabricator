@@ -1,12 +1,9 @@
+# /home/tlh/refactored_gui_fict_fab/requirements.txt
 streamlit
-ollama
+openai
 pydantic
 python-dotenv
 black
 pytest
-sphinx
-mypy
-requests
-tiktoken
-langchain
-langchain_community
+pydantic-settings
+aiohttp
