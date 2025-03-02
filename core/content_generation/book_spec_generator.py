@@ -1,4 +1,4 @@
-# core/content_generation/book_spec_generator.py
+# /home/tlh/refactored_gui_fict_fab/core/content_generation/book_spec_generator.py
 import json
 from typing import Optional
 
@@ -6,55 +6,71 @@ from pydantic import ValidationError
 
 from core.book_spec import BookSpec
 from core.content_generation.base_generator import BaseContentGenerator
-from llm.prompt_manager.prompt_manager import DynamicPromptManager # type: ignore
+from llm.prompt_manager.prompt_manager import PromptManager
 from utils.logger import logger
 
 
 class BookSpecGenerator(BaseContentGenerator):
     """
     Content generator for BookSpec objects.
-
-    Inherits from BaseContentGenerator and implements specific logic
-    for generating and enhancing BookSpec content.
     """
 
     def __init__(self, prompt_manager, model_name: str):
-        """
-        Initializes BookSpecGenerator with prompt manager and model name.
-        """
+        logger.debug("BookSpecGenerator.__init__ START")  # <-- ADDED LOGGING
         super().__init__(prompt_manager, model_name)
         self.prompts = prompt_manager
         logger.debug("prompt: %s...", self.prompts)
+        logger.debug("BookSpecGenerator.__init__ END")  # <-- ADDED LOGGING
 
     async def generate(
         self, idea: str, project_name: str = "Untitled"
     ) -> Optional[BookSpec]:  # Add type hint for the return type
         """
         Generates a BookSpec based on a story idea.
-
-        Args:
-            idea (str): The initial story idea to generate a BookSpec from.
-            project_name (str): The name of the project, used as a default title.
-
-        Returns:
-            Optional[BookSpec]: The generated BookSpec object, or None if generation fails.
         """
-        logger.debug(f"Generating BookSpec with idea: {idea}")
-        generation_prompt_template = self.prompts.get_prompt("book_spec_generation_prompt")
+        logger.debug(
+            f"Generating BookSpec with idea: {idea}, project_name: {project_name}"
+        )  # Log input
+
+        generation_prompt_template = self.prompts.get_prompt(
+            "book_spec_generation_prompt"
+        )
         logger.debug("generation_prompt_template: %s...", generation_prompt_template)
+
         variables = {"idea": idea, "project_name": project_name}
+        logger.debug(
+            f"Prompt variables: {variables}"
+        )  # Log variables BEFORE formatting
+
+        try:  # Add try-except around prompt formatting
+            formatted_prompt = generation_prompt_template.format(
+                **variables
+            )  # Format prompt HERE
+            logger.debug(
+                f"Formatted prompt (first 200 chars): {formatted_prompt[:200]}..."
+            )  # Log formatted prompt
+        except KeyError as e:
+            logger.error(
+                f"KeyError during prompt formatting: {e}"
+            )  # More specific error log
+            logger.error(
+                f"Prompt template: {generation_prompt_template}"
+            )  # Log template on error
+            logger.error(f"Variables: {variables}")  # Log variables on error
+            return None  # Return None on formatting error
+
         generated_text = await self._generate_content_from_prompt(
-            generation_prompt_template, variables
+            formatted_prompt,
+            {},  # Use formatted_prompt, no need to pass variables again
         )
         if not generated_text:
             logger.error("Initial content generation failed.")
             return None
 
-
         book_spec = self._parse_response(generated_text)
         if not book_spec:
-             logger.error("Parsing failed.")
-             return None
+            logger.error("Parsing failed.")
+            return None
 
         logger.debug("Parsing successful.  Returning BookSpec.")
         return book_spec
@@ -75,7 +91,7 @@ class BookSpecGenerator(BaseContentGenerator):
             "tone": current_content.tone,
             "point_of_view": current_content.point_of_view,
             "characters": ", ".join(current_content.characters),
-            "premise": current_content.premise
+            "premise": current_content.premise,
         }  # Now using current_content
 
         critique_text = await self._generate_content_from_prompt(

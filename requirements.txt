@@ -1,4 +1,4 @@
-# /home/tlh/refactored_gui_fict_fab/requirements.txt
+# requirements.txt
 streamlit
 openai
 pydantic
@@ -7,3 +7,5 @@ black
 pytest
 pydantic-settings
 aiohttp
+requests
+numpy

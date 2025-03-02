@@ -1,10 +1,11 @@
-# core/content_generation/plot_outline_generator.py
+# /home/tlh/refactored_gui_fict_fab/core/content_generation/plot_outline_generator.py
 from typing import Optional
 
 from core.book_spec import BookSpec
 from core.content_generation.base_generator import BaseContentGenerator
 from core.plot_outline import PlotOutline
-from llm.prompt_manager.plot_outline_prompts import PlotOutlinePrompts
+
+# from llm.prompt_manager.plot_outline_prompts import PlotOutlinePrompts # Removed incorrect import
 from utils.logger import logger
 
 
@@ -21,17 +22,17 @@ class PlotOutlineGenerator(BaseContentGenerator):
         Initializes PlotOutlineGenerator with prompt manager and model name.
         """
         super().__init__(prompt_manager, model_name)
-        self.prompts = PlotOutlinePrompts(
-            prompt_manager
-        )  # Initialize plot outline specific prompts
+        # self.prompts = PlotOutlinePrompts(prompt_manager)  # Removed incorrect instantiation
+        # self.prompts = prompt_manager # This was also incorrect, should not reassign prompt_manager
+        pass  # No need to initialize prompts here anymore, PromptManager handles it
 
     async def generate(self, book_spec: BookSpec) -> Optional[PlotOutline]:
         """
         Generates a PlotOutline based on a BookSpec.
         """
-        generation_prompt_template = (
-            self.prompts.create_plot_outline_generation_prompt()
-        )
+        generation_prompt_template = self.prompt_manager.get_prompt(
+            "plot_outline_generation_prompt"
+        )  # Use prompt_manager to get prompt
         variables = {"book_spec_json": book_spec.model_dump_json(indent=4)}
         generated_text = await self._generate_content_from_prompt(
             generation_prompt_template, variables
@@ -39,12 +40,12 @@ class PlotOutlineGenerator(BaseContentGenerator):
         if not generated_text:
             return None
 
-        structure_check_prompt_template = (
-            self.prompts.create_plot_outline_structure_check_prompt()
-        )
-        structure_fix_prompt_template = (
-            self.prompts.create_plot_outline_structure_fix_prompt()
-        )
+        structure_check_prompt_template = self.prompt_manager.get_prompt(
+            "plot_outline_structure_check_prompt"
+        )  # Use prompt_manager to get prompt
+        structure_fix_prompt_template = self.prompt_manager.get_prompt(
+            "plot_outline_structure_fix_prompt"
+        )  # Use prompt_manager to get prompt
         validated_text = await self._structure_check_and_fix(
             generated_text,
             structure_check_prompt_template,
@@ -61,8 +62,12 @@ class PlotOutlineGenerator(BaseContentGenerator):
         """
         Enhances an existing plot outline.
         """
-        critique_prompt_template = self.prompts.create_plot_outline_critique_prompt()
-        rewrite_prompt_template = self.prompts.create_plot_outline_rewrite_prompt()
+        critique_prompt_template = self.prompt_manager.get_prompt(
+            "plot_outline_critique_prompt"
+        )  # Use prompt_manager to get prompt
+        rewrite_prompt_template = self.prompt_manager.get_prompt(
+            "plot_outline_rewrite_prompt"
+        )  # Use prompt_manager to get prompt
         variables = {
             "current_outline": "\n".join(
                 [

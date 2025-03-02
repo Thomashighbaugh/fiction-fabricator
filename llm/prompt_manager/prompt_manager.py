@@ -1,82 +1,106 @@
-#/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/prompt_manager.py
-import logging
-from typing import Dict, Protocol, runtime_checkable
+# llm/prompt_manager/prompt_manager.py
+import os
+from typing import Dict
 
-from utils.logger import logger  # Assuming you have a logger configured
-
-from llm.prompt_manager.book_spec_prompts import BookSpecPrompts
-from llm.prompt_manager.plot_outline_prompts import PlotOutlinePrompts
-from llm.prompt_manager.chapter_outline_prompts import ChapterOutlinePrompts
-from llm.prompt_manager.scene_outline_prompts import SceneOutlinePrompts
-from llm.prompt_manager.scene_part_prompts import ScenePartPrompts
-
-
-
-@runtime_checkable
-class PromptManagerInterface(Protocol):
-    """
-    Defines the interface for PromptManager classes.
-    """
-
-    """
-    Retrieves a specific prompt by its name.
-
-    Args:
-        prompt_name (str): The name identifier of the prompt to retrieve.
-
-    Returns:
-        str: The requested prompt text.
-
-    Raises:
-        NotImplementedError: This is an abstract method that must be implemented by subclasses.
-    """
-
-    def get_prompt(self, prompt_name: str) -> str: ...  # Abstract method
+from utils.logger import logger
+from llm.prompt_manager import base_prompts
+from llm.prompt_manager import book_spec_prompts
+from llm.prompt_manager import plot_outline_prompts
+from llm.prompt_manager import chapter_outline_prompts
+from llm.prompt_manager import scene_outline_prompts
+from llm.prompt_manager import scene_part_prompts
 
 
-class DynamicPromptManager(PromptManagerInterface):
-    """
-    Manages prompts dynamically, defining them directly in code.
-    """
-
+class PromptManager:
     def __init__(self):
-        """
-        Initializes the DynamicPromptManager by defining prompts.
-        """
-        self.book_spec_prompts = BookSpecPrompts()
-        self.plot_outline_prompts = PlotOutlinePrompts()
-        self.chapter_outline_prompts = ChapterOutlinePrompts()
-        self.scene_outline_prompts = SceneOutlinePrompts()
-        self.scene_part_prompts = ScenePartPrompts()
+        logger.debug("PromptManager.__init__ START")  # <-- ADDED LOGGING
+        self.prompts: Dict[str, str] = {}
+        self._load_prompts()
+        logger.debug(
+            "PromptManager.__init__ END - Prompts loaded."
+        )  # <-- ADDED LOGGING
 
+    def _load_prompts(self):
+        # Load base prompts
+        self.prompts.update(base_prompts.base_prompts)
+        logger.debug(
+            f"Loaded base prompts. Count: {len(base_prompts.base_prompts)}"
+        )  # <-- ADDED LOGGING
 
+        # Load prompts from other modules
+        self.prompts.update(book_spec_prompts.book_spec_prompts)
+        logger.debug(
+            f"Loaded book_spec_prompts. Count: {len(book_spec_prompts.book_spec_prompts)}"
+        )  # <-- ADDED LOGGING
+        for (
+            name,
+            prompt,
+        ) in book_spec_prompts.book_spec_prompts.items():  # <-- ADDED LOOP LOGGING
+            logger.debug(
+                f"  - BookSpec Prompt: {name[:30]:30} ... content preview: {prompt[:100]!r}"
+            )  # <-- ADDED LOOP LOGGING
+
+        self.prompts.update(plot_outline_prompts.plot_outline_prompts)
+        logger.debug(
+            f"Loaded plot_outline_prompts. Count: {len(plot_outline_prompts.plot_outline_prompts)}"
+        )  # <-- ADDED LOGGING
+        for (
+            name,
+            prompt,
+        ) in (
+            plot_outline_prompts.plot_outline_prompts.items()
+        ):  # <-- ADDED LOOP LOGGING
+            logger.debug(
+                f"  - PlotOutline Prompt: {name[:30]:30} ... content preview: {prompt[:100]!r}"
+            )  # <-- ADDED LOOP LOGGING
+
+        self.prompts.update(chapter_outline_prompts.chapter_outline_prompts)
+        logger.debug(
+            f"Loaded chapter_outline_prompts. Count: {len(chapter_outline_prompts.chapter_outline_prompts)}"
+        )  # <-- ADDED LOGGING
+        for (
+            name,
+            prompt,
+        ) in (
+            chapter_outline_prompts.chapter_outline_prompts.items()
+        ):  # <-- ADDED LOOP LOGGING
+            logger.debug(
+                f"  - ChapterOutline Prompt: {name[:30]:30} ... content preview: {prompt[:100]!r}"
+            )  # <-- ADDED LOOP LOGGING
+
+        self.prompts.update(scene_outline_prompts.scene_outline_prompts)
+        logger.debug(
+            f"Loaded scene_outline_prompts. Count: {len(scene_outline_prompts.scene_outline_prompts)}"
+        )  # <-- ADDED LOGGING
+        for (
+            name,
+            prompt,
+        ) in (
+            scene_outline_prompts.scene_outline_prompts.items()
+        ):  # <-- ADDED LOOP LOGGING
+            logger.debug(
+                f"  - SceneOutline Prompt: {name[:30]:30} ... content preview: {prompt[:100]!r}"
+            )  # <-- ADDED LOOP LOGGING
+
+        self.prompts.update(scene_part_prompts.scene_part_prompts)
+        logger.debug(
+            f"Loaded scene_part_prompts. Count: {len(scene_part_prompts.scene_part_prompts)}"
+        )  # <-- ADDED LOGGING
+        for (
+            name,
+            prompt,
+        ) in scene_part_prompts.scene_part_prompts.items():  # <-- ADDED LOOP LOGGING
+            logger.debug(
+                f"  - ScenePart Prompt: {name[:30]:30} ... content preview: {prompt[:100]!r}"
+            )  # <-- ADDED LOOP LOGGING
+
+        logger.debug(
+            f"Loaded total prompts: {list(self.prompts.keys())}"
+        )  # Modified log message
 
     def get_prompt(self, prompt_name: str) -> str:
-        """
-        Retrieves a prompt by its name.
-
-        Args:
-            prompt_name (str): The name of the prompt to retrieve.
-
-        Returns:
-            str: The prompt text. Raises an exception if the prompt is not found.
-        """
-        if prompt_name.startswith("book_spec"):
-            prompt_text =  getattr(self.book_spec_prompts, f"create_{prompt_name}")()
-        elif prompt_name.startswith("plot_outline"):
-            prompt_text = getattr(self.plot_outline_prompts, f"create_{prompt_name}")()
-        elif prompt_name.startswith("chapter_outlines"):
-            prompt_text =  getattr(self.chapter_outline_prompts, f"create_{prompt_name}")()
-        elif prompt_name.startswith("scene_outlines"):
-            prompt_text = getattr(self.scene_outline_prompts, f"create_{prompt_name}")()
-        elif prompt_name.startswith("scene_part"):
-            prompt_text = getattr(self.scene_part_prompts, f"create_{prompt_name}")()
-        else:
-            raise ValueError(f"couldnt find {prompt_name}")
-        
-        if prompt_text:
-            logger.debug("Retrieved prompt: {prompt_name}")
-            return prompt_text
-        else:
-            logger.warning("Prompt not found: {prompt_name}")
-            raise ValueError("Prompt not found: {prompt_name}")
+        prompt = self.prompts.get(prompt_name)
+        if not prompt:
+            logger.error(f"Prompt not found: {prompt_name}")
+            raise ValueError(f"Prompt not found: {prompt_name}")
+        return prompt

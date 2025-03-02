@@ -1,10 +1,11 @@
-# core/content_generation/scene_part_generator.py
+# /home/tlh/refactored_gui_fict_fab/core/content_generation/scene_part_generator.py
 from typing import Optional
 
 from core.content_generation.base_generator import BaseContentGenerator
 from core.plot_outline import SceneOutline, ChapterOutline
 from core.book_spec import BookSpec
-from llm.prompt_manager.scene_part_prompts import ScenePartPrompts
+
+# from llm.prompt_manager.scene_part_prompts import ScenePartPrompts # Removed incorrect import
 from utils.logger import logger
 
 
@@ -21,9 +22,9 @@ class ScenePartGenerator(BaseContentGenerator):
         Initializes ScenePartGenerator with prompt manager and model name.
         """
         super().__init__(prompt_manager, model_name)
-        self.prompts = ScenePartPrompts(
-            prompt_manager
-        )  # Initialize scene part specific prompts
+        # self.prompts = ScenePartPrompts(prompt_manager) # Removed incorrect instantiation
+        # self.prompts = prompt_manager # This was also incorrect, should not reassign prompt_manager
+        pass  # No need to initialize prompts here anymore, PromptManager handles it
 
     async def generate(
         self,
@@ -36,7 +37,9 @@ class ScenePartGenerator(BaseContentGenerator):
         """
         Generates a part of a scene's text content.
         """
-        generation_prompt_template = self.prompts.create_scene_part_generation_prompt()
+        generation_prompt_template = self.prompt_manager.get_prompt(
+            "scene_part_generation_prompt"
+        )
         variables = {
             "scene_outline": scene_outline.summary,
             "part_number": str(part_number),
@@ -50,11 +53,11 @@ class ScenePartGenerator(BaseContentGenerator):
         if not generated_text:
             return None
 
-        structure_check_prompt_template = (
-            self.prompts.create_scene_part_structure_check_prompt()
+        structure_check_prompt_template = self.prompt_manager.get_prompt(
+            "scene_part_structure_check_prompt"
         )
-        structure_fix_prompt_template = (
-            self.prompts.create_scene_part_structure_fix_prompt()
+        structure_fix_prompt_template = self.prompt_manager.get_prompt(
+            "scene_part_structure_fix_prompt"
         )
         validated_text = await self._structure_check_and_fix(
             generated_text,
@@ -77,8 +80,12 @@ class ScenePartGenerator(BaseContentGenerator):
         """
         Enhances an existing scene part's text content.
         """
-        critique_prompt_template = self.prompts.create_scene_part_critique_prompt()
-        rewrite_prompt_template = self.prompts.create_scene_part_rewrite_prompt()
+        critique_prompt_template = self.prompt_manager.get_prompt(
+            "scene_part_critique_prompt"
+        )
+        rewrite_prompt_template = self.prompt_manager.get_prompt(
+            "scene_part_rewrite_prompt"
+        )
         variables = {
             "book_spec": book_spec.model_dump_json(indent=4),
             "chapter_outline": chapter_outline.summary,

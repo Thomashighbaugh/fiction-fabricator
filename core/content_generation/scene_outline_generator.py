@@ -1,9 +1,10 @@
-# core/content_generation/scene_outline_generator.py
+# /home/tlh/refactored_gui_fict_fab/core/content_generation/scene_outline_generator.py
 from typing import List, Optional
 
 from core.content_generation.base_generator import BaseContentGenerator
 from core.plot_outline import ChapterOutline, SceneOutline
-from llm.prompt_manager.scene_outline_prompts import SceneOutlinePrompts
+
+# from llm.prompt_manager.scene_outline_prompts import SceneOutlinePrompts # Removed incorrect import
 from utils.logger import logger
 
 
@@ -20,9 +21,9 @@ class SceneOutlineGenerator(BaseContentGenerator):
         Initializes SceneOutlineGenerator with prompt manager and model name.
         """
         super().__init__(prompt_manager, model_name)
-        self.prompts = SceneOutlinePrompts(
-            prompt_manager
-        )  # Initialize scene outline specific prompts
+        # self.prompts = SceneOutlinePrompts(prompt_manager)  # Removed incorrect instantiation
+        # self.prompts = prompt_manager # This was also incorrect, should not reassign prompt_manager
+        pass  # No need to initialize prompts here anymore, PromptManager handles it
 
     async def generate(
         self, chapter_outline: ChapterOutline, num_scenes: int
@@ -30,8 +31,8 @@ class SceneOutlineGenerator(BaseContentGenerator):
         """
         Generates a list of SceneOutlines for a given ChapterOutline.
         """
-        generation_prompt_template = (
-            self.prompts.create_scene_outlines_generation_prompt()
+        generation_prompt_template = self.prompt_manager.get_prompt(
+            "scene_outlines_generation_prompt"
         )
         variables = {
             "chapter_outline": chapter_outline.summary,
@@ -43,11 +44,11 @@ class SceneOutlineGenerator(BaseContentGenerator):
         if not generated_text:
             return None
 
-        structure_check_prompt_template = (
-            self.prompts.create_scene_outlines_structure_check_prompt()
+        structure_check_prompt_template = self.prompt_manager.get_prompt(
+            "scene_outlines_structure_check_prompt"
         )
-        structure_fix_prompt_template = (
-            self.prompts.create_scene_outlines_structure_fix_prompt()
+        structure_fix_prompt_template = self.prompt_manager.get_prompt(
+            "scene_outlines_structure_fix_prompt"
         )
         validated_text = await self._structure_check_and_fix(
             generated_text,
@@ -74,8 +75,12 @@ class SceneOutlineGenerator(BaseContentGenerator):
         ]
         current_outlines_text = "\n\n".join(outline_texts)
 
-        critique_prompt_template = self.prompts.create_scene_outlines_critique_prompt()
-        rewrite_prompt_template = self.prompts.create_scene_outlines_rewrite_prompt()
+        critique_prompt_template = self.prompt_manager.get_prompt(
+            "scene_outlines_critique_prompt"
+        )
+        rewrite_prompt_template = self.prompt_manager.get_prompt(
+            "scene_outlines_rewrite_prompt"
+        )
         variables = {"current_outlines": current_outlines_text}
 
         critique_text = await self._generate_content_from_prompt(

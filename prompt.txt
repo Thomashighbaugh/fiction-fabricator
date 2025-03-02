@@ -8,25 +8,19 @@ refactored_gui_fict_fab
 ├── prompt.txt
 ├── run
 ├── utils
+│   ├── __pycache__
 │   ├── config.py
 │   ├── file_handler.py
 │   ├── logger.py
 │   ├── data_validation.py
 │   └── async_utils.py
 ├── requirements.txt
+├── flake.lock
 ├── setup-env.sh
-├── data
-│   ├── shroom
-│   │   └── shroom.json
-│   ├── Horizons
-│   │   └── Horizons.json
-│   ├── shroom.json
-│   ├── Horizon
-│   │   └── Horizon.json
-│   └── horizon
-│       └── horizon.json
 ├── streamlit_app
+│   ├── __pycache__
 │   ├── components
+│   │   ├── __pycache__
 │   │   ├── book_spec_view.py
 │   │   ├── scene_part_view.py
 │   │   ├── plot_outline_view.py
@@ -36,7 +30,9 @@ refactored_gui_fict_fab
 │   │   └── chapter_outline_view.py
 │   └── __init__.py
 ├── core
+│   ├── __pycache__
 │   ├── content_generation
+│   │   ├── __pycache__
 │   │   ├── plot_outline_generator.py
 │   │   ├── scene_outline_generator.py
 │   │   ├── chapter_outline_generator.py
@@ -48,8 +44,11 @@ refactored_gui_fict_fab
 │   ├── book_spec.py
 │   ├── plot_outline.py
 │   └── project_manager.py
+├── flake.nix
 └── llm
+    ├── __pycache__
     ├── prompt_manager
+    │   ├── __pycache__
     │   ├── book_spec_prompts.py
     │   ├── scene_part_prompts.py
     │   ├── base_prompts.py
@@ -72,12 +71,10 @@ import asyncio
 import os
 import sys
 
-# Add the parent directory of 'llm' to the Python path
 llm_parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "llm"))
 if llm_parent_dir not in sys.path:
     sys.path.insert(0, llm_parent_dir)
 
-# Ensure components are importable after moving app.py to root
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from streamlit_app.components.book_spec_view import book_spec_display
@@ -93,11 +90,9 @@ from core.content_generation.chapter_outline_generator import ChapterOutlineGene
 from core.content_generation.scene_outline_generator import SceneOutlineGenerator
 from core.content_generation.scene_part_generator import ScenePartGenerator
 from core.content_generation.book_assembler import BookAssembler
-from core.project_manager import ProjectManager  # import statement here
-from llm.prompt_manager.prompt_manager import (
-    DynamicPromptManager,
-)  # changed import here
-from llm.llm_client import OpenAILLMClient  # Changed to OpenAILLMClient
+from core.project_manager import ProjectManager
+from llm.prompt_manager.prompt_manager import DynamicPromptManager
+from llm.llm_client import OpenAILLMClient
 from utils.config import config
 from core.book_spec import BookSpec
 from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
@@ -105,7 +100,6 @@ from utils.logger import logger
 
 
 def main():
-    """Main function to run the Streamlit Fiction Fabricator application."""
     st.set_page_config(
         page_title="Fiction Fabricator",
         page_icon="🕉️",
@@ -114,11 +108,10 @@ def main():
     )
     st.title("Fiction Fabricator")
 
-    # --- Initialize Session State ---
-    if "openai_client" not in st.session_state:  # Renamed client
-        st.session_state.openai_client = OpenAILLMClient()  # Changed client class
+    if "openai_client" not in st.session_state:
+        st.session_state.openai_client = OpenAILLMClient()
     if "prompt_manager" not in st.session_state:
-        st.session_state.prompt_manager = DynamicPromptManager()  # changed class here
+        st.session_state.prompt_manager = DynamicPromptManager()
     if "book_spec_generator" not in st.session_state:
         st.session_state.book_spec_generator = BookSpecGenerator(
             st.session_state.prompt_manager, config.get_ollama_model_name()
@@ -144,8 +137,9 @@ def main():
     if "project_manager" not in st.session_state:
         st.session_state.project_manager = ProjectManager()
     if "available_models" not in st.session_state:
-        # Model listing no longer supported with openai, use default from config
-        st.session_state.available_models = [config.get_ollama_model_name()]
+        st.session_state.available_models = (
+            asyncio.run(st.session_state.openai_client.list_models()) or []
+        )
     if "selected_model" not in st.session_state:
         st.session_state.selected_model = config.get_ollama_model_name()
     st.session_state.story_idea = st.session_state.get("story_idea", "")
@@ -161,27 +155,98 @@ def main():
     )
     st.session_state.scene_parts_text = st.session_state.get("scene_parts_text", {})
     st.session_state.book_text = st.session_state.get("book_text", None)
-    st.session_state.project_error = st.session_state.get(
-        "project_error", None
-    )  # Add project error
+    st.session_state.project_error = st.session_state.get("project_error", None)
 
-    # --- Sidebar ---
     with st.sidebar:
         st.header("Settings & Project")
 
-        # **Model Selection (MANDATORY FIRST STEP)**
-        # Removed model selection dropdown as list_models is not supported, using config model
+        model_options = st.session_state.available_models or [
+            config.get_ollama_model_name()
+        ]
+        model_selectbox = st.selectbox(
+            "Select Model (REQUIRED)",
+            model_options,
+            index=(
+                model_options.index(st.session_state.selected_model)
+                if st.session_state.selected_model in model_options
+                else 0
+            ),
+            key="model_selectbox",
+        )
+        if model_selectbox != st.session_state.selected_model:
+            st.session_state.selected_model = model_selectbox
+            for generator_key in [
+                "book_spec_generator",
+                "plot_outline_generator",
+                "chapter_outline_generator",
+                "scene_outline_generator",
+                "scene_part_generator",
+            ]:
+                if generator_key in st.session_state:
+                    st.session_state[generator_key].model_name = (
+                        st.session_state.selected_model
+                    )
+            st.rerun()
         st.write(f"**Selected Model:** `{st.session_state.selected_model}`")
 
-        # **Project Management (Available after Model Selection)**
-        if (
-            st.session_state.selected_model
-        ):  # Only show project options if model is selected
+        if st.session_state.selected_model:
             st.sidebar.subheader("Project Management")
             project_dir = config.get_project_directory()
-            project_files = [
-                f[:-5] for f in os.listdir(project_dir) if f.endswith(".json")
-            ]
+            logger.debug(f"Project directory for listing files: {project_dir}")
+            try:
+                all_files_and_dirs = os.listdir(project_dir)
+                logger.debug(
+                    f"Items in project directory: {all_files_and_dirs}"
+                )  # Log ALL items
+
+                project_files = []
+                for item_name in all_files_and_dirs:  # Iterate through item names
+                    item_path = os.path.join(
+                        project_dir, item_name
+                    )  # Construct full item path
+                    logger.debug(
+                        f"Checking item: {item_name}, path: {item_path}"
+                    )  # Log each item being checked
+
+                    if os.path.isdir(item_path):  # Check if it's a directory
+                        logger.debug(f"  - Is a directory")
+                        project_json_filepath = os.path.join(
+                            item_path, f"{item_name}.json"
+                        )  # Construct project.json path
+                        logger.debug(
+                            f"  - Checking for project JSON file: {project_json_filepath}"
+                        )  # Log json path
+
+                        if os.path.isfile(
+                            project_json_filepath
+                        ):  # Check if project.json exists
+                            logger.info(
+                                f"  - Found project JSON file: {project_json_filepath}"
+                            )  # Info log if found
+                            project_files.append(
+                                item_name
+                            )  # Add project directory name
+                        else:
+                            logger.debug(
+                                f"  - Project JSON file NOT found"
+                            )  # Debug log if json not found
+                    else:
+                        logger.debug(
+                            f"  - Not a directory (ignoring)"
+                        )  # Debug log if not a directory
+
+                logger.debug(
+                    f"Filtered project files (subdirectories with project.json): {project_files}"
+                )  # Log final list
+
+            except FileNotFoundError:
+                logger.warning(f"Project directory not found: {project_dir}")
+                project_files = []
+            except Exception as e:
+                logger.error(f"Error listing project directory: {e}")
+                project_files = []
+
+            st.write(f"Project Files (from listdir): {project_files}")
             project_options = ["New Project"] + project_files
             selected_project = st.selectbox(
                 "Select Project", project_options, key="project_selectbox"
@@ -218,12 +283,10 @@ def main():
                                 f"Project '{st.session_state.project_name}' saved!"
                             )
                             st.session_state.project_name = project_name
-                            st.session_state.project_error = (
-                                None  # Clear any prior errors
-                            )
+                            st.session_state.project_error = None
                         except (IOError, TypeError, ValueError) as e:
                             st.session_state.project_error = (
-                                f"Error saving project: {e}"  # Save the error in session state
+                                f"Error saving project: {e}"
                             )
                     else:
                         st.warning("Please enter a project name to save.")
@@ -234,7 +297,6 @@ def main():
                         and st.session_state.project_name != "New Project"
                     ):
                         try:
-                            # **AGGRESSIVELY CLEAR book_spec BEFORE LOADING**
                             st.session_state.book_spec = None
 
                             loaded_data = st.session_state.project_manager.load_project(
@@ -257,7 +319,9 @@ def main():
                                 )
                                 st.session_state.chapter_outlines = [
                                     ChapterOutline(**co)
-                                    for co in (loaded_data.get("chapter_outlines") or [])
+                                    for co in (
+                                        loaded_data.get("chapter_outlines") or []
+                                    )
                                 ]
                                 scene_outlines_data = loaded_data.get(
                                     "scene_outlines", {}
@@ -282,38 +346,37 @@ def main():
                                 st.success(
                                     f"Project '{st.session_state.project_name}' loaded!"
                                 )
-                                st.session_state.project_error = (
-                                    None  # Clear any prior errors
-                                )
+                                st.session_state.project_error = None
                             else:
                                 st.warning(
-                                    f"No project data loaded for '{st.session_state.project_name}'."
+                                    f"No project data loaded (empty data) for '{st.session_state.project_name}'."
                                 )
-                        except FileNotFoundError:
+                                st.session_state.project_error = f"No project data loaded for '{st.session_state.project_name}' - empty data."
+                        except FileNotFoundError as e:
                             st.error(
-                                f"Project file '{st.session_state.project_name}.json' not found."
+                                f"Project file '{st.session_state.project_name}.json' not found: {e}"
                             )
-                            st.session_state.project_error = f"Project file '{st.session_state.project_name}.json' not found."
+                            st.session_state.project_error = f"Project file '{st.session_state.project_name}.json' not found: {e}"
+                        except json.JSONDecodeError as e:
+                            st.error(f"Error decoding project JSON: {e}")
+                            st.session_state.project_error = (
+                                f"Error decoding project JSON: {e}"
+                            )
                         except Exception as e:
-                            st.error(f"Error loading project: {e}")
-                            st.session_state.project_error = f"Error loading project: {e}"
-                    else:
-                        st.warning("Please enter a project name to load.")
+                            st.error(f"General error loading project: {e}")
+                            st.session_state.project_error = (
+                                f"General error loading project: {e}"
+                            )
 
-    # --- Main Panel ---
-    if (
-        st.session_state.selected_model
-    ):  # Only show workflow if model is selected
+    if st.session_state.selected_model:
         col_workflow, col_display = st.columns([1, 1], gap="large")
 
         with col_workflow:
             st.header("Novel Generation Workflow")
 
-            # 0. Display Project Error, if any
             if st.session_state.project_error:
                 st.error(st.session_state.project_error)
 
-            # 1. Story Idea
             with st.container():
                 st.subheader("1. Story Idea")
                 st.session_state.story_idea = st.text_area(
@@ -321,20 +384,19 @@ def main():
                     value=st.session_state.story_idea,
                     height=100,
                     key="story_idea_textarea",
-                    on_change=None,  # removed the callback here
+                    on_change=None,
                 )
 
-                # Autogenerate Book Spec
                 if st.session_state.story_idea and not st.session_state.book_spec:
                     with st.spinner("Generating Book Specification..."):
                         generated_spec = asyncio.run(
                             st.session_state.book_spec_generator.generate(
-                                st.session_state.story_idea, st.session_state.project_name
+                                st.session_state.story_idea,
+                                st.session_state.project_name,
                             )
                         )
                     if generated_spec:
                         st.session_state.book_spec = generated_spec
-                        # Autosave project after generation
                         st.session_state.project_manager.save_project(
                             st.session_state.project_name,
                             st.session_state.story_idea,
@@ -349,17 +411,15 @@ def main():
                         st.success(
                             "Book Specification Generated and Project Autosaved!"
                         )
-                        st.rerun()  # Refresh to show the generated spec
+                        st.rerun()
                     else:
                         st.error("Failed to generate Book Specification.")
 
-            # 2. Book Specification
             with st.container():
                 book_spec_display(
                     st.session_state.book_spec, st.session_state.book_spec_generator
                 )
 
-            # 3. Plot Outline
             if st.session_state.book_spec:
                 with st.container():
                     plot_outline_display(
@@ -367,7 +427,6 @@ def main():
                         st.session_state.plot_outline_generator,
                     )
 
-            # 4. Chapter Outlines
             if st.session_state.plot_outline:
                 with st.container():
                     chapter_outlines_display(
@@ -375,7 +434,6 @@ def main():
                         st.session_state.chapter_outline_generator,
                     )
 
-            # 5. Scene Outlines
             if st.session_state.chapter_outlines:
                 with st.container():
                     scene_outlines_display(
@@ -383,18 +441,16 @@ def main():
                         st.session_state.scene_outline_generator,
                     )
 
-            # 6. Scene Parts
             if st.session_state.scene_outlines:
                 with st.container():
                     scene_part_display(
-                        st.session_state.scene_parts_text,  # Corrected argument order
+                        st.session_state.scene_parts_text,
                         st.session_state.scene_part_generator,
                         st.session_state.book_spec,
                         st.session_state.chapter_outlines,
                         st.session_state.scene_outlines,
                     )
 
-            # 7. Assemble Book Text
             if st.session_state.scene_parts_text:
                 with st.container():
                     st.subheader("7. Assemble Book Text")
@@ -422,7 +478,6 @@ def main():
 
         with col_display:
             st.header("Project Data Display")
-            # 0. Display Project Error, if any
             if st.session_state.project_error:
                 st.error(st.session_state.project_error)
 
@@ -449,7 +504,7 @@ def main():
                     st.session_state.scene_outline_generator,
                 )
             if st.session_state.scene_parts_text:
-                scene_part_display( # Corrected argument order
+                scene_part_display(
                     st.session_state.scene_parts_text,
                     st.session_state.scene_part_generator,
                     st.session_state.book_spec,
@@ -458,12 +513,13 @@ def main():
                 )
             if st.session_state.book_text:
                 book_text_display(st.session_state.book_text)
-    else:  # If no model selected, display message
+    else:
         st.warning("Please select an Ollama model in the sidebar to begin.")
 
 
 if __name__ == "__main__":
     main()
+
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/run`:
@@ -477,7 +533,7 @@ source .venv/bin/activate
 `/home/tlh/refactored_gui_fict_fab/utils/config.py`:
 
 ```````py
-# /home/tlh/refactored_gui_fict_fab/utils/config.py
+# utils/config.py
 import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -773,7 +829,7 @@ async def timeout_wrapper(
 `/home/tlh/refactored_gui_fict_fab/requirements.txt`:
 
 ```````txt
-# /home/tlh/refactored_gui_fict_fab/requirements.txt
+# requirements.txt
 streamlit
 openai
 pydantic
@@ -782,6 +838,41 @@ black
 pytest
 pydantic-settings
 aiohttp
+requests
+numpy
+```````
+
+`/home/tlh/refactored_gui_fict_fab/flake.lock`:
+
+```````lock
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1740828860,
+        "narHash": "sha256-cjbHI+zUzK5CPsQZqMhE3npTyYFt9tJ3+ohcfaOF/WM=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "303bd8071377433a2d8f76e684ec773d70c5b642",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/setup-env.sh`:
@@ -940,7 +1031,7 @@ def book_spec_display(
 `/home/tlh/refactored_gui_fict_fab/streamlit_app/components/scene_part_view.py`:
 
 ```````py
-# /home/tlh/refactored_gui_fict_fab/streamlit_app/components/scene_part_view.py
+# streamlit_app/components/scene_part_view.py
 import streamlit as st
 import asyncio
 from typing import Optional, Dict, List
@@ -2264,7 +2355,7 @@ class BookAssembler:
 `/home/tlh/refactored_gui_fict_fab/core/content_generation/book_spec_generator.py`:
 
 ```````py
-# core/content_generation/book_spec_generator.py
+# /home/tlh/refactored_gui_fict_fab/core/content_generation/book_spec_generator.py
 import json
 from typing import Optional
 
@@ -2279,9 +2370,6 @@ from utils.logger import logger
 class BookSpecGenerator(BaseContentGenerator):
     """
     Content generator for BookSpec objects.
-
-    Inherits from BaseContentGenerator and implements specific logic
-    for generating and enhancing BookSpec content.
     """
 
     def __init__(self, prompt_manager, model_name: str):
@@ -2297,20 +2385,27 @@ class BookSpecGenerator(BaseContentGenerator):
     ) -> Optional[BookSpec]:  # Add type hint for the return type
         """
         Generates a BookSpec based on a story idea.
-
-        Args:
-            idea (str): The initial story idea to generate a BookSpec from.
-            project_name (str): The name of the project, used as a default title.
-
-        Returns:
-            Optional[BookSpec]: The generated BookSpec object, or None if generation fails.
         """
-        logger.debug(f"Generating BookSpec with idea: {idea}")
+        logger.debug(f"Generating BookSpec with idea: {idea}, project_name: {project_name}") # Log input
+
         generation_prompt_template = self.prompts.get_prompt("book_spec_generation_prompt")
         logger.debug("generation_prompt_template: %s...", generation_prompt_template)
+
         variables = {"idea": idea, "project_name": project_name}
+        logger.debug(f"Prompt variables: {variables}") # Log variables BEFORE formatting
+
+        try: # Add try-except around prompt formatting
+            formatted_prompt = generation_prompt_template.format(**variables) # Format prompt HERE
+            logger.debug(f"Formatted prompt (first 200 chars): {formatted_prompt[:200]}...") # Log formatted prompt
+        except KeyError as e:
+            logger.error(f"KeyError during prompt formatting: {e}") # More specific error log
+            logger.error(f"Prompt template: {generation_prompt_template}") # Log template on error
+            logger.error(f"Variables: {variables}") # Log variables on error
+            return None # Return None on formatting error
+
+
         generated_text = await self._generate_content_from_prompt(
-            generation_prompt_template, variables
+            formatted_prompt, {} # Use formatted_prompt, no need to pass variables again
         )
         if not generated_text:
             logger.error("Initial content generation failed.")
@@ -2319,8 +2414,8 @@ class BookSpecGenerator(BaseContentGenerator):
 
         book_spec = self._parse_response(generated_text)
         if not book_spec:
-             logger.error("Parsing failed.")
-             return None
+            logger.error("Parsing failed.")
+            return None
 
         logger.debug("Parsing successful.  Returning BookSpec.")
         return book_spec
@@ -2396,66 +2491,129 @@ class BookSpecGenerator(BaseContentGenerator):
 `/home/tlh/refactored_gui_fict_fab/core/content_generation/base_generator.py`:
 
 ```````py
-# /home/tlh/refactored_gui_fict_fab/llm/llm_client.py
-import json
-from typing import Optional
+# core/content_generation/base_generator.py
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
 
+import json
 import aiohttp
 
-from utils.config import config
+from llm.llm_client import OpenAILLMClient  # Changed to OpenAILLMClient
 from utils.logger import logger
-from openai import AsyncOpenAI  # Import OpenAI
 
 
-class OpenAILLMClient:
+class BaseContentGenerator(ABC):
     """
-    Client for interacting with a local OpenAI compatible instance using aiohttp.
+    Abstract base class for content generators.
+
+    Defines a common interface and implements shared functionalities
+    for all content generator classes.
     """
 
-    def __init__(self, base_url: str = None):
+    def __init__(self, prompt_manager, model_name: str):
         """
-        Initializes the OpenAI client.
+        Initializes the BaseContentGenerator with a prompt manager and model name.
         """
-        self.base_url = base_url or config.get_openai_base_url()
-        self.client = AsyncOpenAI(
-            base_url=self.base_url, api_key="placeholder"
-        )  # Initialize OpenAI client
-        logger.debug(
-            "OpenAILLMClient initialized with base_url: %s", self.base_url
-        )  # Lazy formatting
+        self.prompt_manager = prompt_manager
+        self.model_name = model_name
+        self.openai_client = OpenAILLMClient()  # Changed to OpenAILLMClient
 
-    async def list_models(self) -> Optional[list[str]]:
-        """OpenAI does not support listing models via localhost."""
-        return None
-
-    async def generate_text(self, model_name: str, prompt: str) -> Optional[str]:
+    @abstractmethod
+    async def generate(self, *args: Any, **kwargs: Any) -> Optional[Any]:
         """
-        Asynchronously generates text using the OpenAI API.
+        Abstract method for generating content. Must be implemented by subclasses.
+        """
+
+    @abstractmethod
+    async def enhance(self, current_content: Any) -> Optional[Any]:
+        """
+        Abstract method for enhancing existing content. Must be implemented by subclasses.
+        """
+
+    async def _generate_content_from_prompt(
+        self, prompt_template: str, variables: Dict[str, str]
+    ) -> Optional[str]:
+        """
+        Handles content generation from a prompt template using Ollama with lazy logging and specific exception handling.
         """
         try:
-            response = await self.client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-                max_tokens=800,
-            )
-            generated_text = response.choices[0].message.content
-
+            prompt = prompt_template.format(**variables)
+            logger.debug("Generated Prompt: %s...", prompt[:150])  # Lazy formatting
+            generated_text = await self.openai_client.generate_text(
+                model_name=self.model_name, prompt=prompt
+            )  # Changed to openai_client
             if generated_text:
-                logger.info(
-                    "Text generated successfully using model '%s'", model_name
-                )  # Lazy formatting
                 return generated_text
             else:
-                logger.error("No response from OpenAI API")
+                logger.error("LLM text generation failed or returned empty response.")
                 return None
 
-        except Exception as e:  # General exception to handle OpenAI and other errors
-            logger.error("OpenAI text generation failed: %s", e)  # Lazy formatting
+        except KeyError as e:  # Catch specific KeyError for prompt formatting issues
+            logger.error(
+                "Error formatting prompt due to missing variable: %s", e
+            )  # Lazy formatting
             return None
+        except (
+            aiohttp.ClientError
+        ) as e:  # Catch specific aiohttp ClientError for network/API issues
+            logger.error(
+                "Error during OpenAI API call: %s", e
+            )  # Changed error message
+            return None
+        except json.JSONDecodeError as e:  # Catch specific JSONDecodeError for invalid JSON
+            logger.error(
+                "OpenAI response JSON decoding error: %s", e
+            )  # Changed error message
+            return None
+        except (
+            ValueError,
+            TypeError,
+            RuntimeError,
+        ) as e:  # Catch specific operational errors
+            logger.error(
+                "Operational error during content generation: %s", e
+            )  # Lazy formatting
+            logger.exception(e)  # Log full exception details for unexpected errors
+            return None
+
+    @abstractmethod
+    def _parse_response(self, response_text: str) -> Any:
+        """
+        Abstract method to parse the LLM response. Must be implemented by subclasses.
+        """
+
+    async def _structure_check_and_fix(
+        self,
+        content: str,
+        structure_check_prompt_template: str,
+        structure_fix_prompt_template: str,
+    ) -> Optional[str]:
+        """
+        Implements structure checking and fixing logic using LLM prompts.
+        """
+        structure_check_variables = {"content": content}
+        structure_check_result = await self._generate_content_from_prompt(
+            structure_check_prompt_template, structure_check_variables
+        )
+
+        if structure_check_result != "STRUCTURE_OK":
+            logger.warning("Content structure check failed. Attempting to fix...")
+            structure_fix_variables = {
+                "content_with_structure_problems": content,
+                "structure_problems": structure_check_result,
+            }
+            fixed_text = await self._generate_content_from_prompt(
+                structure_fix_prompt_template, structure_fix_variables
+            )
+            if fixed_text:
+                logger.info("Content structure fixed successfully.")
+                return fixed_text
+            else:
+                logger.error("Failed to fix content structure.")
+                return None
+        else:
+            logger.info("Content structure check OK.")
+            return content
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/core/content_generation/scene_part_generator.py`:
@@ -2705,7 +2863,7 @@ class SceneOutline(BaseModel):
 `/home/tlh/refactored_gui_fict_fab/core/project_manager.py`:
 
 ```````py
-# core/project_manager.py
+# /home/tlh/refactored_gui_fict_fab/core/project_manager.py
 import json
 import os
 from typing import Dict, Any, Optional
@@ -2713,6 +2871,7 @@ from typing import Dict, Any, Optional
 from utils.file_handler import save_json, load_json
 from utils.config import config
 from utils.logger import logger
+
 
 class ProjectManager:
     """
@@ -2725,6 +2884,9 @@ class ProjectManager:
         """
         self.project_dir = config.get_project_directory()
         os.makedirs(self.project_dir, exist_ok=True)  # Ensure project directory exists
+        logger.debug(
+            f"ProjectManager initialized, project directory: {self.project_dir}"
+        )
 
     def save_project(
         self,
@@ -2741,18 +2903,37 @@ class ProjectManager:
         """
         Saves the project data to a JSON file.
         """
-        project_dir = os.path.join(self.project_dir, project_name) # Create project folder
+        # Enforce lowercase project directory names:
+        project_dir_name = (
+            project_name.lower()
+        )  # Convert project name to lowercase for directory
+        project_dir = os.path.join(
+            self.project_dir, project_dir_name
+        )  # Use lowercase name for directory
         os.makedirs(project_dir, exist_ok=True)  # Create project folder if not exists
-        project_filepath = os.path.join(project_dir, f"{project_name}.json") # Add project name to the path
+        project_filepath = os.path.join(
+            project_dir, f"{project_name}.json"
+        )  # Filename still uses original project_name
+
+        logger.debug(f"Saving project '{project_name}', filepath: {project_filepath}")
+
         try:
             # Convert Pydantic models to dictionaries
             book_spec_data = book_spec.model_dump() if book_spec else None
             plot_outline_data = plot_outline.model_dump() if plot_outline else None
-            chapter_outlines_data = [co.model_dump() for co in chapter_outlines] if chapter_outlines else None
-            scene_outlines_data = {
-                chapter_num: [so.model_dump() for so in scene_outlines]
-                for chapter_num, scene_outlines in scene_outlines.items()
-            } if scene_outlines else None
+            chapter_outlines_data = (
+                [co.model_dump() for co in chapter_outlines]
+                if chapter_outlines
+                else None
+            )
+            scene_outlines_data = (
+                {
+                    chapter_num: [so.model_dump() for so in scene_outlines]
+                    for chapter_num, scene_outlines in scene_outlines.items()
+                }
+                if scene_outlines
+                else None
+            )
 
             project_data: Dict[str, Any] = {
                 "story_idea": story_idea,
@@ -2764,6 +2945,7 @@ class ProjectManager:
                 "scene_parts_text": scene_parts_text,
                 "book_text": book_text,
             }
+            logger.debug(f"Project data before save_json: {project_data}")
 
             save_json(project_data, project_filepath)
             logger.info("Project '%s' saved successfully.", project_name)
@@ -2775,194 +2957,180 @@ class ProjectManager:
         """
         Loads project data from a JSON file.
         """
-        project_dir = os.path.join(self.project_dir, project_name) # added to the start so it reads the correct directory
-        project_filepath = os.path.join(project_dir, f"{project_name}.json")
+        # Enforce lowercase project directory names for loading as well:
+        project_dir_name = (
+            project_name.lower()
+        )  # Convert project name to lowercase for directory
+        project_dir = os.path.join(
+            self.project_dir, project_dir_name
+        )  # Use lowercase directory name
+        project_filepath = os.path.join(
+            project_dir, f"{project_name}.json"
+        )  # Filename still uses original project_name
+
+        logger.debug(f"Loading project '{project_name}', filepath: {project_filepath}")
+
+        if not os.path.exists(project_filepath):
+            logger.error(f"Project file NOT found at: {project_filepath}")
+            raise FileNotFoundError(f"Project file not found: {project_filepath}")
+
+        if not os.path.isfile(project_filepath):
+            logger.error(f"Path is not a file: {project_filepath}")
+            raise FileNotFoundError(f"Project file is not a file: {project_filepath}")
+
         try:
             project_data = load_json(project_filepath)
             logger.info("Project '%s' loaded successfully.", project_name)
+            logger.debug(f"Project data after load_json: {project_data}")
             return project_data
         except FileNotFoundError:
-            logger.error("Project file not found: %s", project_filepath)
+            logger.error(f"Project file not found: %s", project_filepath)
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON from %s: %s", project_filepath, e)
             raise
         except Exception as e:
-            logger.error("Error loading project '%s': %s", project_name, e)
+            logger.error(f"Error loading project '%s': %s", project_name, e)
             raise
+
+```````
+
+`/home/tlh/refactored_gui_fict_fab/flake.nix`:
+
+```````nix
+{
+  description = "A basic flake demoing a python wrapper with lib injection";
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  };
+
+  outputs = {
+    self,
+    nixpkgs,
+  }: let
+    supportedSystems = ["x86_64-linux"];
+    forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    pkgs = forAllSystems (system: import nixpkgs {inherit system;});
+    pythonVer = "311";
+  in {
+    packages = {};
+
+    devShells = forAllSystems (system:
+      with pkgs.${system}; let
+        python = pkgs.${system}."python${pythonVer}";
+        wrappedPython = writeShellScriptBin "python" ''
+          export LD_LIBRARY_PATH=$NIX_LD_LIBRARY_PATH
+          SCRIPT_DIR=$(${coreutils}/bin/dirname $(${coreutils}/bin/realpath -s "$0"))
+          exec -a "$SCRIPT_DIR/python" "${python}/bin/python" "$@"
+        '';
+      in
+        with pkgs.${system}; {
+          default = pkgs.${system}.mkShell {
+            # adapt to your needs
+            NIX_LD_LIBRARY_PATH =
+              lib.makeLibraryPath [stdenv.cc.cc openssl zlib];
+            packages = [wrappedPython];
+          };
+        });
+  };
+}
+
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/book_spec_prompts.py`:
 
 ```````py
-# llm/prompt_manager/book_spec_prompts.py
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/book_spec_prompts.py
 from llm.prompt_manager.base_prompts import (
     COMMON_INSTRUCTIONS_NOVELIST,
-    JSON_OUTPUT_FORMAT_INSTRUCTIONS,
     STRUCTURE_CHECK_INSTRUCTIONS,
     STRUCTURE_FIX_PROMPT_TEMPLATE,
     CRITIQUE_PROMPT_TEMPLATE,
     REWRITE_PROMPT_TEMPLATE,
 )
+from core.book_spec import BookSpec
+import json
 
 
 class BookSpecPrompts:
     """
-    Encapsulates prompt templates for BookSpec operations.
-
-    Provides methods to retrieve specific prompt templates for
-    generating, structure checking, fixing, critiquing, and rewriting BookSpecs.
+    Encapsulates prompt templates for BookSpec operations, loading templates from files.
     """
 
-    def __init__(self, prompt_manager=None):
+    def __init__(self, prompt_manager, template_env):
         """
-        Initializes BookSpecPrompts.
-        Prompt manager is currently not used, but included for potential future use or consistency.
+        Initializes BookSpecPrompts with a reference to the prompt manager and Jinja2 environment.
         """
         self.prompt_manager = prompt_manager
+        self.template_env = template_env
+
+    def get_prompt(self, prompt_name: str) -> str:
+        """
+        Retrieves and renders a specific BookSpec prompt by name from a Jinja2 template file.
+
+        Args:
+            prompt_name (str): The name of the prompt to retrieve (e.g., 'book_spec_generation_prompt').
+
+        Returns:
+            str: The rendered prompt text.
+        """
+        template_name = f"{prompt_name}.j2"  # Filename convention: prompt_name.j2
+        template = self.template_env.get_template(template_name)  # Load template from file
+
+        if prompt_name == "book_spec_generation_prompt":
+            json_schema = BookSpec.model_json_schema()  # Get BookSpec JSON schema
+            variables = {"json_structure": json.dumps(json_schema, indent=4), "BookSpec_json_schema": json.dumps(BookSpec.model_json_schema(), indent=4)}  # Pass schema as variable
+        elif prompt_name == "book_spec_structure_fix_prompt":
+            json_schema = BookSpec.model_json_schema()  # Get BookSpec JSON schema
+            variables = {"json_structure": json.dumps(json_schema, indent=4), "BookSpec_json_schema": json.dumps(BookSpec.model_json_schema(), indent=4)}  # Pass schema as variable
+        else:
+            variables = {}  # Default to empty variables for other prompts
+
+        return template.render(
+            COMMON_INSTRUCTIONS_NOVELIST=COMMON_INSTRUCTIONS_NOVELIST,
+            STRUCTURE_CHECK_INSTRUCTIONS=STRUCTURE_CHECK_INSTRUCTIONS,
+            STRUCTURE_FIX_PROMPT_TEMPLATE=STRUCTURE_FIX_PROMPT_TEMPLATE,
+            CRITIQUE_PROMPT_TEMPLATE=CRITIQUE_PROMPT_TEMPLATE,
+            REWRITE_PROMPT_TEMPLATE=REWRITE_PROMPT_TEMPLATE,
+            **variables,
+        )  # Pass base templates and stage-specific variables
 
     def create_book_spec_generation_prompt(self) -> str:
         """
-        Returns the prompt template for generating a new BookSpec from a story idea.
+        Proxies to get_prompt for 'book_spec_generation_prompt' to use template files.
         """
-        json_structure = """
-        {
-            "title": "string",
-            "genre": "string",
-            "setting": "string",
-            "themes": ["string", "string", "string"],
-            "tone": "string",
-            "point_of_view": "string",
-            "characters": ["string", "string", "string"],
-            "premise": "string"
-        }
-        """
-        prompt_template = f"""
-        {COMMON_INSTRUCTIONS_NOVELIST.format(task="generate detailed book specifications based on short story ideas")}
-
-        Generate a detailed book specification for a novel based on the following idea: "{{idea}}".
-
-        The novel should have a strong focus on dark themes.
-
-        Include the following elements in the book specification:
-        - Title (Compelling and evocative)
-        - Genre (Specify the genre and subgenres - be specific, e.g., Dark Fantasy, Erotic Thriller)
-        - Setting(s) (Detailed description of locations and time period, make it vivid)
-        - Themes (List of 3-5 major themes explored in the novel, particularly dark and erotic themes)
-        - Tone (Describe the overall tone of the novel - e.g., gritty, suspenseful, melancholic, sensual, noir, gothic)
-        - Point of View (Specify the narrative perspective - e.g., first-person, third-person limited, third-person omniscient)
-        - Characters (Detailed descriptions of 2-3 main characters, including their motivations, flaws, backstories, and key personality traits.  Focus on aspects related to dark and erotic elements. Each character description should be a single string, detailed and evocative.)
-        - Premise (A concise and intriguing premise that sets up the central conflict and hints at the dark and erotic nature of the story. Make it immediately captivating.)
-
-        Ensure the book specification is well-structured, creative, and clearly reflects the dark focus.  Be expansive and detailed in your descriptions.
-
-        {JSON_OUTPUT_FORMAT_INSTRUCTIONS.format(json_structure=json_structure)}
-
-        Do not include any explanation or introductory text, just the valid JSON.
-        """
-        return prompt_template
+        return self.get_prompt("book_spec_generation_prompt")
 
     def create_book_spec_structure_check_prompt(self) -> str:
         """
-        Returns the prompt template for checking the structure of a BookSpec JSON.
+        Proxies to get_prompt for 'book_spec_structure_check_prompt'.
         """
-        prompt_template = f"""
-        {STRUCTURE_CHECK_INSTRUCTIONS}
-
-        Here is the BookSpec in JSON format:
-        ```json
-        {{content}}
-        ```
-
-        Specifically, check that:
-        - The JSON is valid and parsable.
-        - All fields are present: title, genre, setting, themes, tone, point_of_view, characters, premise.
-        - All values are strings, EXCEPT for 'themes' and 'characters', which must be lists of strings.
-        - The lists 'themes' and 'characters' contain at least one item.
-
-        If the BookSpec adheres to the correct structure, respond with 'STRUCTURE_OK'.
-        If there are any structural issues, respond with a detailed explanation of the problems and how to fix them.
-        """
-        return prompt_template
+        return self.get_prompt("book_spec_structure_check_prompt")
 
     def create_book_spec_structure_fix_prompt(self) -> str:
         """
-        Returns the prompt template for fixing structural issues in a BookSpec JSON.
+        Proxies to get_prompt for 'book_spec_structure_fix_prompt'.
         """
-        json_structure = """
-        {
-            "title": "string",
-            "genre": "string",
-            "setting": "string",
-            "themes": ["string", "string", "string"],
-            "tone": "string",
-            "point_of_view": "string",
-            "characters": ["string", "string", "string"],
-            "premise": "string"
-        }
-        """
-        prompt_template = f"""
-        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(json_structure=json_structure, content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}")}
-
-        Your task is to modify the JSON to adhere to the correct structure as outlined below and fix the structural problems described:
-
-        ```json
-        {json_structure}
-        ```
-
-        Return only valid JSON, without deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
-        """
-        return prompt_template
+        return self.get_prompt("book_spec_structure_fix_prompt")
 
     def create_book_spec_critique_prompt(self) -> str:
         """
-        Returns the prompt template for generating a critique of a BookSpec.
+        Proxies to get_prompt for 'book_spec_critique_prompt'.
         """
-        prompt_template = f"""
-        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
-
-        Focus your critique on:
-        - **Clarity and Detail:** Are all sections sufficiently detailed and clear? Could any section be expanded or made more specific?
-        - **Cohesion and Consistency:** Does the BookSpec present a unified and coherent vision for the novel? Are all elements consistent with each other?
-        - **Strength of Dark Themes:** How effectively does the BookSpec establish and emphasize the dark and erotic themes of the novel? Is the premise intriguing and suggestive of the novel's nature?
-        - **Character Depth:** Are the character descriptions compelling and insightful? Do they adequately explore motivations and flaws related to the dark and erotic elements?
-        - **Overall Impact:** How compelling and well-defined is the BookSpec as a foundation for writing a novel? What are its strongest and weakest points?
-        """
-        return prompt_template
+        return self.get_prompt("book_spec_critique_prompt")
 
     def create_book_spec_rewrite_prompt(self) -> str:
         """
-        Returns the prompt template for rewriting a BookSpec based on critique.
+        Proxies to get_prompt for 'book_spec_rewrite_prompt'.
         """
-        json_structure = """
-        {
-            "title": "string",
-            "genre": "string",
-            "setting": "string",
-            "themes": ["string", "string", "string"],
-            "tone": "string",
-            "point_of_view": "string",
-            "characters": ["string", "string", "string"],
-            "premise": "string"
-        }
-        """
-        prompt_template = f"""
-        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
-
-        When rewriting, specifically focus on:
-        - **Addressing all points raised in the critique** directly and thoroughly.
-        - **Enhancing detail and clarity** in all sections, especially those identified as weak in the critique.
-        - **Strengthening the dark and erotic themes** throughout the specification.
-        - **Deepening character descriptions** to add more psychological insight and compelling motivations.
-        - **Ensuring overall cohesion and impact** of the BookSpec as a robust foundation for novel writing.
-
-        Output the ENTIRE revised BookSpec in JSON format.
-
-        {JSON_OUTPUT_FORMAT_INSTRUCTIONS.format(json_structure=json_structure)}
-        """
-        return prompt_template
+        return self.get_prompt("book_spec_rewrite_prompt")
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/scene_part_prompts.py`:
 
 ```````py
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/scene_part_prompts.py
 # llm/prompt_manager/scene_part_prompts.py
 
 """
@@ -2980,6 +3148,9 @@ from llm.prompt_manager.base_prompts import (
     CRITIQUE_PROMPT_TEMPLATE,
     REWRITE_PROMPT_TEMPLATE,
 )
+from core.book_spec import BookSpec # Import BookSpec
+from core.plot_outline import ChapterOutline, SceneOutline # Import ChapterOutline, SceneOutline
+import json # Import json
 
 
 class ScenePartPrompts:
@@ -2995,130 +3166,60 @@ class ScenePartPrompts:
         Initializes ScenePartPrompts.
         Prompt manager is currently not used, but included for potential future use or consistency.
         """
+        self.template_env = None
         self.prompt_manager = prompt_manager
+
+    def get_prompt(self, prompt_name: str) -> str:
+        """
+        Returns the prompt template for generating SceneParts from SceneOutline.
+        """
+        json_structure = BookSpec.model_json_schema() # Using BookSpec schema as it's comprehensive enough
+        template_name = f"{prompt_name}.j2" # Filename convention: prompt_name.j2
+        template = self.template_env.get_template(template_name) # Load template from file
+        variables = {"json_structure": json.dumps(json_structure, indent=4)}
+        return template.render(COMMON_INSTRUCTIONS_NOVELIST=COMMON_INSTRUCTIONS_NOVELIST, 
+                                STRUCTURE_CHECK_INSTRUCTIONS=STRUCTURE_CHECK_INSTRUCTIONS,
+                                STRUCTURE_FIX_PROMPT_TEMPLATE=STRUCTURE_FIX_PROMPT_TEMPLATE,
+                                CRITIQUE_PROMPT_TEMPLATE=CRITIQUE_PROMPT_TEMPLATE,
+                                REWRITE_PROMPT_TEMPLATE=REWRITE_PROMPT_TEMPLATE,
+                                json_structure = json.dumps(json_structure, indent=4)
+                                )
 
     def create_scene_part_generation_prompt(self) -> str:
         """
-        Returns the prompt template for generating a ScenePart.
+        Returns the prompt template for generating SceneParts.
         """
-        prompt_template = f"""
-        {COMMON_INSTRUCTIONS_NOVELIST.format(task="generate specific parts of scenes from scene outlines, creating vivid and engaging narrative text")}
-
-        Generate part {{part_number}} of the text for the following scene, based on the provided book specification, chapter outline, and scene outline. Focus on writing compelling prose that brings the scene to life.
-
-        Book Specification:
-        ```json
-        {{book_spec_text}}
-        ```
-
-        Chapter Outline:
-        ```
-        {{chapter_outline}}
-        ```
-
-        Scene Outline:
-        ```
-        {{scene_outline_full}}
-        ```
-
-        Specifically for Part {{part_number}} of the scene, focusing on the following outline points:
-        ```
-        {{scene_outline}}
-        ```
-
-        Write this part of the scene in a compelling and descriptive manner, consistent with the tone, themes, and characters established in the book specification. Emphasize the dark and erotic elements as appropriate for this scene and the overall novel, but ensure that these elements are integrated tastefully and contribute to the narrative's depth and complexity, rather than being gratuitous. Focus on vivid sensory descriptions, engaging dialogue that reveals character and advances the plot, and actions that move the scene forward dynamically.
-
-        The generated text should be suitable for inclusion in a novel and should seamlessly connect with the preceding and subsequent parts of the scene (if applicable), creating a cohesive and immersive reading experience.
-
-        Your response MUST be ONLY the text for scene part {{part_number}}. Do not include any preamble or concluding remarks, just the scene part text itself.
-        """
-        return prompt_template
+        return self.get_prompt("scene_part_generation_prompt")
 
     def create_scene_part_structure_check_prompt(self) -> str:
         """
-        Returns the prompt template for checking the structure of a ScenePart.
+        Returns the prompt template for checking the structure of SceneParts.
         """
-        prompt_template = f"""
-        {STRUCTURE_CHECK_INSTRUCTIONS}
-
-        Here is the scene part text:
-        ```
-        {{content}}
-        ```
-
-        Your task is to ensure that the scene part:
-        - Is written in grammatically correct English with proper sentence structure and punctuation.
-        - Is formatted as plain text, without any structural elements like headings, bullet points, or scene breaks within the part.
-        - Is coherent and reads smoothly as a part of a narrative, logically connecting to the surrounding parts of the scene (even though the context of surrounding parts is not provided here).
-        - Maintains a consistent tone and style appropriate for a dark and erotic novel, as established in the Book Specification (even though the Book Specification itself is not provided here).
-
-        If the scene part adheres to these basic structural and grammatical criteria, and is presented as plain, coherent text, respond with 'STRUCTURE_OK'.
-        If there are any structural issues, such as grammatical errors, formatting issues, incoherence, or significant deviations in tone, provide a detailed explanation of the problems and how to fix them.
-        """
-        return prompt_template
+        return self.get_prompt("scene_part_structure_check_prompt")
 
     def create_scene_part_structure_fix_prompt(self) -> str:
         """
-        Returns the prompt template for fixing structural issues in a ScenePart.
+        Returns the prompt template for fixing structural issues in SceneParts.
         """
-        prompt_template = f"""
-        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}", json_structure="")}
-
-        Your task is to modify the scene part text to correct the identified structural and grammatical issues. Specifically:
-        - Correct any grammatical errors, punctuation mistakes, and awkward sentence structures to ensure the text is grammatically sound and easy to read.
-        - Ensure the text is formatted as plain text, removing any unintended structural elements like headings or bullet points. The scene part should be a continuous block of narrative text.
-        - Improve coherence and flow to ensure the scene part reads smoothly and logically. Enhance transitions and connections within the text as needed.
-        - Adjust the tone and style to ensure consistency with the established tone for a dark and erotic novel, aligning with the overall project guidelines.
-
-        Return ONLY the corrected scene part text, without any preamble or concluding remarks. The corrected scene part should be grammatically correct, formatted as plain text, and structurally sound.
-        """
-        return prompt_template
+        return self.get_prompt("scene_part_structure_fix_prompt")
 
     def create_scene_part_critique_prompt(self) -> str:
         """
-        Returns the prompt template for generating a critique of a ScenePart.
+        Returns the prompt template for generating a critique of SceneParts.
         """
-        prompt_template = f"""
-        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
-
-        Focus your critique on:
-        - **Descriptive Writing and Imagery:** How vivid and engaging are the descriptions? Does the writing effectively use sensory details to immerse the reader in the scene's setting and atmosphere? Could the imagery be stronger or more evocative?
-        - **Character Voice and Dialogue:** If dialogue is present, how effective is it in revealing character and advancing the plot? Is the character voice distinct and believable? Is the dialogue engaging and natural?
-        - **Pacing and Engagement:** Is the pacing of the scene part effective? Does it maintain reader engagement and interest? Is there a sense of dramatic tension or emotional depth? Could the pacing be improved to enhance impact?
-        - **Integration of Dark and Erotic Themes:** If applicable, how well are the dark and erotic themes integrated into this scene part? Are these elements handled tastefully and effectively contribute to the narrative, or do they feel gratuitous or underdeveloped?
-        - **Consistency with Book/Chapter/Scene Outlines:** How well does this scene part realize the potential of the provided Book Specification, Chapter Outline, and Scene Outline? Does it effectively capture the intended events, tone, and purpose of this part of the scene?
-        - **Overall Writing Quality and Impact:** Evaluate the overall quality of the writing in this scene part. What are its strengths and weaknesses? How could it be improved to be more compelling, immersive, and impactful for the reader?
-        """
-        return prompt_template
+        return self.get_prompt("scene_part_critique_prompt")
 
     def create_scene_part_rewrite_prompt(self) -> str:
         """
-        Returns the prompt template for rewriting a ScenePart based on critique.
+        Returns the prompt template for rewriting SceneParts.
         """
-        prompt_template = f"""
-        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
-
-        When rewriting the scene part, specifically focus on:
-        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised scene part text.
-        - **Enhancing descriptive writing and imagery** to create a more vivid and immersive experience for the reader. Strengthen sensory details, atmosphere, and setting descriptions.
-        - **Refining character voice and dialogue** to make it more engaging, revealing, and impactful. Improve the believability and distinctiveness of character voices and ensure dialogue effectively serves the narrative.
-        - **Adjusting pacing and engagement** to optimize the scene part's impact. Enhance dramatic tension, emotional depth, and overall reader interest through pacing adjustments and more compelling prose.
-        - **Improving the integration of dark and erotic themes**, if applicable, ensuring these elements are handled tastefully and contribute meaningfully to the narrative's complexity and depth. Avoid gratuitous or underdeveloped portrayals of these themes; instead, aim for nuanced and impactful integration.
-        - **Ensuring stronger consistency with the Book Specification, Chapter Outline, and Scene Outline**, aligning the scene part more closely with the established guidelines and intended purpose. Enhance the realization of the outlined events, tone, and objectives within the scene part text.
-
-        Rewrite the ENTIRE scene part text, focusing on enhancing its descriptive quality, character voice, pacing, thematic integration, and overall writing quality to create a more compelling and immersive narrative.
-
-        Return ONLY the revised scene part text, without any preamble or concluding remarks.
-        """
-        return prompt_template
-
+        return self.get_prompt("scene_part_rewrite_prompt")
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/base_prompts.py`:
 
 ```````py
-# llm/prompt_manager/base_prompts.py
-
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/base_prompts.py
 """
 Base prompt templates and utility functions for prompt management.
 
@@ -3142,18 +3243,6 @@ content provided and verify if it correctly follows the required structure.
 If the structure is correct, you should respond with 'STRUCTURE_OK'.
 If there are structural issues, you must provide a detailed explanation
 of the problems and clearly indicate how to fix them. Be specific and actionable in your feedback.
-"""
-
-JSON_OUTPUT_FORMAT_INSTRUCTIONS = """
-Critically important: Your ENTIRE response MUST be valid JSON.
-Adhere strictly to the JSON format specified below, ensuring correct
-data types, proper syntax, and valid structure. The JSON object should be:
-```json
-{json_structure}
-```
-Do not include any explanatory text or introductory phrases before
-or after the JSON block. Just output valid JSON. Ensure that the JSON is
-properly formatted with correct escaping of special characters as needed.
 """
 
 CRITIQUE_PROMPT_TEMPLATE = """
@@ -3227,6 +3316,7 @@ Return only valid JSON, without deviations or extra explanation. Adhere strictly
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/plot_outline_prompts.py`:
 
 ```````py
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/plot_outline_prompts.py
 # llm/prompt_manager/plot_outline_prompts.py
 
 """
@@ -3244,6 +3334,8 @@ from llm.prompt_manager.base_prompts import (
     CRITIQUE_PROMPT_TEMPLATE,
     REWRITE_PROMPT_TEMPLATE,
 )
+from core.plot_outline import PlotOutline  # Import PlotOutline
+import json  # Import json
 
 
 class PlotOutlinePrompts:
@@ -3260,127 +3352,63 @@ class PlotOutlinePrompts:
         Prompt manager is currently not used, but included for potential future use or consistency.
         """
         self.prompt_manager = prompt_manager  # Currently not used
+        self.template_env = None
+
+    def get_prompt(self, prompt_name: str) -> str:
+        """
+        Returns the prompt template for generating a PlotOutline from a BookSpec.
+        """
+        json_structure = PlotOutline.model_json_schema()  # Get schema as Python dict
+        template_name = f"{prompt_name}.j2"  # Filename convention: prompt_name.j2
+        template = self.template_env.get_template(
+            template_name
+        )  # Load template from file
+        variables = {"json_structure": json.dumps(json_structure, indent=4)}
+        return template.render(
+            COMMON_INSTRUCTIONS_NOVELIST=COMMON_INSTRUCTIONS_NOVELIST,
+            STRUCTURE_CHECK_INSTRUCTIONS=STRUCTURE_CHECK_INSTRUCTIONS,
+            STRUCTURE_FIX_PROMPT_TEMPLATE=STRUCTURE_FIX_PROMPT_TEMPLATE,
+            CRITIQUE_PROMPT_TEMPLATE=CRITIQUE_PROMPT_TEMPLATE,
+            REWRITE_PROMPT_TEMPLATE=REWRITE_PROMPT_TEMPLATE,
+            json_structure=json.dumps(json_structure, indent=4),
+        )
 
     def create_plot_outline_generation_prompt(self) -> str:
         """
         Returns the prompt template for generating a PlotOutline from a BookSpec.
         """
-        prompt_template = f"""
-        {COMMON_INSTRUCTIONS_NOVELIST.format(task="create compelling and detailed 3-act plot outlines from book specifications")}
-
-        Create a detailed and compelling three-act plot outline for a novel based on the following book specification. Ensure a balanced story arc with substantial plot points in each act.
-
-        Book Specification:
-        ```json
-        {{book_spec_json}}
-        ```
-
-        **IMPORTANT:** The plot outline you create MUST be directly based on and consistent with the Book Specification provided above.
-        Specifically, ensure the plot outline strongly reflects the:
-        - Genre and Themes
-        - Setting
-        - Premise and Characters defined in the Book Specification.
-
-        The plot outline MUST be structured in three acts, with roughly 3-5 major plot points described in each act:
-        - **Act One: Setup** - Introduce the characters, setting, and premise from the Book Spec in a captivating way. Establish the initial conflict and the protagonist's primary goals and motivations, all consistent with the Book Spec. Detail at least 3-5 significant plot points that drive the story forward and establish the world as described in the Book Spec. This act should build intrigue and set the stage for the rising action, firmly within the boundaries of the Book Spec.
-
-        - **Act Two: Confrontation** - Develop the central conflict with rising stakes. The protagonist faces significant obstacles and challenges, leading to a major turning point. Explore the dark and erotic themes through specific plot events and character interactions. Detail at least 3-5 major plot points showcasing the escalating conflict, including a midpoint twist or revelation that changes the protagonist's course.
-
-        - **Act Three: Resolution** - The climax of the story, where the central conflict reaches its peak. The main conflict is resolved, and the protagonist experiences a significant transformation or realization. Address the consequences of the dark and erotic elements explored throughout the novel, leading to thematic closure. Detail at least 3-5 major plot points that lead to the resolution, including the climax itself and the immediate aftermath/denouement. Each point should show clear consequences of previous actions.
-
-        The plot outline should be detailed enough to provide a clear and robust roadmap for writing the novel, with specific and impactful plot points driving significant character developments in each act. Each act should feel substantial and necessary to the overall narrative. Ensure the outline effectively incorporates and develops the themes from the book specification, avoiding superficial plot points.
-
-        Your response MUST be ONLY the plot outline, structured into Act One, Act Two, and Act Three, with clear headings for each act and bullet points or numbered lists for plot points within each act.  Do not include any preamble or concluding remarks, only the plot outline itself.
-        """
-        return prompt_template
+        return self.get_prompt("plot_outline_generation_prompt")
 
     def create_plot_outline_structure_check_prompt(self) -> str:
         """
         Returns the prompt template for checking the structure of a PlotOutline.
         """
-        prompt_template = f"""
-        {STRUCTURE_CHECK_INSTRUCTIONS}
-
-        Here is the PlotOutline:
-        ```
-        {{content}}
-        ```
-
-        Your task is to ensure that the plot outline is structured in three acts, with clear headings for each act:
-
-        - Act One: Setup
-        - Act Two: Confrontation
-        - Act Three: Resolution
-
-        Each act should contain a reasonable number of plot points (ideally 3-5). Check if all three acts are present and clearly delineated.
-
-        If the PlotOutline adheres to the correct 3-act structure with clear act headings, respond with 'STRUCTURE_OK'.
-        If there are any structural issues, such as missing acts, unclear headings, or if it's not clearly divided into three acts, provide a detailed explanation of the problems and how to fix them.
-        """
-        return prompt_template
+        return self.get_prompt("plot_outline_structure_check_prompt")
 
     def create_plot_outline_structure_fix_prompt(self) -> str:
         """
         Returns the prompt template for fixing structural issues in a PlotOutline.
         """
-        prompt_template = f"""
-        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}")}
-
-        Your task is to modify the plot outline to ensure that it is correctly structured in three acts, with clear headings for each act:
-
-        - Act One: Setup
-        - Act Two: Confrontation
-        - Act Three: Resolution
-
-        Each act should contain a reasonable number of plot points (ideally 3-5). Ensure all three acts are present and clearly delineated with proper headings.
-
-        Return ONLY the corrected plot outline, without any preamble or concluding remarks. The corrected plot outline should strictly adhere to the 3-act structure.
-        """
-        return prompt_template
+        return self.get_prompt("plot_outline_structure_fix_prompt")
 
     def create_plot_outline_critique_prompt(self) -> str:
         """
         Returns the prompt template for generating a critique of a PlotOutline.
         """
-        prompt_template = f"""
-        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
-
-        Focus your critique on:
-        - **Plot Structure and Pacing:** Is the 3-act structure clearly defined and effectively used? Is the pacing appropriate across the acts? Does each act have a clear beginning, middle, and end in terms of plot progression?
-        - **Clarity and Detail of Plot Points:** Are the plot points within each act clearly described and sufficiently detailed? Is it easy to understand the sequence of events and their impact on the story?
-        - **Rising Action and Conflict:** Is there a clear sense of rising action in Act Two? Is the central conflict effectively developed and escalated? Are the stakes high enough?
-        - **Resolution and Thematic Closure:** Does Act Three provide a satisfying resolution to the central conflict? Is there a sense of thematic closure? Are the consequences of earlier events adequately addressed?
-        - **Consistency with Book Specification:** Does the plot outline consistently and effectively implement the elements defined in the Book Specification (genre, themes, setting, characters, premise)?
-        - **Overall Compellingness:** How compelling and engaging is the plot outline? Does it create anticipation for the full story? What are its strengths and weaknesses in terms of making the reader want to know more?
-        """
-        return prompt_template
+        return self.get_prompt("plot_outline_critique_prompt")
 
     def create_plot_outline_rewrite_prompt(self) -> str:
         """
         Returns the prompt template for rewriting a PlotOutline based on critique.
         """
-        prompt_template = f"""
-        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
-
-        When rewriting the plot outline, specifically focus on:
-        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised plot outline.
-        - **Strengthening the 3-act structure** to ensure a clear and effective narrative arc. Enhance the pacing within and between acts to build tension and maintain reader engagement.
-        - **Adding detail and clarity to plot points**, making sure each point is well-defined and contributes to the overall plot progression. Expand on plot points that were identified as too vague or underdeveloped.
-        - **Escalating the conflict in Act Two** to raise the stakes and increase dramatic tension. Ensure that the confrontation is significant and leads to a clear turning point.
-        - **Ensuring a satisfying resolution in Act Three** that provides thematic closure and addresses all major plot threads. Make sure the resolution feels earned and consistent with the preceding acts.
-        - **Improving consistency with the Book Specification**, double-checking that all elements of the plot outline align with and develop the genre, themes, setting, characters, and premise established in the Book Specification.
-
-        Rewrite the ENTIRE plot outline, ensuring it is well-structured in three acts (Act One: Setup, Act Two: Confrontation, Act Three: Resolution) with clear headings for each act and detailed plot points within each.
-
-        Return ONLY the revised plot outline, without any preamble or concluding remarks.
-        """
-        return prompt_template
+        return self.get_prompt("plot_outline_rewrite_prompt")
 
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/chapter_outline_prompts.py`:
 
 ```````py
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/chapter_outline_prompts.py
 # llm/prompt_manager/chapter_outline_prompts.py
 
 """
@@ -3397,8 +3425,9 @@ from llm.prompt_manager.base_prompts import (
     STRUCTURE_FIX_PROMPT_TEMPLATE,
     CRITIQUE_PROMPT_TEMPLATE,
     REWRITE_PROMPT_TEMPLATE,
-    JSON_OUTPUT_FORMAT_INSTRUCTIONS,
 )
+from core.plot_outline import ChapterOutline  # Import ChapterOutline
+import json  # Import json
 
 
 class ChapterOutlinePrompts:
@@ -3415,118 +3444,63 @@ class ChapterOutlinePrompts:
         Prompt manager is currently not used, but included for potential future use or consistency.
         """
         self.prompt_manager = prompt_manager
+        self.template_env = None
+
+    def get_prompt(self, prompt_name: str) -> str:
+        """
+        Returns the prompt template for generating ChapterOutlines from a PlotOutline.
+        """
+        json_structure = ChapterOutline.model_json_schema()  # Get schema as Python dict
+        template_name = f"{prompt_name}.j2"  # Filename convention: prompt_name.j2
+        template = self.template_env.get_template(
+            template_name
+        )  # Load template from file
+        variables = {"json_structure": json.dumps(json_structure, indent=4)}
+        return template.render(
+            COMMON_INSTRUCTIONS_NOVELIST=COMMON_INSTRUCTIONS_NOVELIST,
+            STRUCTURE_CHECK_INSTRUCTIONS=STRUCTURE_CHECK_INSTRUCTIONS,
+            STRUCTURE_FIX_PROMPT_TEMPLATE=STRUCTURE_FIX_PROMPT_TEMPLATE,
+            CRITIQUE_PROMPT_TEMPLATE=CRITIQUE_PROMPT_TEMPLATE,
+            REWRITE_PROMPT_TEMPLATE=REWRITE_PROMPT_TEMPLATE,
+            json_structure=json.dumps(json_structure, indent=4),
+        )
 
     def create_chapter_outlines_generation_prompt(self) -> str:
         """
         Returns the prompt template for generating ChapterOutlines from a PlotOutline.
         """
-        prompt_template = f"""
-        {COMMON_INSTRUCTIONS_NOVELIST.format(task="create comprehensive chapter outlines based on a 3-act plot outline")}
-
-        Based on the following three-act plot outline, generate exactly {{num_chapters}} detailed chapter outlines. I need precisely {{num_chapters}} chapters, no fewer, no more. Divide the plot events roughly equally across these {{num_chapters}} chapters, ensuring a logical flow and pacing.
-
-        Plot Outline:
-        ```
-        {{plot_outline}}
-        ```
-
-        For each chapter, provide a concise outline (2-3 paragraphs) summarizing the key events and developments that occur within that chapter. The chapter outlines should:
-        - Clearly advance the overall plot as described in the three-act outline.
-        - Maintain the established tone and themes, especially the dark and erotic elements.
-        - Create anticipation for subsequent chapters and maintain reader engagement.
-        - Be numbered sequentially (Chapter 1, Chapter 2, etc.).
-        - **Crucially, for Chapter 1, provide an exposition-focused summary that introduces the main characters, setting, and central conflict as if the reader knows nothing about them. Avoid referring to characters as if they are already known. This chapter should set the stage for the rest of the novel.**
-
-        Ensure the chapter outlines collectively cover the entire plot outline and provide a solid structure for writing the full novel.
-
-        Your response MUST be ONLY the chapter outlines, with each chapter clearly numbered (e.g., "Chapter 1:", "Chapter 2:", etc.) followed by its outline. Do not include any preamble or concluding remarks, just the chapter outlines themselves.
-        """
-        return prompt_template
+        return self.get_prompt("chapter_outlines_generation_prompt")
 
     def create_chapter_outlines_structure_check_prompt(self) -> str:
         """
         Returns the prompt template for checking the structure of ChapterOutlines.
         """
-        prompt_template = f"""
-        {STRUCTURE_CHECK_INSTRUCTIONS}
-
-        Here are the chapter outlines:
-        ```
-        {{content}}
-        ```
-
-        Your task is to ensure that each chapter outline:
-        - Is clearly numbered and sequentially ordered (Chapter 1, Chapter 2, Chapter 3, etc.).
-        - Provides a concise summary of the key events and developments within that chapter.
-        - Clearly advances the overall plot as outlined in the provided 3-act plot outline.
-        - Is approximately 2-3 paragraphs in length.
-
-        If the chapter outlines adhere to the correct structure and numbering, and each provides a relevant summary, respond with 'STRUCTURE_OK'.
-        If there are any structural issues, such as incorrect numbering, missing chapters, summaries that are too short or too long, or outlines that do not clearly relate to the plot outline, provide a detailed explanation of the problems and how to fix them.
-        """
-        return prompt_template
+        return self.get_prompt("chapter_outlines_structure_check_prompt")
 
     def create_chapter_outlines_structure_fix_prompt(self) -> str:
         """
         Returns the prompt template for fixing structural issues in ChapterOutlines.
         """
-        prompt_template = f"""
-        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}", json_structure="")}
-
-        Your task is to modify the chapter outlines to ensure that they are correctly structured and formatted. Specifically:
-        - Ensure each chapter outline is clearly numbered and sequentially ordered (Chapter 1, Chapter 2, Chapter 3, etc.).
-        - Ensure each chapter outline provides a concise and relevant summary of the chapter's events.
-        - Adjust the length of summaries to be approximately 2-3 paragraphs for each chapter.
-        - Verify that all chapter outlines logically follow and advance the provided 3-act plot outline.
-
-        Return ONLY the corrected chapter outlines, with each chapter clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks. The corrected chapter outlines should strictly adhere to the specified numbering and formatting.
-        """
-        return prompt_template
+        return self.get_prompt("chapter_outlines_structure_fix_prompt")
 
     def create_chapter_outlines_critique_prompt(self) -> str:
         """
         Returns the prompt template for generating a critique of ChapterOutlines.
         """
-        prompt_template = f"""
-        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
-
-        Focus your critique on:
-        - **Chapter to Chapter Flow:** Do the chapter outlines flow logically from one to the next, creating a smooth and coherent progression of the story? Are the transitions between chapters effective?
-        - **Pacing and Plot Progression:** Is the pacing appropriate across the chapter outlines? Does each chapter outline advance the plot effectively, building upon previous chapters and setting up future developments?
-        - **Coverage of Plot Outline:** Do the chapter outlines collectively cover all the key plot points from the provided 3-act plot outline? Are there any significant plot points missing or glossed over?
-        - **Chapter Summary Detail and Clarity:** Are the summaries for each chapter sufficiently detailed and clear? Do they provide a good sense of the chapter's main events, character developments, and contributions to the overall story?
-        - **Thematic Consistency:** Do the chapter outlines maintain consistency in tone and themes with the Book Specification and Plot Outline, particularly regarding the dark and erotic elements of the novel?
-        - **Engagement and Intrigue:** Do the chapter outlines, as a set, create a sense of anticipation and engagement? Do they make you want to read the full novel? What are their strongest and weakest points in terms of capturing reader interest?
-        """
-        return prompt_template
+        return self.get_prompt("chapter_outlines_critique_prompt")
 
     def create_chapter_outlines_rewrite_prompt(self) -> str:
         """
         Returns the prompt template for rewriting ChapterOutlines based on critique.
         """
-        prompt_template = f"""
-        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
-
-        When rewriting the chapter outlines, specifically focus on:
-        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised chapter outlines.
-        - **Improving chapter-to-chapter flow and transitions** to create a smoother and more coherent narrative progression. Strengthen the logical connections between consecutive chapters.
-        - **Refining pacing and plot progression** to ensure that the story advances at an engaging and effective rate across the chapters. Adjust the distribution of plot points across chapters as needed.
-        - **Ensuring comprehensive coverage of the Plot Outline**, verifying that all key plot points from the 3-act plot outline are adequately addressed within the chapter outlines. Add detail or expand summaries where necessary to fully incorporate all essential plot elements.
-        - **Enhancing detail and clarity in chapter summaries**, providing richer descriptions of events, character actions, and setting to give a stronger sense of each chapter's content.
-        - **Maintaining thematic consistency** with the Book Specification and Plot Outline. Ensure that the dark and erotic themes are appropriately integrated and consistently present throughout the chapter outlines.
-
-        Rewrite the ENTIRE set of chapter outlines, ensuring each chapter is clearly numbered and provides a detailed and engaging summary that logically advances the plot and maintains thematic consistency.
-
-        Return ONLY the revised set of chapter outlines, with each chapter clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks.
-        """
-        return prompt_template
+        return self.get_prompt("chapter_outlines_rewrite_prompt")
 
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/prompt_manager.py`:
 
 ```````py
-#/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/prompt_manager.py
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/prompt_manager.py
 import logging
 from typing import Dict, Protocol, runtime_checkable
 
@@ -3537,7 +3511,6 @@ from llm.prompt_manager.plot_outline_prompts import PlotOutlinePrompts
 from llm.prompt_manager.chapter_outline_prompts import ChapterOutlinePrompts
 from llm.prompt_manager.scene_outline_prompts import SceneOutlinePrompts
 from llm.prompt_manager.scene_part_prompts import ScenePartPrompts
-
 
 
 @runtime_checkable
@@ -3564,55 +3537,50 @@ class PromptManagerInterface(Protocol):
 
 class DynamicPromptManager(PromptManagerInterface):
     """
-    Manages prompts dynamically, defining them directly in code.
+    Manages prompts dynamically, delegating to specialized prompt classes.
     """
 
     def __init__(self):
         """
-        Initializes the DynamicPromptManager by defining prompts.
+        Initializes the DynamicPromptManager, creating instances of specialized prompt handlers.
         """
-        self.book_spec_prompts = BookSpecPrompts()
-        self.plot_outline_prompts = PlotOutlinePrompts()
-        self.chapter_outline_prompts = ChapterOutlinePrompts()
-        self.scene_outline_prompts = SceneOutlinePrompts()
-        self.scene_part_prompts = ScenePartPrompts()
-
-
+        self.book_spec_prompts = BookSpecPrompts(self)
+        self.plot_outline_prompts = PlotOutlinePrompts(self)
+        self.chapter_outline_prompts = ChapterOutlinePrompts(self)
+        self.scene_outline_prompts = SceneOutlinePrompts(self)
+        self.scene_part_prompts = ScenePartPrompts(self)
 
     def get_prompt(self, prompt_name: str) -> str:
         """
-        Retrieves a prompt by its name.
+        Retrieves a prompt by name, delegating the call to the appropriate specialized prompt handler.
 
         Args:
             prompt_name (str): The name of the prompt to retrieve.
 
         Returns:
-            str: The prompt text. Raises an exception if the prompt is not found.
+            str: The prompt text from the relevant prompt handler.
         """
+        logger.debug(f"Fetching prompt: {prompt_name}")
         if prompt_name.startswith("book_spec"):
-            prompt_text =  getattr(self.book_spec_prompts, f"create_{prompt_name}")()
+            return self.book_spec_prompts.get_prompt(prompt_name)
         elif prompt_name.startswith("plot_outline"):
-            prompt_text = getattr(self.plot_outline_prompts, f"create_{prompt_name}")()
+            return self.plot_outline_prompts.get_prompt(prompt_name)
         elif prompt_name.startswith("chapter_outlines"):
-            prompt_text =  getattr(self.chapter_outline_prompts, f"create_{prompt_name}")()
+            return self.chapter_outline_prompts.get_prompt(prompt_name)
         elif prompt_name.startswith("scene_outlines"):
-            prompt_text = getattr(self.scene_outline_prompts, f"create_{prompt_name}")()
+            return self.scene_outline_prompts.get_prompt(prompt_name)
         elif prompt_name.startswith("scene_part"):
-            prompt_text = getattr(self.scene_part_prompts, f"create_{prompt_name}")()
+            return self.scene_part_prompts.get_prompt(prompt_name)
         else:
-            raise ValueError(f"couldnt find {prompt_name}")
-        
-        if prompt_text:
-            logger.debug("Retrieved prompt: {prompt_name}")
-            return prompt_text
-        else:
-            logger.warning("Prompt not found: {prompt_name}")
-            raise ValueError("Prompt not found: {prompt_name}")
+            logger.error(f"Prompt name not recognized: {prompt_name}")
+            raise ValueError(f"Prompt name not recognized: {prompt_name}")
+
 ```````
 
 `/home/tlh/refactored_gui_fict_fab/llm/prompt_manager/scene_outline_prompts.py`:
 
 ```````py
+# /home/tlh/refactored_gui_fict_fab/llm/prompt_manager/scene_outline_prompts.py
 # llm/prompt_manager/scene_outline_prompts.py
 
 """
@@ -3629,8 +3597,9 @@ from llm.prompt_manager.base_prompts import (
     STRUCTURE_FIX_PROMPT_TEMPLATE,
     CRITIQUE_PROMPT_TEMPLATE,
     REWRITE_PROMPT_TEMPLATE,
-    JSON_OUTPUT_FORMAT_INSTRUCTIONS,
 )
+from core.plot_outline import SceneOutline  # Import SceneOutline
+import json  # Import json
 
 
 class SceneOutlinePrompts:
@@ -3647,110 +3616,56 @@ class SceneOutlinePrompts:
         Prompt manager is currently not used, but included for potential future use or consistency.
         """
         self.prompt_manager = prompt_manager
+        self.template_env = None
+
+    def get_prompt(self, prompt_name: str) -> str:
+        """
+        Returns the prompt template for generating SceneOutlines from a ChapterOutline.
+        """
+        json_structure = SceneOutline.model_json_schema()  # Get schema as Python dict
+        template_name = f"{prompt_name}.j2"  # Filename convention: prompt_name.j2
+        template = self.template_env.get_template(
+            template_name
+        )  # Load template from file
+        variables = {"json_structure": json.dumps(json_structure, indent=4)}
+        return template.render(
+            COMMON_INSTRUCTIONS_NOVELIST=COMMON_INSTRUCTIONS_NOVELIST,
+            STRUCTURE_CHECK_INSTRUCTIONS=STRUCTURE_CHECK_INSTRUCTIONS,
+            STRUCTURE_FIX_PROMPT_TEMPLATE=STRUCTURE_FIX_PROMPT_TEMPLATE,
+            CRITIQUE_PROMPT_TEMPLATE=CRITIQUE_PROMPT_TEMPLATE,
+            REWRITE_PROMPT_TEMPLATE=REWRITE_PROMPT_TEMPLATE,
+            json_structure=json.dumps(json_structure, indent=4),
+        )
 
     def create_scene_outlines_generation_prompt(self) -> str:
         """
         Returns the prompt template for generating SceneOutlines from a ChapterOutline.
         """
-        prompt_template = f"""
-        {COMMON_INSTRUCTIONS_NOVELIST.format(task="break down chapter outlines into comprehensive lists of scene outlines")}
-
-        Based on the following chapter outline, create detailed outlines for {{num_scenes_per_chapter}} scenes within this chapter. Ensure the scenes logically break down the chapter's events and contribute to the overall narrative.
-
-        Chapter Outline:
-        ```
-        {{chapter_outline}}
-        ```
-
-        For each scene, provide a concise outline (1-2 paragraphs) summarizing the key events, setting, characters present, and purpose of the scene within the chapter and overall story. The scene outlines should:
-        - Logically break down the events described in the chapter outline into smaller, manageable scene units.
-        - Detail the setting (location, time of day, atmosphere) and characters involved in each scene.
-        - Clearly indicate the purpose of each scene in advancing the plot, developing characters, enhancing themes, or building suspense (especially regarding dark and erotic themes).
-        - Be numbered sequentially within the chapter (Scene 1, Scene 2, etc.).
-        - Collectively, the scene outlines should comprehensively cover all key events and narrative beats of the chapter outline.
-
-        Your response MUST be ONLY the scene outlines, with each scene clearly numbered (e.g., "Scene 1:", "Scene 2:", etc.) followed by its outline. Do not include any preamble or concluding remarks, just the scene outlines themselves.
-        """
-        return prompt_template
+        return self.get_prompt("scene_outlines_generation_prompt")
 
     def create_scene_outlines_structure_check_prompt(self) -> str:
         """
         Returns the prompt template for checking the structure of SceneOutlines.
         """
-        prompt_template = f"""
-        {STRUCTURE_CHECK_INSTRUCTIONS}
-
-        Here are the scene outlines:
-        ```
-        {{content}}
-        ```
-
-        Your task is to ensure that each scene outline:
-        - Is clearly numbered and sequentially ordered within the chapter (Scene 1, Scene 2, Scene 3, etc.).
-        - Provides a concise summary of the key events, setting, and characters present in the scene.
-        - Clearly indicates the purpose of the scene in advancing the plot, developing characters, or enhancing themes.
-        - Is approximately 1-2 paragraphs in length.
-
-        If the scene outlines adhere to the correct structure, numbering, and each provides a relevant summary and purpose, respond with 'STRUCTURE_OK'.
-        If there are any structural issues, such as incorrect numbering, missing scenes, summaries that are too short or too long, lack of clear purpose, or outlines that do not logically break down the chapter outline, provide a detailed explanation of the problems and how to fix them.
-        """
-        return prompt_template
+        return self.get_prompt("scene_outlines_structure_check_prompt")
 
     def create_scene_outlines_structure_fix_prompt(self) -> str:
         """
         Returns the prompt template for fixing structural issues in SceneOutlines.
         """
-        prompt_template = f"""
-        {STRUCTURE_FIX_PROMPT_TEMPLATE.format(content_with_structure_problems="{{content_with_structure_problems}}", structure_problems="{{structure_problems}}", json_structure="")}
-
-        Your task is to modify the scene outlines to ensure that they are correctly structured and formatted. Specifically:
-        - Ensure each scene outline is clearly numbered and sequentially ordered within the chapter (Scene 1, Scene 2, Scene 3, etc.).
-        - Ensure each scene outline provides a concise summary of the scene's key elements: events, setting, characters, and purpose.
-        - Adjust the length of summaries to be approximately 1-2 paragraphs for each scene.
-        - Verify that all scene outlines logically break down and comprehensively cover the provided chapter outline.
-        - Ensure each scene outline clearly articulates its purpose within the chapter and overall narrative.
-
-        Return ONLY the corrected scene outlines, with each scene clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks. The corrected scene outlines should strictly adhere to the specified numbering and formatting.
-        """
-        return prompt_template
+        return self.get_prompt("scene_outlines_structure_fix_prompt")
 
     def create_scene_outlines_critique_prompt(self) -> str:
         """
         Returns the prompt template for generating a critique of SceneOutlines.
         """
-        prompt_template = f"""
-        {CRITIQUE_PROMPT_TEMPLATE.format(content="{{content}}")}
-
-        Focus your critique on:
-        - **Scene to Scene Flow within Chapter:** Do the scene outlines flow logically within the chapter, creating a coherent and well-paced sequence of events? Are the transitions between scenes effective?
-        - **Contribution to Chapter Objectives:** Does each scene outline clearly contribute to the objectives of the chapter as defined in the chapter outline? Is the purpose of each scene evident and meaningful within the chapter's context?
-        - **Scene Detail and Clarity:** Are the summaries for each scene sufficiently detailed and clear? Do they provide a good sense of the scene's setting, characters' actions, and key events? Is the purpose of each scene clearly articulated?
-        - **Pacing and Dramatic Tension within Chapter:** Does the set of scene outlines create effective pacing and build dramatic tension within the chapter? Are there variations in scene length and intensity to maintain reader engagement?
-        - **Thematic and Tone Consistency:** Do the scene outlines maintain consistency in tone and themes with the Book Specification, Plot Outline, and Chapter Outline, particularly regarding the dark and erotic elements of the novel?
-        - **Overall Effectiveness as Scene Breakdown:** How effective are these scene outlines as a blueprint for writing the actual scenes of the chapter? Do they provide a solid and inspiring foundation for scene writing? What are its strengths and weaknesses in guiding the scene-writing process?
-        """
-        return prompt_template
+        return self.get_prompt("scene_outlines_critique_prompt")
 
     def create_scene_outlines_rewrite_prompt(self) -> str:
         """
         Returns the prompt template for rewriting SceneOutlines based on critique.
         """
-        prompt_template = f"""
-        {REWRITE_PROMPT_TEMPLATE.format(content="{{content}}", critique="{{critique}}")}
-
-        When rewriting the scene outlines, specifically focus on:
-        - **Addressing all points raised in the critique** directly and thoroughly. Ensure that each issue identified by the editor is resolved in the revised scene outlines.
-        - **Improving scene-to-scene flow and transitions within the chapter** to create a smoother and more coherent reading experience. Strengthen the logical connections between scenes and ensure effective transitions.
-        - **Ensuring each scene outline clearly contributes to chapter objectives**, verifying that every scene serves a purpose within the chapter's narrative and overall plot progression. Enhance the articulation of each scene's purpose for greater clarity.
-        - **Adding detail and clarity to scene summaries**, providing richer descriptions of settings, character actions, and key events to give a stronger sense of each scene's content and atmosphere.
-        - **Refining pacing and dramatic tension** across the chapter's scene outlines. Adjust scene lengths, intensity, and placement to optimize pacing and build dramatic tension effectively.
-        - **Maintaining thematic and tone consistency** with the established Book Specification, Plot Outline, and Chapter Outline. Ensure that the dark and erotic themes are appropriately and consistently integrated into the scene outlines.
-
-        Rewrite the ENTIRE set of scene outlines, ensuring each scene is clearly numbered and provides a detailed and purposeful summary that logically contributes to the chapter's objectives and maintains thematic consistency.
-
-        Return ONLY the revised set of scene outlines, with each scene clearly numbered and followed by its revised outline. Do not include any preamble or concluding remarks.
-        """
-        return prompt_template
+        return self.get_prompt("scene_outlines_rewrite_prompt")
 
 ```````
 
@@ -3789,110 +3704,105 @@ of the application.
 
 ```````py
 # llm/llm_client.py
-import json 
-from typing import Optional  
 
-import aiohttp  
+from typing import Optional
 
-from utils.config import config  
+
+import requests  # Import the requests library
+
+from utils.config import config
 from utils.logger import logger
+from openai import (
+    AsyncOpenAI,
+    types,
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+)  # Import error types
 
 
-class OllamaClient:
+class OpenAILLMClient:
     """
-    Client for interacting with a local Ollama instance using aiohttp.
+    Client for interacting with a local OpenAI compatible instance.
     """
 
     def __init__(self, base_url: str = None):
         """
-        Initializes the Ollama client.
+        Initializes the OpenAI client.
         """
-        self.base_url = base_url or config.get_ollama_base_url()
-        logger.debug(
-            "OllamaClient initialized with base_url: %s", self.base_url
-        )  # Lazy formatting
+        self.base_url = base_url or config.get_openai_base_url()
+        self.client = AsyncOpenAI(
+            base_url=self.base_url, api_key="placeholder"
+        )  # Initialize OpenAI client
+        logger.debug("OpenAILLMClient initialized with base_url: %s", self.base_url)
 
     async def list_models(self) -> Optional[list[str]]:
         """
-        Asynchronously fetches the list of available models from the Ollama API.
+        Asynchronously fetches the list of available models from the OpenAI API.
+        Falls back to requests if openai library fails.
         """
-        url = f"{self.base_url}/api/tags"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    model_names = [model["name"] for model in data.get("models", [])]
-                    logger.info(
-                        "Successfully fetched models: %s", model_names
-                    )  # Lazy formatting
-                    return model_names
-        except aiohttp.ClientError as e:  # Catch specific aiohttp ClientError
-            logger.error(
-                "Error fetching model list from Ollama: %s", e
-            )  # Lazy formatting
-            return None
-        except json.JSONDecodeError as e:  # Catch specific json.JSONDecodeError
-            logger.error(
-                "Error decoding JSON response from Ollama: %s", e
-            )  # Lazy formatting
-            return None
-        except (
-            ValueError,
-            TypeError,
-            RuntimeError,
-        ) as e:  # Catch data processing errors
-            logger.error("Error processing model list data: %s", e)  # Lazy formatting
-            logger.exception(e)  # Log full exception details
-            return None
+            response = await self.client.models.list()
+            model_names = [
+                model.id for model in response.data if isinstance(model, types.Model)
+            ]  # Use types.Model
+            logger.info(
+                "Successfully fetched models using openai library: {model_names}"
+            )
+            return model_names
+        except (APIError, APIConnectionError, RateLimitError) as openai_err:
+            logger.warning(
+                f"Error fetching models using openai library: {openai_err}. Trying requests fallback."
+            )
+            try:
+                url = f"{self.base_url}/models"  # Standard models endpoint
+                response = requests.get(url, timeout=0)
+                response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+                data = response.json()
+                # Adjust key based on typical API responses; 'data' or 'models' are common
+                models_data = data.get("data") or data.get("models", [])
+                model_names = [
+                    model["id"]
+                    for model in models_data
+                    if isinstance(model, dict) and "id" in model
+                ]
+                logger.info("Successfully fetched models using requests: {model_names}")
+                return model_names
+            except requests.RequestException as requests_err:
+                logger.error(
+                    "Error fetching models using requests fallback: {requests_err}"
+                )
+                return None
 
     async def generate_text(self, model_name: str, prompt: str) -> Optional[str]:
         """
-        Asynchronously generates text using the Ollama API.
+        Asynchronously generates text using the OpenAI API.
         """
-        url = f"{self.base_url}/api/generate"
-        headers = {"Content-Type": "application/json"}
-        data = {"model": model_name, "prompt": prompt, "stream": False}
-
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url, headers=headers, data=json.dumps(data)
-                ) as response:
-                    response.raise_for_status()
-                    response_data = await response.json()
-                    generated_text = response_data.get("response")
+            response = await self.client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.7,
+                max_tokens=800,
+            )
+            generated_text = response.choices[0].message.content
 
-                    if generated_text:
-                        logger.info(
-                            "Text generated successfully using model '%s'",
-                            model_name,  # Lazy formatting
-                        )
-                        return generated_text
-                    else:
-                        logger.error(
-                            "No 'response' field found in Ollama response: %s",
-                            response_data,  # Lazy formatting
-                        )
-                        return None
+            if generated_text:
+                logger.info("Text generated successfully using model '{model_name}'")
+                return generated_text
+            else:
+                logger.error("No response from OpenAI API")
+                return None
 
-        except aiohttp.ClientError as e:  # Catch specific aiohttp ClientError
-            logger.error("Ollama text generation failed: %s", e)  # Lazy formatting
-            return None
-        except json.JSONDecodeError as e:  # Catch specific json.JSONDecodeError
-            logger.error(
-                "Error decoding JSON response from Ollama: %s", e
-            )  # Lazy formatting
-            return None
         except (
-            ValueError,
-            TypeError,
-            RuntimeError,
-        ) as e:  # Catch data processing errors
-            logger.error(
-                "Error processing text response data: %s", e
-            )  # Lazy formatting
-            logger.exception(e)  # Log full exception details
+            APIError,
+            APIConnectionError,
+            RateLimitError,
+        ) as e:  # Catch specific OpenAI errors
+            logger.error("OpenAI text generation failed: {e}")
             return None
 
 ```````

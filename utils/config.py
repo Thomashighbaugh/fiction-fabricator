@@ -1,4 +1,4 @@
-# /home/tlh/refactored_gui_fict_fab/utils/config.py
+# utils/config.py
 import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict

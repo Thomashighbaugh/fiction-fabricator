@@ -1,4 +1,4 @@
-# /home/tlh/refactored_gui_fict_fab/streamlit_app/components/scene_part_view.py
+# streamlit_app/components/scene_part_view.py
 import streamlit as st
 import asyncio
 from typing import Optional, Dict, List
