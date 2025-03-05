@@ -14,7 +14,7 @@ class Config(BaseSettings):
     """
 
     project_directory: str = "data"
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
     ollama_model_name: str = (
         "huggingface.co/DavidAU/Mistral-MOE-4X7B-Dark-MultiVerse-Uncensored-Enhanced32-24B-gguf:latest"
     )

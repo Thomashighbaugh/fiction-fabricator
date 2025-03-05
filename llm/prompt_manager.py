@@ -1,4 +1,5 @@
 # llm/prompt_manager.py
+# llm/prompt_manager.py
 from core.book_spec import BookSpec
 from utils.logger import logger
 from core.plot_outline import SceneOutline
@@ -208,35 +209,54 @@ class PromptManager:
         Return only valid JSON, without deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
         """
 
-    # Plot Outline Prompts
+        # Plot Outline Prompts
     def create_plot_outline_generation_prompt(self) -> str:
-        """
-        Returns a prompt template for generating a plot outline.
-        """
-        return """
-        You are a world-class story writer who can craft compelling and detailed 3-act plot outlines from book specifications.
-        Create a detailed and compelling three-act plot outline for a novel based on the following book specification.  Ensure a balanced story arc with substantial plot points in each act.
+            """
+            Returns a prompt template for generating a plot outline.
+            """
+            return """
+            You are a world-class story writer who can craft compelling and detailed 3-act plot outlines from book specifications.
+            Create a detailed and compelling three-act plot outline for a novel based on the following book specification.  Ensure a balanced story arc with substantial plot points in each act.
 
-        Book Specification:
-        ```json
-        {book_spec_json}
-        ```
+            Book Specification:
+            ```json
+            {book_spec_json}
+            ```
 
-        **IMPORTANT:** The plot outline you create MUST be directly based on and consistent with the Book Specification provided above.
-        Specifically, ensure the plot outline strongly reflects the:
-        - Genre and Themes
-        - Setting
-        - Premise and Characters defined in the Book Specification.
+            **IMPORTANT:** The plot outline you create MUST be directly based on and consistent with the Book Specification provided above.
+            Specifically, ensure the plot outline strongly reflects the:
+            - Genre and Themes
+            - Setting
+            - Premise and Characters defined in the Book Specification.
 
-        The plot outline MUST be structured in three acts, with roughly 3-5 major plot points described in each act:
-        - **Act One: Setup** - Introduce the characters, setting, and premise from the Book Spec in a captivating way. Establish the initial conflict and the protagonist's primary goals and motivations, all consistent with the Book Spec. Detail at least 3-5 significant plot points that drive the story forward and establish the world as described in the Book Spec. This act should build intrigue and set the stage for the rising action, firmly within the boundaries of the Book Spec.
+            The plot outline MUST be structured in three acts, with roughly 3-5 major plot points described in each act.
+            **Format each act as a bulleted list.**
 
-        - **Act Two: Confrontation** - Develop the central conflict with rising stakes. The protagonist faces significant obstacles and challenges, leading to a major turning point. Explore the dark and erotic themes through specific plot events and character interactions. Detail at least 3-5 major plot points showcasing the escalating conflict, including a midpoint twist or revelation that changes the protagonist's course.
+            - **Act One: Setup**
+            - [Plot Point 1 for Act One]
+            - [Plot Point 2 for Act One]
+            - [Plot Point 3 for Act One]
+            - [Plot Point 4 for Act One]
+            - [Plot Point 5 for Act One]
 
-        - **Act Three: Resolution** - The climax of the story, where the central conflict reaches its peak. The main conflict is resolved, and the protagonist experiences a significant transformation or realization. Address the consequences of the dark and erotic elements explored throughout the novel, leading to thematic closure. Detail at least 3-5 major plot points that lead to the resolution, including the climax itself and the immediate aftermath/denouement. Each point should show clear consequences of previous actions.
+            - **Act Two: Confrontation**
+            - [Plot Point 1 for Act Two]
+            - [Plot Point 2 for Act Two]
+            - [Plot Point 3 for Act Two]
+            - [Plot Point 4 for Act Two]
+            - [Plot Point 5 for Act Two]
 
-        The plot outline should be detailed enough to provide a clear and robust roadmap for writing the novel, with specific and impactful plot points driving significant character developments in each act.  Each act should feel substantial and necessary to the overall narrative. Ensure the outline effectively incorporates and develops the themes from the book specification, avoiding superficial plot points.
-        """
+            - **Act Three: Resolution**
+            - [Plot Point 1 for Act Three]
+            - [Plot Point 2 for Act Three]
+            - [Plot Point 3 for Act Three]
+            - [Plot Point 4 for Act Three]
+            - [Plot Point 5 for Act Three]
+
+            Each plot point should be a concise summary of a key event or development in the story.
+            Ensure that the plot points within each act logically progress the narrative and contribute to the overall story arc.
+            The entire plot outline should be suitable for use as a guide for writing the novel, providing a clear roadmap of the story's progression.
+            """
 
     def create_plot_outline_structure_check_prompt(self) -> str:
         """
@@ -340,16 +360,32 @@ class PromptManager:
         - Deepening the integration of the themes into the plot events and character actions.
         - Checking for pacing and narrative flow, ensuring a compelling and engaging structure.
         - Ensuring the resolution in Act Three is satisfying and thematically resonant with the elements explored in the novel.
-        """
 
+        Maintain the three-act structure and the formatting of the plot outline.
+        """
     # Chapter Outline Prompts
     def create_chapter_outlines_generation_prompt(self) -> str:
         """
-        Returns a prompt template for generating chapter outlines.
+                Returns a prompt template for generating chapter outlines.
+        +       Now generates chapters dynamically based on the plot outline, without a fixed number.
         """
         return """
         You are a world-class story writer who can create comprehensive chapter outlines based on a 3-act plot outline.
-        Based on the following three-act plot outline, generate exactly {num_chapters} detailed chapter outlines. I need precisely {num_chapters} chapters, no fewer, no more. Divide the plot events roughly equally across these {num_chapters} chapters, ensuring a logical flow and pacing.
+        Based on the following three-act plot outline, generate detailed chapter outlines.  The number of chapters should be appropriate to logically break down the plot outline provided.
+
+        Format your response as follows, with each chapter clearly marked:
+
+        Chapter 1: [Chapter Title]
+        [Detailed outline for chapter 1 - 2-3 paragraphs]
+
+        Chapter 2: [Chapter Title]
+        [Detailed outline for chapter 2 - 3 paragraphs]
+
+        ...
+
+        Chapter N: [Chapter Title]
+        [Detailed outline for chapter N - 2-3 paragraphs]
+
 
         Plot Outline:
         ```
@@ -363,7 +399,7 @@ class PromptManager:
         - Be numbered sequentially (Chapter 1, Chapter 2, etc.).
         - **Crucially, for Chapter 1, provide an exposition-focused summary that introduces the main characters, setting, and central conflict as if the reader knows nothing about them. Avoid referring to characters as if they are already known. This chapter should set the stage for the rest of the novel.**
 
-        Ensure the chapter outlines collectively cover the entire plot outline and provide a solid structure for writing the full novel.
+        Ensure the chapter outlines collectively cover the entire plot outline and provide a solid structure for writing the full novel. Generate a reasonable number of chapters that appropriately divide the provided plot outline.
         """
 
     def create_chapter_outlines_structure_check_prompt(self) -> str:
