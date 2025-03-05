@@ -1,4 +1,4 @@
-# fiction_fabricator/src/utils/logger.py
+# /home/tlh/gui-fab-fict/utils/logger.py
 import logging
 import sys
 

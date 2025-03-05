@@ -1,5 +1,7 @@
 # streamlit_app.py
+
 import random
+import re
 import os
 import asyncio
 
@@ -22,37 +24,20 @@ def main():
     """
     st.title("Fiction Fabricator")
 
-    # Initialize Ollama client and prompt manager (once, outside model change logic)
+    # Initialize session state variables
     if "ollama_client" not in st.session_state:
-        st.session_state.ollama_client = OllamaClient(
-            timeout=None
-        )  # Option 1: No timeout
+        st.session_state.ollama_client = OllamaClient(timeout=None)
     if "prompt_manager" not in st.session_state:
         st.session_state.prompt_manager = PromptManager()
-
-    # Initialize selected_model from config or session state
     if "selected_model" not in st.session_state:
         st.session_state.selected_model = config.get_ollama_model_name()
-    logger.debug(
-        f"Initial st.session_state.selected_model: {st.session_state.selected_model}"
-    )
-    # Initialize  ContentGenerator based on selected_model
-    # and ensure they are recreated only when the model changes
     if (
         "content_generator" not in st.session_state
         or st.session_state.get("content_generator") is None
     ):
-        logger.debug(
-            f"Re-initializing clients with model: {st.session_state.selected_model}"
-        )
         st.session_state.content_generator = ContentGenerator(
             st.session_state.prompt_manager, st.session_state.selected_model
         )
-    else:
-        logger.debug(
-            "Clients already initialized and model not changed, skipping re-initialization."
-        )
-
     if "project_manager" not in st.session_state:
         st.session_state.project_manager = project_manager.ProjectManager()
     if "available_models" not in st.session_state:
@@ -64,7 +49,7 @@ def main():
     if "book_spec" not in st.session_state:
         st.session_state.book_spec = None
     if "plot_outline" not in st.session_state:
-        st.session_state.plot_outline = None
+        st.session_state.plot_outline = PlotOutline()
     if "chapter_outlines" not in st.session_state:
         st.session_state.chapter_outlines = []
     if "scene_outlines" not in st.session_state:
@@ -77,22 +62,28 @@ def main():
         st.session_state.num_chapters = 10
     if "max_scenes_per_chapter" not in st.session_state:
         st.session_state.max_scenes_per_chapter = 3
+    if "current_chapter_index" not in st.session_state:
+        st.session_state.current_chapter_index = 0
+    if "initialized" not in st.session_state:
+        st.session_state.initialized = True
 
-    if "project_manager" not in st.session_state:
-        st.session_state.project_manager = project_manager.ProjectManager()
+    # Initialize act_one_text, act_two_text, and act_three_text here
+    if "act_one_text" not in st.session_state:
+        st.session_state.act_one_text = ""
+    if "act_two_text" not in st.session_state:
+        st.session_state.act_two_text = ""
+    if "act_three_text" not in st.session_state:
+        st.session_state.act_three_text = ""
 
-    # --- Sidebar for Settings and Project Management ---
+    # --- Sidebar ---
     with st.sidebar:
         st.header("Settings & Project")
-
-        # Model Selection
         model_options = st.session_state.available_models
         if not model_options:
             st.warning(
                 "No models found on local Ollama instance. Ensure Ollama is running and models are pulled."
             )
             model_options = [st.session_state.selected_model]
-
         selected_model_index = (
             model_options.index(st.session_state.selected_model)
             if st.session_state.selected_model in model_options
@@ -104,126 +95,59 @@ def main():
             index=selected_model_index,
             key="model_selectbox",
         )
-
         if st.button("Change Model"):
-            new_model_name = st.session_state.model_selectbox
-            logger.debug(
-                f"Change Model button clicked - model_selectbox value: {new_model_name}"
-            )
-            st.session_state.selected_model = new_model_name
-            logger.debug(
-                f"st.session_state.selected_model updated to: {st.session_state.selected_model}"
-            )
-
-            # Re-initialize  ContentGenerator with the new model
+            st.session_state.selected_model = st.session_state.model_selectbox
             st.session_state.content_generator = ContentGenerator(
                 st.session_state.prompt_manager, st.session_state.selected_model
             )
-            logger.debug(
-                f"Re-initialized clients with model: {st.session_state.selected_model}"
-            )
-            st.rerun()  # Force rerun to apply changes
-
+            st.rerun()
         st.write(f"**Selected Model:** `{st.session_state.selected_model}`")
-
         st.sidebar.subheader("Project Management")
-
-        # Project Selection
         project_dir = config.get_project_directory()
         project_files = [f[:-5] for f in os.listdir(project_dir) if f.endswith(".json")]
         project_options = ["New Project"] + project_files
         selected_project = st.selectbox("Select Project", project_options)
-
-        new_project_name = ""
-        if selected_project == "New Project":
-            new_project_name = st.text_input(
-                "New Project Name", value=st.session_state.project_name
-            )
-            project_name = new_project_name
-        else:
-            project_name = selected_project
-
-        st.session_state.project_name = st.text_input(
-            "Project Name", value=project_name
+        project_name = st.text_input(
+            "Project Name",
+            value=(
+                st.session_state.project_name
+                if selected_project != "New Project"
+                else ""
+            ),
         )
-
+        st.session_state.project_name = project_name
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Save Project"):
                 if st.session_state.project_name:
-                    try:
-                        st.session_state.project_manager.save_project(
-                            st.session_state.project_name,
-                            st.session_state.story_idea,
-                            st.session_state.book_spec,
-                            st.session_state.plot_outline,
-                            st.session_state.chapter_outlines,
-                            st.session_state.scene_outlines,
-                            st.session_state.scene_parts,
-                        )
-                        st.success(f"Project '{st.session_state.project_name}' saved!")
-                    except (IOError, ValueError, ValidationError) as e:
-                        st.error(f"Error saving project: {e}")
+                    st.session_state.project_manager.save_project(**st.session_state)
+                    st.success(f"Project '{st.session_state.project_name}' saved!")
                 else:
                     st.warning("Please enter a project name to save.")
         with col2:
             if st.button("Load Project"):
                 if st.session_state.project_name:
-                    try:
-                        loaded_data = st.session_state.project_manager.load_project(
-                            st.session_state.project_name
+                    loaded_data = st.session_state.project_manager.load_project(
+                        st.session_state.project_name
+                    )
+                    if loaded_data:
+                        for key, value in loaded_data.items():
+                            st.session_state[key] = value
+                        st.session_state.plot_outline = PlotOutline(
+                            **loaded_data.get("plot_outline", {})
                         )
-                        if loaded_data:
-                            # Convert loaded data to proper objects
-                            st.session_state.book_spec = (
-                                BookSpec(**loaded_data["book_spec"])
-                                if loaded_data.get("book_spec")
-                                else None
-                            )
-                            st.session_state.plot_outline = (
-                                PlotOutline(**loaded_data["plot_outline"])
-                                if loaded_data.get("plot_outline")
-                                else None
-                            )
-                            st.session_state.chapter_outlines = [
-                                ChapterOutline(**co)
-                                for co in (loaded_data.get("chapter_outlines") or [])
-                            ]
-                            scene_outlines_data = loaded_data.get("scene_outlines", {})
-                            st.session_state.scene_outlines = {
-                                int(chapter_num): [
-                                    SceneOutline(**so) for so in scene_outlines
-                                ]
-                                for chapter_num, scene_outlines in (
-                                    scene_outlines_data or {}
-                                ).items()
-                            }
-                            st.session_state.scene_parts = loaded_data.get(
-                                "scene_parts", {}
-                            )
-                            st.session_state.story_idea = loaded_data.get(
-                                "story_idea", ""
-                            )
-                            st.success(
-                                f"Project '{st.session_state.project_name}' loaded!"
-                            )
-                        else:
-                            st.warning(
-                                f"No project data loaded for '{st.session_state.project_name}'."
-                            )
-                    except FileNotFoundError:
-                        st.error(
-                            f"Project file '{st.session_state.project_name}.json' not found."
+                        st.success(f"Project '{st.session_state.project_name}' loaded!")
+                    else:
+                        st.warning(
+                            f"No project data loaded for '{st.session_state.project_name}'."
                         )
-                    except (IOError, ValueError, ValidationError) as e:
-                        st.error(f"Error loading project: {e}")
                 else:
                     st.warning("Please enter a project name to load.")
 
-    # --- Main Panel for Content Generation Workflow ---
+    # --- Main Panel ---
     st.header("Novel Generation Workflow")
 
-    # 1. Story Idea Input
+    # 1. Story Idea
     st.subheader("1. Story Idea")
     st.session_state.story_idea = st.text_area(
         "Enter your story idea:", value=st.session_state.story_idea, height=100
@@ -232,11 +156,6 @@ def main():
         "Generate Book Specification", disabled=not st.session_state.story_idea
     ):
         with st.spinner("Generating Book Specification..."):
-            st.session_state.prompt_manager.book_spec = None
-            if st.session_state.book_spec:
-                st.session_state.prompt_manager.book_spec = BookSpec(
-                    **st.session_state.book_spec.model_dump()
-                )
             st.session_state.book_spec = asyncio.run(
                 st.session_state.content_generator.generate_book_spec(
                     st.session_state.story_idea
@@ -244,10 +163,12 @@ def main():
             )
         if st.session_state.book_spec:
             st.success("Book Specification Generated!")
+            if st.session_state.project_name:
+                st.session_state.project_manager.save_project(**st.session_state)
         else:
             st.error("Failed to generate Book Specification.")
 
-    # 2. Book Specification Display and Edit
+    # 2. Book Specification
     if st.session_state.book_spec:
         st.subheader("2. Book Specification")
         with st.form("book_spec_form"):
@@ -304,50 +225,58 @@ def main():
                     ]
                     st.session_state.book_spec.premise = premise
                     st.success("Book Specification Saved!")
+                    if st.session_state.project_name:
+                        st.session_state.project_manager.save_project(
+                            **st.session_state
+                        )
 
             with col2:
+                if st.form_submit_button("Enhance Book Specification"):
 
-                async def enhance_book_spec_callback():
-                    with st.spinner("Enhancing Book Specification..."):
-                        enhanced_spec = (
-                            await st.session_state.content_generator.enhance_book_spec(
+                    async def enhance_book_spec_callback():
+                        with st.spinner("Enhancing Book Specification..."):
+                            enhanced_spec = await st.session_state.content_generator.enhance_book_spec(
                                 st.session_state.book_spec
                             )
-                        )
-                        if enhanced_spec:
-                            if isinstance(enhanced_spec.characters, list):
-                                st.session_state.book_spec.characters = [
-                                    (
-                                        item.get("name", "")
-                                        if isinstance(item, dict)
-                                        else str(item)
+                            if enhanced_spec:
+                                if isinstance(enhanced_spec.characters, list):
+                                    st.session_state.book_spec.characters = [
+                                        (
+                                            item.get("name", "")
+                                            if isinstance(item, dict)
+                                            else str(item)
+                                        )
+                                        for item in enhanced_spec.characters
+                                    ]
+                                else:
+                                    st.session_state.book_spec.characters = [
+                                        str(enhanced_spec.characters)
+                                    ]
+
+                                st.session_state.book_spec.title = enhanced_spec.title
+                                st.session_state.book_spec.genre = enhanced_spec.genre
+                                st.session_state.book_spec.setting = (
+                                    enhanced_spec.setting
+                                )
+                                st.session_state.book_spec.themes = enhanced_spec.themes
+                                st.session_state.book_spec.tone = enhanced_spec.tone
+                                st.session_state.book_spec.point_of_view = (
+                                    enhanced_spec.point_of_view
+                                )
+                                st.session_state.book_spec.premise = (
+                                    enhanced_spec.premise
+                                )
+
+                                st.success("Book Specification Enhanced!")
+                                if st.session_state.project_name:
+                                    st.session_state.project_manager.save_project(
+                                        **st.session_state
                                     )
-                                    for item in enhanced_spec.characters
-                                ]
+
                             else:
-                                # Handle cases where enhanced_spec.characters is not a list
-                                st.session_state.book_spec.characters = [
-                                    str(enhanced_spec.characters)
-                                ]
+                                st.error("Failed to enhance Book Specification.")
 
-                            st.session_state.book_spec.title = enhanced_spec.title
-                            st.session_state.book_spec.genre = enhanced_spec.genre
-                            st.session_state.book_spec.setting = enhanced_spec.setting
-                            st.session_state.book_spec.themes = enhanced_spec.themes
-                            st.session_state.book_spec.tone = enhanced_spec.tone
-                            st.session_state.book_spec.point_of_view = (
-                                enhanced_spec.point_of_view
-                            )
-                            st.session_state.book_spec.premise = enhanced_spec.premise
-
-                            st.success("Book Specification Enhanced!")
-                        else:
-                            st.error("Failed to enhance Book Specification.")
-
-                if st.form_submit_button(
-                    "Enhance Book Specification", on_click=enhance_book_spec_callback
-                ):
-                    pass  # button callback is now handled by enhance_book_spec_callback
+                    asyncio.run(enhance_book_spec_callback())
 
         if st.session_state.book_spec:
             st.json(st.session_state.book_spec.model_dump())
@@ -356,45 +285,150 @@ def main():
                 "No Book Specification to display. Generate one using the Story Idea form."
             )
 
-    # 3. Plot Outline Generation and Edit
+        # 3. Plot Outline Generation and Edit
     if st.session_state.book_spec:
         st.subheader("3. Plot Outline")
-        if st.button(
-            "Generate Plot Outline", disabled=st.session_state.plot_outline is not None
-        ):
+
+        # --- Generate Plot Outline Button and Confirmation (NOW FIRST) ---
+        # Check if any manual input exists.
+        manual_input_exists = bool(
+            st.session_state.act_one_text.strip()
+            or st.session_state.act_two_text.strip()
+            or st.session_state.act_three_text.strip()
+        )
+
+        # Check if a generated plot outline exists.
+        generated_outline_exists = bool(
+            st.session_state.plot_outline
+            and (
+                st.session_state.plot_outline.act_one
+                or st.session_state.plot_outline.act_two
+                or st.session_state.plot_outline.act_three
+            )
+        )
+
+        # Disable the button if manual input is present, *unless* a generated outline *also* exists.
+        button_disabled = manual_input_exists and not generated_outline_exists
+
+        if st.button("Generate Plot Outline", disabled=button_disabled):
+            # Confirmation Check. Only appears IF a plot outline exists (either manual or generated)
+            if st.session_state.plot_outline and (
+                st.session_state.plot_outline.act_one
+                or st.session_state.plot_outline.act_two
+                or st.session_state.plot_outline.act_three
+            ):
+                if not st.checkbox(
+                    "Overwrite existing Plot Outline?", key="confirm_plot_overwrite"
+                ):
+                    st.warning("Please confirm to overwrite the existing plot outline.")
+                    st.stop()  # Stop execution if not confirmed
+
+            # Proceed with generation (clearing any existing data)
             with st.spinner("Generating Plot Outline..."):
+                st.session_state.plot_outline = (
+                    PlotOutline()
+                )  # Clear existing plot outline.  Important!
                 st.session_state.plot_outline = asyncio.run(
                     st.session_state.content_generator.generate_plot_outline(
                         st.session_state.book_spec
                     )
                 )
+
             if st.session_state.plot_outline:
                 st.success("Plot Outline Generated!")
+                if st.session_state.project_name:
+                    st.session_state.project_manager.save_project(**st.session_state)
+                    st.success(f"Project '{st.session_state.project_name}' saved!")
             else:
                 st.error("Failed to generate Plot Outline.")
 
+        # --- Act Outline Input Text Areas ---
+        st.subheader("Act Outlines (Manual Input)")
+        st.session_state.act_one_text = st.text_area(
+            "Act One Plot Points",
+            value="\n".join(st.session_state.plot_outline.act_one),
+            height=150,
+            key="act_one_input",
+        )
+        st.session_state.act_two_text = st.text_area(
+            "Act Two Plot Points",
+            value="\n".join(st.session_state.plot_outline.act_two),
+            height=150,
+            key="act_two_input",
+        )
+        st.session_state.act_three_text = st.text_area(
+            "Act Three Plot Points",
+            value="\n".join(st.session_state.plot_outline.act_three),
+            height=150,
+            key="act_three_input",
+        )
+
+        # --- Submit Buttons for Act Outlines ---
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("Submit Act One", key="submit_act_one"):
+                st.session_state.plot_outline.act_one = [
+                    p.strip()
+                    for p in st.session_state.act_one_text.splitlines()
+                    if p.strip()
+                ]
+                if st.session_state.project_name:
+                    st.session_state.project_manager.save_project(**st.session_state)
+        with col2:
+            if st.button("Submit Act Two", key="submit_act_two"):
+                st.session_state.plot_outline.act_two = [
+                    p.strip()
+                    for p in st.session_state.act_two_text.splitlines()
+                    if p.strip()
+                ]
+                if st.session_state.project_name:
+                    st.session_state.project_manager.save_project(**st.session_state)
+        with col3:
+            if st.button("Submit Act Three", key="submit_act_three"):
+                st.session_state.plot_outline.act_three = [
+                    p.strip()
+                    for p in st.session_state.act_three_text.splitlines()
+                    if p.strip()
+                ]
+                if st.session_state.project_name:
+                    st.session_state.project_manager.save_project(**st.session_state)
+
         if st.session_state.plot_outline:
-            with st.form("plot_outline_form"):
-                st.session_state.plot_outline.act_one = st.text_area(
-                    "Act One: Setup",
-                    st.session_state.plot_outline.act_one,
-                    height=150,
-                )
-                st.session_state.plot_outline.act_two = st.text_area(
-                    "Act Two: Confrontation",
-                    st.session_state.plot_outline.act_two,
-                    height=200,
-                )
-                st.session_state.plot_outline.act_three = st.text_area(
-                    "Act Three: Resolution",
-                    st.session_state.plot_outline.act_three,
-                    height=150,
-                )
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    if st.form_submit_button("Save Plot Outline"):
-                        st.success("Plot Outline Saved!")
-                with col2:
+            st.write("Plot Outline:")
+
+            # Display plot outline acts and points (non-editable - unchanged)
+            def format_plot_points(act_points):
+                formatted_points = []
+                for point in act_points:
+                    cleaned_point = re.sub(r"^\d+\.\s*", "", point.strip())
+                    if cleaned_point and not cleaned_point.startswith(
+                        ("**", "Plot Outline:", "Act ")
+                    ):
+                        formatted_points.append(cleaned_point)
+                return formatted_points
+
+            st.write("**Act One: Setup**")
+            for point in format_plot_points(st.session_state.plot_outline.act_one):
+                st.markdown(f"- {point}")
+
+            st.write("**Act Two: Confrontation**")
+            for point in format_plot_points(st.session_state.plot_outline.act_two):
+                st.markdown(f"- {point}")
+
+            st.write("**Act Three: Resolution**")
+            for point in format_plot_points(st.session_state.plot_outline.act_three):
+                st.markdown(f"- {point}")
+
+            # --- Enhance and Generate Chapters Buttons (Placed Below Plot Outline) ---
+            col_enhance_chapter, col_generate_chapter = st.columns(
+                2
+            )  # Two columns for buttons
+            with col_enhance_chapter:
+                if st.button(
+                    "Enhance Plot Outline",
+                    key="enhance_plot_button",
+                    disabled=not st.session_state.plot_outline,
+                ):
 
                     async def enhance_plot_outline_callback():
                         with st.spinner("Enhancing Plot Outline..."):
@@ -402,60 +436,128 @@ def main():
                                 "\n".join(
                                     [
                                         "Act One:\n"
-                                        + st.session_state.plot_outline.act_one,
+                                        + "\n".join(
+                                            st.session_state.plot_outline.act_one
+                                        ),
                                         "Act Two:\n"
-                                        + st.session_state.plot_outline.act_two,
+                                        + "\n".join(
+                                            st.session_state.plot_outline.act_two
+                                        ),
                                         "Act Three:\n"
-                                        + st.session_state.plot_outline.act_three,
+                                        + "\n".join(
+                                            st.session_state.plot_outline.act_three
+                                        ),
                                     ]
                                 )
                             )
                             if enhanced_outline_raw:
-                                st.session_state.plot_outline = enhanced_outline_raw
+                                updated_plot_outline = PlotOutline(
+                                    act_one=[], act_two=[], act_three=[]
+                                )
+                                acts = enhanced_outline_raw.split("Act ")
+                                if len(acts) >= 4:
+                                    updated_plot_outline.act_one = [
+                                        txt.strip()
+                                        for txt in acts[1]
+                                        .split("Act")[0]
+                                        .strip()
+                                        .split("\n")
+                                        if txt.strip()
+                                    ]
+                                    updated_plot_outline.act_two = [
+                                        txt.strip()
+                                        for txt in acts[2]
+                                        .split("Act")[0]
+                                        .strip()
+                                        .split("\n")
+                                        if txt.strip()
+                                    ]
+                                    updated_plot_outline.act_three = [
+                                        txt.strip()
+                                        for txt in acts[3].strip().split("\n")
+                                        if txt.strip()
+                                    ]
+                                st.session_state.plot_outline = updated_plot_outline
+                                if st.session_state.project_name:
+                                    st.session_state.project_manager.save_project(
+                                        **st.session_state
+                                    )  # Autosave after enhance
                                 st.success("Plot Outline Enhanced!")
                             else:
                                 st.error("Failed to enhance Plot Outline.")
 
-                    if st.form_submit_button(
-                        "Enhance Plot Outline", on_click=enhance_plot_outline_callback
+                    asyncio.run(enhance_plot_outline_callback())
+
+            with col_generate_chapter:  # Corrected placement
+                if st.button(
+                    "Generate Chapter Outlines",
+                    key="generate_chapter_button",
+                    disabled=not st.session_state.plot_outline,
+                ):
+                    with st.spinner(
+                        f"Generating Chapter Outlines... based on plot points"
                     ):
-                        pass
-
-            st.write("Plot Outline:")
-            st.text(
-                f"Act One: {st.session_state.plot_outline.act_one}\n\n"
-                f"Act Two: {st.session_state.plot_outline.act_two}\n\n"
-                f"Act Three: {st.session_state.plot_outline.act_three}"
-            )
-
+                        st.session_state.chapter_outlines = asyncio.run(
+                            st.session_state.content_generator.generate_chapter_outlines(
+                                st.session_state.plot_outline
+                            )
+                        )
+                    if st.session_state.chapter_outlines:
+                        st.success(
+                            f"Chapter Outlines Generated for {len(st.session_state.chapter_outlines)} chapters!"
+                        )
+                        if st.session_state.project_name:
+                            st.session_state.project_manager.save_project(
+                                **st.session_state
+                            )
+                    else:
+                        st.error("Failed to generate Chapter Outlines")
     # 4. Chapter Outline Generation and Edit
     if st.session_state.plot_outline:
         st.subheader("4. Chapter Outlines")
-        num_chapters_input = st.number_input(
-            "Number of Chapters:",
-            min_value=3,
-            max_value=50,
-            value=st.session_state.num_chapters,
-            step=1,
-        )
-        st.session_state.num_chapters = int(num_chapters_input)
-        if st.button(
-            "Generate Chapter Outlines",
-            disabled=st.session_state.chapter_outlines is not None
-            and len(st.session_state.chapter_outlines) > 0,
-        ):
-            with st.spinner("Generating Chapter Outlines..."):
-                st.session_state.chapter_outlines = asyncio.run(
-                    st.session_state.content_generator.generate_chapter_outlines(
-                        st.session_state.plot_outline, st.session_state.num_chapters
+
+        if st.session_state.chapter_outlines:
+            confirm_chapter_overwrite = st.checkbox(
+                "Overwrite existing chapter outlines?",
+                value=False,
+                key="confirm_chapter_overwrite",
+            )
+        else:
+            confirm_chapter_overwrite = True
+
+        if confirm_chapter_overwrite:
+            if st.button("Generate Chapter Outlines"):
+                if st.session_state.chapter_outlines:
+                    st.session_state.chapter_outlines = []
+                with st.spinner("Generating Chapter Outlines..."):
+                    st.session_state.chapter_outlines = asyncio.run(
+                        st.session_state.content_generator.generate_chapter_outlines(
+                            st.session_state.plot_outline
+                        )
                     )
-                )
-            if st.session_state.chapter_outlines:
-                st.success(
-                    f"Chapter Outlines Generated for {len(st.session_state.chapter_outlines)} chapters!"
-                )
-            else:
-                st.error("Failed to generate Chapter Outlines.")
+                if st.session_state.chapter_outlines:
+                    st.success(
+                        f"Chapter Outlines Generated for {len(st.session_state.chapter_outlines)} chapters!"
+                    )
+                    if st.session_state.project_name:  # Auto-save after generation
+                        st.session_state.project_manager.save_project(
+                            st.session_state.project_name,
+                            st.session_state.story_idea,
+                            st.session_state.book_spec,
+                            st.session_state.plot_outline,
+                            st.session_state.chapter_outlines,
+                            st.session_state.scene_outlines,
+                            st.session_state.scene_parts,
+                        )
+                        st.success(
+                            f"Project '{st.session_state.project_name}' saved!"
+                        )  # provide feedback of auto-save
+                else:
+                    st.error("Failed to generate Chapter Outlines.")
+        else:
+            st.info(
+                "Please confirm you wish to overwrite existing chapter outlines to proceed."
+            )
 
         # Display, Edit and Enhance Chapter Outlines
         if st.session_state.chapter_outlines:
@@ -480,33 +582,59 @@ def main():
                     if st.form_submit_button("Save Chapter Outlines"):
                         st.session_state.chapter_outlines = edited_chapter_outlines
                         st.success("Chapter Outlines Saved!")
+                        if st.session_state.project_name:  # Auto-save after edit
+                            st.session_state.project_manager.save_project(
+                                st.session_state.project_name,
+                                st.session_state.story_idea,
+                                st.session_state.book_spec,
+                                st.session_state.plot_outline,
+                                st.session_state.chapter_outlines,
+                                st.session_state.scene_outlines,
+                                st.session_state.scene_parts,
+                            )
+                            st.success(
+                                f"Project '{st.session_state.project_name}' saved!"
+                            )  # provide feedback of auto-save
                 with col2:
 
-                    async def enhance_chapter_outlines_callback():
-                        with st.spinner("Enhancing Chapter Outlines..."):
-                            enhanced_chapter_outlines = await st.session_state.content_generator.enhance_chapter_outlines(
-                                edited_chapter_outlines
-                            )
-                        if enhanced_chapter_outlines:
-                            st.session_state.chapter_outlines = (
-                                enhanced_chapter_outlines
-                            )
-                            st.success("Chapter Outlines Enhanced!")
-                        else:
-                            st.error("Failed to enhance Chapter Outlines.")
+                    if st.form_submit_button("Enhance Chapter Outlines"):
 
-                    if st.form_submit_button(
-                        "Enhance Chapter Outlines",
-                        on_click=enhance_chapter_outlines_callback,
-                    ):
-                        pass
+                        async def enhance_chapter_outlines_callback():
+                            with st.spinner("Enhancing Chapter Outlines..."):
+                                enhanced_chapter_outlines = await st.session_state.content_generator.enhance_chapter_outlines(
+                                    edited_chapter_outlines
+                                )
+                                if enhanced_chapter_outlines:
+                                    st.session_state.chapter_outlines = (
+                                        enhanced_chapter_outlines
+                                    )
+                                    st.success("Chapter Outlines Enhanced!")
+                                    if (
+                                        st.session_state.project_name
+                                    ):  # Auto-save after enhance
+                                        st.session_state.project_manager.save_project(
+                                            st.session_state.project_name,
+                                            st.session_state.story_idea,
+                                            st.session_state.book_spec,
+                                            st.session_state.plot_outline,
+                                            st.session_state.chapter_outlines,
+                                            st.session_state.scene_outlines,
+                                            st.session_state.scene_parts,
+                                        )
+                                        st.success(
+                                            f"Project '{st.session_state.project_name}' saved!"
+                                        )  # provide feedback of auto-save
+                                else:
+                                    st.error("Failed to enhance Chapter Outlines.")
+
+                        asyncio.run(enhance_chapter_outlines_callback())
 
             # Display Chapter Outlines outside the form
             for chapter_outline in st.session_state.chapter_outlines:
                 st.markdown(f"**Chapter {chapter_outline.chapter_number}:**")
                 st.write(chapter_outline.summary)
 
-    # 5. Scene Outline Generation and Edit
+    # 5. Scene Outline Generation and Edit - CHAPTER BY CHAPTER
     if st.session_state.chapter_outlines and len(st.session_state.chapter_outlines) > 0:
         st.subheader("5. Scene Outlines")
         max_scenes_input = st.number_input(
@@ -518,91 +646,150 @@ def main():
         )
         st.session_state.max_scenes_per_chapter = int(max_scenes_input)
 
+        chapter_options = [
+            f"Chapter {co.chapter_number}" for co in st.session_state.chapter_outlines
+        ]
+        st.session_state.current_chapter_index = st.selectbox(
+            "Select Chapter for Scene Outlines:",
+            options=range(len(chapter_options)),  # Use index for easier access
+            format_func=lambda index: chapter_options[index],  # Display Chapter name
+        )
+        selected_chapter_outline = st.session_state.chapter_outlines[
+            st.session_state.current_chapter_index
+        ]
+
         if st.button(
-            "Generate Scene Outlines (All Chapters)",
-            disabled=st.session_state.scene_outlines is not None
-            and len(st.session_state.scene_outlines) > 0,
-        ):
-            with st.spinner("Generating Scene Outlines for All Chapters..."):
-                st.session_state.scene_outlines = {}
-                for chapter_outline in st.session_state.chapter_outlines:
-                    num_scenes = random.randint(
-                        2, st.session_state.max_scenes_per_chapter
+            f"Generate Scene Outlines for {chapter_options[st.session_state.current_chapter_index]}",
+            disabled=st.session_state.scene_outlines.get(
+                selected_chapter_outline.chapter_number
+            ),
+        ):  # Disable if scenes already exist for chapter
+            with st.spinner(
+                f"Generating Scene Outlines for {chapter_options[st.session_state.current_chapter_index]}..."
+            ):
+                num_scenes = random.randint(2, st.session_state.max_scenes_per_chapter)
+                scene_outlines = asyncio.run(
+                    st.session_state.content_generator.generate_scene_outlines(
+                        selected_chapter_outline, num_scenes
                     )
-                    scene_outlines = asyncio.run(
-                        st.session_state.content_generator.generate_scene_outlines(
-                            chapter_outline, num_scenes
-                        )
-                    )
-                    if scene_outlines:
-                        st.session_state.scene_outlines[
-                            chapter_outline.chapter_number
-                        ] = scene_outlines
-                st.success(
-                    f"Scene Outlines Generated for All Chapters with random number of scenes between 2 and {st.session_state.max_scenes_per_chapter}!"
                 )
-
-        # Display and Edit Scene Outlines
-        if st.session_state.scene_outlines:
-            for (
-                chapter_number,
-                scene_outlines,
-            ) in st.session_state.scene_outlines.items():
-                with st.form(f"scene_outlines_chapter_{chapter_number}_form"):
-                    st.markdown(f"**Chapter {chapter_number}**")
-                    edited_scene_outlines = []
-                    for i, scene_outline in enumerate(scene_outlines):
-                        edited_summary = st.text_area(
-                            f"Scene {i + 1} Outline",
-                            scene_outline.summary,
-                            height=80,
-                            key=f"scene_{chapter_number}_{i}_outline",
+                if scene_outlines:
+                    st.session_state.scene_outlines[
+                        selected_chapter_outline.chapter_number
+                    ] = scene_outlines
+                    st.success(
+                        f"Scene Outlines Generated for {chapter_options[st.session_state.current_chapter_index]}!"
+                    )
+                    if st.session_state.project_name:  # Auto-save after generation
+                        st.session_state.project_manager.save_project(
+                            st.session_state.project_name,
+                            st.session_state.story_idea,
+                            st.session_state.book_spec,
+                            st.session_state.plot_outline,
+                            st.session_state.chapter_outlines,
+                            st.session_state.scene_outlines,
+                            st.session_state.scene_parts,
                         )
-                        edited_scene_outlines.append(
-                            SceneOutline(scene_number=i + 1, summary=edited_summary)
-                        )
+                        st.success(
+                            f"Project '{st.session_state.project_name}' saved!"
+                        )  # provide feedback of auto-save
+                else:
+                    st.error(
+                        f"Failed to generate Scene Outlines for {chapter_options[st.session_state.current_chapter_index]}."
+                    )
 
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        if st.form_submit_button(
-                            f"Save Scene Outlines (Chapter {chapter_number})"
-                        ):
-                            st.session_state.scene_outlines[chapter_number] = (
-                                edited_scene_outlines
+        # Display and Edit Scene Outlines for the selected chapter
+        if st.session_state.scene_outlines.get(selected_chapter_outline.chapter_number):
+            chapter_scene_outlines = st.session_state.scene_outlines[
+                selected_chapter_outline.chapter_number
+            ]
+            with st.form(
+                f"scene_outlines_chapter_{selected_chapter_outline.chapter_number}_form"
+            ):
+                st.markdown(
+                    f"**Chapter {selected_chapter_outline.chapter_number} Scene Outlines**"
+                )  # Chapter number in form header
+                edited_scene_outlines = []
+                for i, scene_outline in enumerate(chapter_scene_outlines):
+                    edited_summary = st.text_area(
+                        f"Scene {i + 1} Outline",
+                        scene_outline.summary,
+                        height=80,
+                        key=f"scene_{selected_chapter_outline.chapter_number}_{i}_outline",
+                    )
+                    edited_scene_outlines.append(
+                        SceneOutline(scene_number=i + 1, summary=edited_summary)
+                    )
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    if st.form_submit_button(
+                        f"Save Scene Outlines (Chapter {selected_chapter_outline.chapter_number})"
+                    ):
+                        st.session_state.scene_outlines[
+                            selected_chapter_outline.chapter_number
+                        ] = edited_scene_outlines
+                        st.success(
+                            f"Scene Outlines Saved for Chapter {selected_chapter_outline.chapter_number}!"
+                        )
+                        if st.session_state.project_name:  # Auto-save after edit
+                            st.session_state.project_manager.save_project(
+                                st.session_state.project_name,
+                                st.session_state.story_idea,
+                                st.session_state.book_spec,
+                                st.session_state.plot_outline,
+                                st.session_state.chapter_outlines,
+                                st.session_state.scene_outlines,
+                                st.session_state.scene_parts,
                             )
                             st.success(
-                                f"Scene Outlines Saved for Chapter {chapter_number}!"
-                            )
-                    with col2:
+                                f"Project '{st.session_state.project_name}' saved!"
+                            )  # provide feedback of auto-save
+                with col2:
+
+                    if st.form_submit_button(
+                        f"Enhance Scene Outlines (Chapter {selected_chapter_outline.chapter_number})"
+                    ):
 
                         async def enhance_scene_outlines_callback():
                             with st.spinner(
-                                f"Enhancing Scene Outlines for Chapter {chapter_number}..."
+                                f"Enhancing Scene Outlines for Chapter {selected_chapter_outline.chapter_number}..."
                             ):
                                 enhanced_scene_outlines = await st.session_state.content_generator.enhance_scene_outlines(
                                     edited_scene_outlines
                                 )
                                 if enhanced_scene_outlines:
-                                    st.session_state.scene_outlines[chapter_number] = (
-                                        enhanced_scene_outlines
-                                    )
+                                    st.session_state.scene_outlines[
+                                        selected_chapter_outline.chapter_number
+                                    ] = enhanced_scene_outlines
                                     st.success(
-                                        f"Scene Outlines Enhanced for Chapter {chapter_number}!"
+                                        f"Scene Outlines Enhanced for Chapter {selected_chapter_outline.chapter_number}!"
                                     )
+                                    if (
+                                        st.session_state.project_name
+                                    ):  # Auto-save after enhance
+                                        st.session_state.project_manager.save_project(
+                                            st.session_state.project_name,
+                                            st.session_state.story_idea,
+                                            st.session_state.book_spec,
+                                            st.session_state.plot_outline,
+                                            st.session_state.chapter_outlines,
+                                            st.session_state.scene_outlines,
+                                            st.session_state.scene_parts,
+                                        )
+                                        st.success(
+                                            f"Project '{st.session_state.project_name}' saved!"
+                                        )  # provide feedback of auto-save
                                 else:
                                     st.error(
-                                        f"Failed to enhance Scene Outlines for Chapter {chapter_number}."
+                                        f"Failed to enhance Scene Outlines for Chapter {selected_chapter_outline.chapter_number}."
                                     )
 
-                        if st.form_submit_button(
-                            f"Enhance Scene Outlines (Chapter {chapter_number})",
-                            on_click=enhance_scene_outlines_callback,
-                        ):
-                            pass
+                        asyncio.run(enhance_scene_outlines_callback())
 
                 # Display Scene Outlines outside the form
                 for scene_outline in st.session_state.scene_outlines.get(
-                    chapter_number, []
+                    selected_chapter_outline.chapter_number, []
                 ):
                     st.markdown(f"**Scene {scene_outline.scene_number}:**")
                     st.write(scene_outline.summary)

@@ -1,3 +1,4 @@
+# core/plot_outline.py
 # fiction_fabricator/src/core/plot_outline.py
 from typing import List
 
@@ -6,20 +7,20 @@ from pydantic import BaseModel
 
 class PlotOutline(BaseModel):
     """
-    Represents a three-act plot outline for a novel.
+    Represents a three-act plot outline for a novel, with acts as lists of plot points.
 
     This Pydantic model defines the structure for storing the three acts
     of a plot outline: Act One (Setup), Act Two (Confrontation), and
-    Act Three (Resolution). Each act is represented as a string containing
-    a summary of the plot points within that act.
+    Act Three (Resolution). Each act is now represented as a list of strings,
+    where each string is a plot point within that act.
     """
 
-    act_one: str
-    """Summary of Act One: Setup - Introduction of characters, setting, and initial conflict."""
-    act_two: str
-    """Summary of Act Two: Confrontation - Development of conflict, rising stakes, and obstacles."""
-    act_three: str
-    """Summary of Act Three: Resolution - Climax, resolution of conflict, and thematic closure."""
+    act_one: List[str] = []
+    """List of plot points for Act One: Setup - Introduction of characters, setting, and initial conflict."""
+    act_two: List[str] = []
+    """List of plot points for Act Two: Confrontation - Development of conflict, rising stakes, and obstacles."""
+    act_three: List[str] = []
+    """List of plot points for Act Three: Resolution - Climax, resolution of conflict, and thematic closure."""
 
 
 class ChapterOutline(BaseModel):
