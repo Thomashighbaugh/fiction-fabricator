@@ -1,0 +1,11 @@
+--- a/llm/prompt_manager.py
++++ b/llm/prompt_manager.py
+@@ -240,7 +240,7 @@
+             "premise": "string"
+         }}
+
+-        Return only valid JSON, without deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
++        Critically important: Return ONLY valid JSON, without any markdown code blocks, or explanations. Ensure that the JSON is valid and properly formatted with correct data types and escaping. If there are structural issues, correct them robustly.
+         """
+
+     #  ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫

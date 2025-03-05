@@ -3,8 +3,9 @@ import json
 import os
 from core.book_spec import BookSpec
 from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
-from utils.config import config
+from core.content_generator import ChapterOutlineMethod  # Import ChapterOutlineMethod
 from utils.logger import logger
+from utils.config import config
 
 
 class ProjectManager:
@@ -25,6 +26,9 @@ class ProjectManager:
         book_spec: BookSpec = None,
         plot_outline: PlotOutline = None,
         chapter_outlines: list[ChapterOutline] = None,
+        chapter_outlines_27_method: list[
+            ChapterOutlineMethod
+        ] = None,  # Add chapter_outlines_27_method here
         scene_outlines: dict[int, list[SceneOutline]] = None,
         scene_parts: dict[int, dict[int, str]] = None,
     ) -> None:
@@ -38,6 +42,11 @@ class ProjectManager:
             "chapter_outlines": (
                 [co.model_dump() for co in chapter_outlines]
                 if chapter_outlines
+                else None
+            ),
+            "chapter_outlines_27_method": (  # Add chapter_outlines_27_method here
+                [co.model_dump() for co in chapter_outlines_27_method]
+                if chapter_outlines_27_method
                 else None
             ),
             "scene_outlines": (

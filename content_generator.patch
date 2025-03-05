@@ -1,0 +1,10 @@
+--- a/core/content_generator.py
++++ b/core/content_generator.py
+@@ -97,3 +97,7 @@
+                 logger.error("Failed to fix BookSpec structure.")
+                     return None
+             try:
++                # Enhanced JSON cleaning:
++                generated_text = generated_text.strip() 
++                if generated_text.startswith("```json") and generated_text.endswith("```"):
++                    generated_text = generated_text[7:-3].strip()

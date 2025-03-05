@@ -176,22 +176,10 @@ class ContentGenerator:
                     logger.error("Failed to fix BookSpec structure.")
                     return None
             try:
-                # Enhanced JSON cleaning: Remove markdown delimiters and common issues
+                # Remove markdown code block delimiters if present
                 generated_text = generated_text.strip()
-                if generated_text.startswith("```json") and generated_text.endswith(
-                    "```"
-                ):
+                if generated_text.startswith("```json") and generated_text.endswith("```"):
                     generated_text = generated_text[7:-3].strip()
-                if generated_text.startswith("```") and generated_text.endswith("```"):
-                    generated_text = generated_text[
-                        3:-3
-                    ].strip()  # strip generic code block
-                generated_text = generated_text.replace(
-                    "\\\n", "\n"
-                )  # Handle escaped newlines
-                generated_text = generated_text.replace(
-                    '\\"', '"'
-                )  # Handle escaped quotes
 
                 book_spec = BookSpec(**json.loads(generated_text))
                 logger.info("Book specification generated successfully.")

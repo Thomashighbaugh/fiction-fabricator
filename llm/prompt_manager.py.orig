@@ -262,7 +262,7 @@ Instead of being intended to provide a strict course of the action within a nove
             "premise": "string"
         }}
 
-        Critically important: Return ONLY valid JSON, without any markdown code blocks, or explanations. Ensure that the JSON is valid and properly formatted with correct data types and escaping. If there are structural issues, correct them robustly.
+        Critically important: Return ONLY valid JSON, without any markdown code blocks, deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
         """
 
     #  ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
