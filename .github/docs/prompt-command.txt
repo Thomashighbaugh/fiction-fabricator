@@ -1,1 +1,0 @@
- code2prompt --tokens --output prompt.txt --exclude-folders .git,.github,output,__pycache__,.venv,.vscode -e md fiction-fabricator

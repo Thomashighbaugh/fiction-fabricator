@@ -1,8 +1,13 @@
-# /home/tlh/fiction-fabricator/requirements.txt
+streamlit
 ollama
-joblib
-loguru
-omegaconf
-tenacity
-questionary
+pydantic
+python-dotenv
+black
+pytest
+pydantic
+sphinx
+mypy
+requests
+tiktoken
 aiohttp
+pydantic-settings
