@@ -1,7 +1,9 @@
+# core/book_spec.py
 # fiction_fabricator/src/core/book_spec.py
-from typing import List
+from typing import List, Dict, Optional # Import Dict, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+import json
 
 
 class BookSpec(BaseModel):
@@ -17,8 +19,10 @@ class BookSpec(BaseModel):
     """The title of the novel."""
     genre: str
     """The genre and subgenres of the novel (e.g., Dark Fantasy, Erotic Thriller)."""
-    setting: str
-    """Detailed description of the novel's setting(s), including location and time period."""
+    setting: Dict[str, str] # Setting is now a dictionary
+    """Detailed description of the novel's setting(s), as a dictionary with keys like 'location' and 'time_period'."""
+
+
     themes: List[str]
     """List of major themes explored in the novel, particularly dark and erotic themes."""
     tone: str

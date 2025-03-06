@@ -1,11 +1,11 @@
 --- llm/prompt_manager.py
 +++ llm/prompt_manager.py
-@@ -240,7 +240,7 @@
-             "premise": "string"
+@@ -219,7 +219,7 @@
          }}
  
--        Return only valid JSON, without deviations or extra explanation. Adhere strictly to this format, ensuring correct data types and escaping.
-+        Critically important: Return ONLY valid JSON, without any markdown code blocks, or explanations. Ensure that the JSON is valid and properly formatted with correct data types and escaping. If there are structural issues, correct them robustly.
-         """
+         Each character description in "characters" should be a SINGLE string. The LLM was generating a dictionary instead of a string.
+-        Critically important: Output ONLY valid JSON, without any markdown code blocks or explanations. Ensure that the JSON is properly formatted with correct escaping of special characters.
++       Critically important: Output ONLY valid JSON, nothing else. No markdown code blocks, no explanations, no extra text after
  
-     #  ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+ 
+ 

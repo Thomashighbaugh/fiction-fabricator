@@ -97,7 +97,7 @@ Instead of being intended to provide a strict course of the action within a nove
         Include the following elements in the book specification:
         - Title (Compelling and evocative)
         - Genre (Specify the genre and subgenres)
-        - Setting(s) (Detailed description of locations and time period)
+        - Setting (Detailed description of the novel's setting(s), including location and time period, all in one STRING)
         - Themes (List of major themes explored in the novel)
         - Tone (Describe the overall tone of the novel - e.g., gritty, suspenseful, melancholic, sensual)
         - Point of View (Specify the narrative perspective - e.g., first-person, third-person limited, third-person omniscient)
@@ -111,7 +111,7 @@ Instead of being intended to provide a strict course of the action within a nove
         {{
             "title": "string",
             "genre": "string",
-            "setting": "string",
+            "setting": "string",  <-- Setting is a SINGLE STRING
             "themes": ["string", "string", "string"],
             "tone": "string",
             "point_of_view": "string",
@@ -120,7 +120,8 @@ Instead of being intended to provide a strict course of the action within a nove
         }}
 
         Each character description in "characters" should be a SINGLE string. The LLM was generating a dictionary instead of a string.
-        Critically important: Output ONLY valid JSON, without any markdown code blocks or explanations. Ensure that the JSON is properly formatted with correct escaping of special characters.
+        Critically important: Output ONLY valid JSON, nothing else. No markdown code blocks or explanations. Ensure that the JSON is properly formatted, with correct data types and escaping, and includes ALL required fields.
+ Critically important: the value for "setting" MUST be a SINGLE STRING, describing location and time period. Do not output a JSON object for setting. Just a single string.
         """
         return prompt_template
 
@@ -139,7 +140,7 @@ Instead of being intended to provide a strict course of the action within a nove
         Refine and expand upon each section, focusing on:
         - Adding more specific details to the setting, themes, characters, and premise.
         - Ensuring all elements are consistent and contribute to a strong, unified vision for a dark and erotic novel.
-        - Enriching character descriptions with deeper psychological insights and motivations related to the dark and erotic aspects of the story.
+        - Enriching character descriptions and setting descriptions with deeper psychological insights and motivations related to the dark and erotic aspects of the story.
         - Strengthening the premise to be even more intriguing and suggestive of the novel's nature.
         - Improving the overall flow and readability of the book specification.
 
@@ -148,7 +149,7 @@ Instead of being intended to provide a strict course of the action within a nove
         {{
             "title": "string",
             "genre": "string",
-            "setting": "string",
+            "setting": "string",  <-- Setting is a SINGLE STRING
             "themes": ["string", "string", "string"],
             "tone": "string",
             "point_of_view": "string",
@@ -158,6 +159,7 @@ Instead of being intended to provide a strict course of the action within a nove
 
         Each character description in "characters" should be a SINGLE string. The LLM was generating a dictionary instead of a string.
         Critically important: Output ONLY valid JSON, without any markdown code blocks or explanations. Ensure that the JSON is properly formatted with correct escaping of special characters.
+ Critically important: the value for "setting" MUST be a SINGLE STRING, describing location and time period. Do not output a JSON object for setting. Just a single string.
         """
         return prompt_template
 
@@ -212,7 +214,7 @@ Instead of being intended to provide a strict course of the action within a nove
         ```json
         {{
             "title": "string",
-            "genre": "string",
+           "genre": "string",
             "setting": "string",
             "themes": ["string", "string", "string"],
             "tone": "string",
@@ -224,7 +226,8 @@ Instead of being intended to provide a strict course of the action within a nove
         Specifically, check that:
         - The JSON is valid and parsable.
         - All fields are present.
-        - All string values are properly formatted.
+        - The "setting" field is a single string.
+        - All other string values are properly formatted.
         - The "themes" and "characters" fields are lists of strings.
 
         If the BookSpec adheres to the correct structure, respond with "STRUCTURE_OK".
@@ -253,7 +256,7 @@ Instead of being intended to provide a strict course of the action within a nove
         ```json
         {{
             "title": "string",
-            "genre": "string",
+           "genre": "string",
             "setting": "string",
             "themes": ["string", "string", "string"],
             "tone": "string",
@@ -262,7 +265,7 @@ Instead of being intended to provide a strict course of the action within a nove
             "premise": "string"
         }}
 
-        Critically important: Return ONLY valid JSON, without any markdown code blocks, or explanations. Ensure that the JSON is valid and properly formatted with correct data types and escaping. If there are structural issues, correct them robustly.
+        Critically important: Return ONLY valid JSON, nothing else. No markdown code blocks, or explanations. Ensure that the JSON is valid and properly formatted with correct data types and escaping. If there are structural issues, correct them robustly and output "setting" as a single string.
         """
 
     #  ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫

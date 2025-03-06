@@ -1,10 +1,30 @@
---- a/core/content_generator.py
-+++ b/core/content_generator.py
-@@ -97,3 +97,7 @@
-                 logger.error("Failed to fix BookSpec structure.")
-                     return None
-             try:
-+                # Enhanced JSON cleaning:
-+                generated_text = generated_text.strip() 
-+                if generated_text.startswith("```json") and generated_text.endswith("```"):
-+                    generated_text = generated_text[7:-3].strip()
+--- a/core/book_spec.py
++++ b/core/book_spec.py
+@@ -1,7 +1,7 @@
+ # fiction_fabricator/src/core/book_spec.py
+ from typing import List
+ 
+-from pydantic import BaseModel
++from pydantic import BaseModel, field_validator
+ 
+ 
+ class BookSpec(BaseModel):
+@@ -19,8 +19,17 @@
+     """The title of the novel."""
+     genre: str
+     """The genre and subgenres of the novel (e.g., Dark Fantasy, Erotic Thriller)."""
+-    setting: str
++    setting: dict
+     """Detailed description of the novel's setting(s), including location and time period."""
++
++    @field_validator("setting")
++    @classmethod
++    def setting_must_be_string(cls, v: dict) -> str:
++        """Validator to convert setting dict to string."""
++        # Convert the dictionary to a string representation
++        return json.dumps(v)
++
++
+     themes: List[str]
+     """List of major themes explored in the novel, particularly dark and erotic themes."""
+     tone: str

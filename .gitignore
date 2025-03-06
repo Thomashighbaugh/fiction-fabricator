@@ -6,3 +6,5 @@ data/*
 **/__pycache__/*
 __pycache__
 __pycache__/*core/content_generator.py
+*.patch 
+prompt.txt

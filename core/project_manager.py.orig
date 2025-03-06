@@ -37,12 +37,7 @@ class ProjectManager:
         """
         project_data = {
             "story_idea": story_idea,
-            "book_spec": (
-                {
-                    **book_spec.model_dump(),
-                    "setting": json.loads(book_spec.setting) if isinstance(book_spec.setting, str) else book_spec.setting # Ensure setting is saved as dict
-                } if book_spec else None
-            ),
+            "book_spec": book_spec.model_dump() if book_spec else None,
             "plot_outline": plot_outline.model_dump() if plot_outline else None,
             "chapter_outlines": (
                 [co.model_dump() for co in chapter_outlines]

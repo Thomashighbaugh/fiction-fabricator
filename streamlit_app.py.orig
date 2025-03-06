@@ -165,22 +165,11 @@ def main():
                     loaded_data = st.session_state.project_manager.load_project(
                         st.session_state.project_name
                     )
+
                     if loaded_data:
                         for key, value in loaded_data.items():
                             if key == "book_spec" and isinstance(value, dict) and isinstance(value.get("setting"), str):
                                  # Parse setting string back to dict upon loading
-                                setting_value = value.get("setting")
-                                if isinstance(setting_value, str):
-                                    try:
-                                        value["setting"] = json.loads(setting_value)
-                                    except json.JSONDecodeError: # Handle cases where setting string is not valid JSON
-                                        logger.warning("Could not parse setting string to JSON, keeping as string.")
-                                        pass # Keep it as a string if parsing fails
-                                    except TypeError:
-                                        logger.warning("Setting value is not a string, cannot parse as JSON.")
-                                        pass # Keep it as is if not a string
-                                else:
-                                    logger.warning("Setting is not a string, no JSON parsing attempted.")
                                 try:
                                     value["setting"] = json.loads(value["setting"])
                                 except json.JSONDecodeError: # Handle cases where setting string is not valid JSON
