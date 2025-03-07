@@ -1,0 +1,15 @@
+#MainMenu {
+  visibility: hidden;
+}
+footer {
+  visibility: hidden;
+}
+import streamlit as st .css-18e3th9 {
+  padding-top: 0rem;
+}
+.stAppDeployButton {
+  display: none;
+}
+.stStatusWidget label {
+  display: none;
+}

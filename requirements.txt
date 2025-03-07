@@ -11,3 +11,4 @@ requests
 tiktoken
 aiohttp
 pydantic-settings
+pillow

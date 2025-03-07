@@ -1,6 +1,6 @@
 # core/book_spec.py
 # fiction_fabricator/src/core/book_spec.py
-from typing import List, Dict, Optional # Import Dict, Optional
+from typing import List, Dict, Optional, Union  # Import Union
 
 from pydantic import BaseModel, field_validator
 import json
@@ -19,9 +19,8 @@ class BookSpec(BaseModel):
     """The title of the novel."""
     genre: str
     """The genre and subgenres of the novel (e.g., Dark Fantasy, Erotic Thriller)."""
-    setting: Dict[str, str] # Setting is now a dictionary
-    """Detailed description of the novel's setting(s), as a dictionary with keys like 'location' and 'time_period'."""
-
+    setting: Union[Dict[str, str], str]  # Setting can be a dictionary or a string
+    """Detailed description of the novel's setting(s), as a dictionary with keys like 'location' and 'time_period', or a string."""
 
     themes: List[str]
     """List of major themes explored in the novel, particularly dark and erotic themes."""
@@ -33,3 +32,19 @@ class BookSpec(BaseModel):
     """Detailed descriptions of 2-3 main characters, including motivations and flaws related to dark and erotic elements."""
     premise: str
     """A concise and intriguing premise that sets up the central conflict and hints at the dark and erotic nature of the story."""
+
+    @field_validator("setting")
+    @classmethod
+    def validate_setting(cls, value):
+        """
+        Validates and potentially converts the setting field.
+        Allows setting to be a string or a dictionary.
+        If it's a string, it's kept as is. If it's a dict, it's validated as a dict.
+        """
+        if isinstance(value, str):
+            return value  # Accept string as is for backward compatibility
+        elif isinstance(value, dict):
+            return value  # Accept dict if it's already a dict
+        else:
+            raise ValueError("Setting must be either a string or a dictionary.")
+

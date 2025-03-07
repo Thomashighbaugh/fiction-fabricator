@@ -76,12 +76,25 @@ async def generate_book_spec(content_generator, idea: str) -> Optional[BookSpec]
             if generated_text.startswith("```json") and generated_text.endswith("```"):
                 generated_text = generated_text[7:-3].strip()
             if generated_text.startswith("```") and generated_text.endswith("```"):
-                generated_text = generated_text[3:-3].strip()  # strip generic code block
-            generated_text = re.sub(r"^.*?\{", "{", generated_text, flags=re.DOTALL)  # Remove leading text before JSON
-            generated_text = re.sub(r']\s*"premise":', '], "premise":', generated_text) # Fix missing comma before "premise"
-            generated_text = generated_text.replace("\\\n", "\n")  # Handle escaped newlines
+                generated_text = generated_text[
+                    3:-3
+                ].strip()  # strip generic code block
+            generated_text = re.sub(
+                r"^.*?\{", "{", generated_text, flags=re.DOTALL
+            )  # Remove leading text before JSON
+            generated_text = re.sub(
+                r"\}[^\}]*$", "}", generated_text, flags=re.DOTALL
+            )  # Remove trailing text after JSON
+            generated_text = re.sub(
+                r']\s*"premise":', '], "premise":', generated_text
+            )  # Fix missing comma before "premise"
+            generated_text = generated_text.replace(
+                "\\\n", "\n"
+            )  # Handle escaped newlines
             generated_text = generated_text.replace('\\"', '"')  # Handle escaped quotes
-            generated_text = re.sub(r'""([^"]+)""', r'"\1"', generated_text)  # Remove extra double quotes
+            generated_text = re.sub(
+                r'""([^"]+)""', r'"\1"', generated_text
+            )  # Remove extra double quotes
 
             book_spec_dict = json.loads(generated_text)
             book_spec = BookSpec(**book_spec_dict)
@@ -98,7 +111,9 @@ async def generate_book_spec(content_generator, idea: str) -> Optional[BookSpec]
         return None
 
 
-async def enhance_book_spec(content_generator, current_spec: BookSpec) -> Optional[BookSpec]:
+async def enhance_book_spec(
+    content_generator, current_spec: BookSpec
+) -> Optional[BookSpec]:
     """
     Enhances an existing BookSpec object using critique and rewrite.
     """
@@ -142,16 +157,34 @@ async def enhance_book_spec(content_generator, current_spec: BookSpec) -> Option
         try:
             # Enhanced JSON cleaning: Remove markdown delimiters and common issues
             enhanced_spec_json = enhanced_spec_json.strip()
-            if enhanced_spec_json.startswith("```json") and enhanced_spec_json.endswith("```"):
+            if enhanced_spec_json.startswith("```json") and enhanced_spec_json.endswith(
+                "```"
+            ):
                 enhanced_spec_json = enhanced_spec_json[7:-3].strip()
-            if enhanced_spec_json.startswith("```") and enhanced_spec_json.endswith("```"):
-                enhanced_spec_json = enhanced_spec_json[3:-3].strip()  # strip generic code block
-            enhanced_spec_json = re.sub(r"^.*?\{", "{", enhanced_spec_json, flags=re.DOTALL)  # Remove leading text before JSON
-            enhanced_spec_json = re.sub(r']\s*"premise":', '], "premise":', enhanced_spec_json) # Fix missing comma before "premise"
-            enhanced_spec_json = enhanced_spec_json.replace("\\\n", "\n")  # Handle escaped newlines
-            enhanced_spec_json = enhanced_spec_json.replace('\\"', '"')  # Handle escaped quotes
-            enhanced_spec_json = re.sub(r'""([^"]+)""', r'"\1"', enhanced_spec_json)  # Remove extra double quotes
-
+            if enhanced_spec_json.startswith("```") and enhanced_spec_json.endswith(
+                "```"
+            ):
+                enhanced_spec_json = enhanced_spec_json[
+                    3:-3
+                ].strip()  # strip generic code block
+            enhanced_spec_json = re.sub(
+                r"^.*?\{", "{", enhanced_spec_json, flags=re.DOTALL
+            )  # Remove leading text before JSON
+            enhanced_spec_json = re.sub(
+                r"\}[^\}]*$", "}", enhanced_spec_json, flags=re.DOTALL
+            )  # Remove trailing text after JSON
+            enhanced_spec_json = re.sub(
+                r']\s*"premise":', '], "premise":', enhanced_spec_json
+            )  # Fix missing comma before "premise"
+            enhanced_spec_json = enhanced_spec_json.replace(
+                "\\\n", "\n"
+            )  # Handle escaped newlines
+            enhanced_spec_json = enhanced_spec_json.replace(
+                '\\"', '"'
+            )  # Handle escaped quotes
+            enhanced_spec_json = re.sub(
+                r'""([^"]+)""', r'"\1"', enhanced_spec_json
+            )  # Remove extra double quotes
 
             book_spec_dict = json.loads(enhanced_spec_json)
             enhanced_spec = BookSpec(**book_spec_dict)
@@ -161,9 +194,13 @@ async def enhance_book_spec(content_generator, current_spec: BookSpec) -> Option
             error_message = f"Error decoding or validating enhanced BookSpec: {e}"
             logger.error(error_message)
             logger.debug("Raw LLM response: %s", enhanced_spec_json)
+            logger.debug(
+                f"Raw LLM response before cleaning: %s", enhanced_spec_json
+            )  # Added raw response logging
 
             return None
 
     except Exception as e:
         logger.exception("Exception occurred during book specification enhancement.")
         return None
+

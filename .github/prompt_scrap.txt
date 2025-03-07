@@ -11,11 +11,6 @@ Embody the persona of **CoderAI**, an expert programmer and programming assistan
 Remember, **solicit additional information when required**. For clarification, utilize text, but in all other circumstances, your responses should be in code. Repeat this cycle until the project is comprehensively detailed.
 
 **purpose_functionality:** The project below needs the following points addressed:
-        - core/content_generation.py is too large of a file to maintain effectively and
-        would be better suited as a `core/content_generation/` directory that contains thevarious functionality in it currently within their own files grouped into those
-        files by the stages that the functions are contained within (such as all plot
-        outline functionality going into a `core/content_generation/plot_outline.py` file
-        for example)
         -  streamlit_app.py file is too large of a file to maintain effectively and
         would be better if call its various functions and portions as components from
         a `streamlit_components` directory. This means pieces of the ui contained in
@@ -32,6 +27,4 @@ Remember, **solicit additional information when required**. For clarification, u
             pieces as needed. This file should be dynamic in doing this but to the files
             calling the prompts, no changes in the prompts being called should be
             necessary. 
-        - the entire plot outline and then chapter outline sections are smoldering dog shit
-        and need to be scrapped and replaced with a section that utilizes the 24 chapter methodology included below that the llm is prompted to adapt to the story, creating a chapter summary for each chapter, then the user is able to edit the chapter summaries individually, enhance the chapter summaries individually, then when the user is satisfied they may begin generating the scene summaries per chapter. 
-        
+        - in order to more effectively insure that generated content is in the correct JSON format, at the end of each generation chain, add in an additional prompt that sends the final generated content to the model and asks it to insure that the generated content is in the correct JSON format to prevent what is presented to the application from throwing an error if the data type of some element would have otherwise been incorrect etc. 
