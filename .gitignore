@@ -13,3 +13,5 @@ prompt.txt
 **/*.orig 
 *.orig 
 **/*.patch
+**/prompt.txt 
+**/*prompt*
