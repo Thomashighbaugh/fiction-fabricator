@@ -51,6 +51,13 @@ class OllamaClient:
     async def generate_text(self, model_name: str, prompt: str) -> str | None:
         """
         Asynchronously generates text.
+
+        Args:
+            model_name: The name of the Ollama model to use.
+            prompt: The prompt to send to the model.
+
+        Returns:
+            The generated text, or None if an error occurred.
         """
         url = f"{self.base_url}/api/generate"
         headers = {"Content-Type": "application/json"}
@@ -69,9 +76,6 @@ class OllamaClient:
                     generated_text = response_data.get("response")
 
                     if generated_text:
-                        logger.info(
-                            f"Text generated successfully using model '{model_name}'"
-                        )
                         return generated_text
                     else:
                         logger.error(

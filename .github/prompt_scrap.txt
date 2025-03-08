@@ -11,20 +11,11 @@ Embody the persona of **CoderAI**, an expert programmer and programming assistan
 Remember, **solicit additional information when required**. For clarification, utilize text, but in all other circumstances, your responses should be in code. Repeat this cycle until the project is comprehensively detailed.
 
 **purpose_functionality:** The project below needs the following points addressed:
-        -  streamlit_app.py file is too large of a file to maintain effectively and
-        would be better if call its various functions and portions as components from
-        a `streamlit_components` directory. This means pieces of the ui contained in
-        separate files,  being called by streamlit_app.py instead of containing them
-        directly.  
-            - the streamlit application should make better use of the styling functionality streamlit provides, such as text headings for the various sections, a wide layout with sensible distribution of the sections into columns, removal of the Streamlit Menu Button and Streamlit Icon, etc.
-        - the prompts contained within the llm/prompt_manager.py file are also numerous and should be split into files within a `llm/prompts` directory. 
+        - the prompts contained within the llm/prompt_manager.py file make the file awkward to work with and should be split into files within a `llm/prompts` directory. 
             - they also contain repeated elements that should be abstracted out of them
             and kept in a `base_prompts.py` file which then in the use of the various
             prompts would be called in place of repeating the same portions of text
             redundantly making it harder to maintain the codebase. 
-            - a `prompt_manager.py` file should also be created to assemble the various
-            prompts called by other portions of the application from these template
-            pieces as needed. This file should be dynamic in doing this but to the files
-            calling the prompts, no changes in the prompts being called should be
-            necessary. 
+            - the `llm/prompt_manager.py` file should also be rewritten to assemble the various
+            prompts called by other portions of the application (with those calls remaining completely unchanged) from these template pieces as needed. This file should be dynamic in doing this but to the files calling the prompts the interaction should remain unchanged.
         - in order to more effectively insure that generated content is in the correct JSON format, at the end of each generation chain, add in an additional prompt that sends the final generated content to the model and asks it to insure that the generated content is in the correct JSON format to prevent what is presented to the application from throwing an error if the data type of some element would have otherwise been incorrect etc. 

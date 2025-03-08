@@ -37,8 +37,7 @@ def main():
     st.set_page_config(layout="wide", page_title="Fiction Fabricator", page_icon=im)
     utils.local_css("./assets/styles.css")
     utils.remote_css("https://fonts.googleapis.com/icon?family=Material+Icons")
-
-    st.title("Fiction Fabricator")  # Added title with emoji
+    st.title("⚙	Fiction Fabricator ⚙")  # Added title with emoji
 
     # Initialize session state variables
     if "ollama_client" not in st.session_state:
@@ -99,7 +98,6 @@ def main():
     # Create sidebar using the component function
     create_sidebar(st.session_state)
     # Main panel layout using columns
-    st.header("Novel Generation Workflow")  # Main header with emoji
     story_idea_ui(st.session_state)
     book_spec_ui(st.session_state)
     chapter_outline_ui(st.session_state)  # Corrected function name

@@ -8,3 +8,8 @@ __pycache__
 __pycache__/*core/content_generator.py
 *.patch 
 prompt.txt
+**/*.rej
+*.rej
+**/*.orig 
+*.orig 
+**/*.patch
