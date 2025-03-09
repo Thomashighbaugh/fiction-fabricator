@@ -1,52 +1,58 @@
 # core/plot_outline.py
-# fiction_fabricator/src/core/plot_outline.py
-from typing import List
+from typing import List, Dict
 
 from pydantic import BaseModel
 
 
 class PlotOutline(BaseModel):
     """
-    Represents a three-act plot outline for a novel, with acts as lists of plot points.
-
-    This Pydantic model defines the structure for storing the three acts
-    of a plot outline: Act One (Setup), Act Two (Confrontation), and
-    Act Three (Resolution). Each act is now represented as a list of strings,
-    where each string is a plot point within that act.
+    Represents a three-act plot outline for a novel.
     """
 
     act_one: List[str] = []
-    """List of plot points for Act One: Setup - Introduction of characters, setting, and initial conflict."""
     act_two: List[str] = []
-    """List of plot points for Act Two: Confrontation - Development of conflict, rising stakes, and obstacles."""
     act_three: List[str] = []
-    """List of plot points for Act Three: Resolution - Climax, resolution of conflict, and thematic closure."""
+
+    def model_dump_toml(self) -> Dict:
+        """Dumps the model to a TOML-compatible dictionary."""
+        return self.model_dump()
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "PlotOutline":
+        """Creates a PlotOutline instance from a dictionary."""
+        return cls(**data)
 
 
 class ChapterOutline(BaseModel):
     """
-    Represents an outline for a single chapter in the novel.
-
-    This Pydantic model defines the structure for a chapter outline,
-    including the chapter number and a summary of the chapter's events.
+    Represents an outline for a single chapter.
     """
 
     chapter_number: int
-    """The chapter number (e.g., 1, 2, 3...)."""
     summary: str
-    """A summary of the key events and developments within this chapter."""
 
+    def model_dump_toml(self) -> Dict:
+        """Dumps the model to a TOML-compatible dictionary."""
+        return self.model_dump()
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "ChapterOutline":
+        """Creates a ChapterOutline instance from a dictionary."""
+        return cls(**data)
 
 class SceneOutline(BaseModel):
     """
     Represents an outline for a single scene within a chapter.
-
-    This Pydantic model defines the structure for a scene outline,
-    including the scene number and a summary of the scene's events,
-    setting, and characters involved.
     """
 
     scene_number: int
-    """The scene number within the chapter (e.g., 1, 2, 3...)."""
     summary: str
-    """A summary of the key events, setting, and characters in this scene."""
+
+    def model_dump_toml(self) -> Dict:
+        """Dumps the model to a TOML-compatible dictionary."""
+        return self.model_dump()
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "SceneOutline":
+        """Creates a SceneOutline instance from a dictionary."""
+        return cls(**data)

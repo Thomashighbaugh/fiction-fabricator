@@ -22,7 +22,7 @@ async def generate_scene_outlines(
             prompt_manager.create_scene_outlines_generation_prompt()
         )
         variables = {
-            "chapter_outline": chapter_outline.summary,
+            "chapter_outline": chapter_outline.summary, # Remains a string.
             "num_scenes_per_chapter": str(num_scenes),
         }
 
@@ -92,7 +92,7 @@ async def generate_scene_outlines(
 
 async def enhance_scene_outlines(
     content_generator, current_outlines: List[SceneOutline]
-) -> Optional[List[SceneOutline]]:
+) -> Optional[List[SceneOutline]]: # Returns List
     """
     Asynchronously enhances existing scene outlines.
     """

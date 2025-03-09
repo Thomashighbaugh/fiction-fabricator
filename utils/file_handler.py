@@ -1,67 +1,62 @@
 # fiction_fabricator/src/utils/file_handler.py
-import json
 import os
+import tomli
+import tomli_w
 
 from utils.logger import logger
 
 
-def save_json(data: dict, filepath: str) -> None:
+def save_toml(data: dict, filepath: str) -> None:
     """
-    Saves data to a JSON file.
+    Saves data to a TOML file.
 
     Args:
-        data (dict): The data to be saved as JSON.
-        filepath (str): The path to the file where the JSON data will be saved.
+        data (dict): The data to be saved as TOML.
+        filepath (str): The path to the file.
     """
     try:
-        # Ensure directory exists
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, "w") as f:
-            json.dump(data, f, indent=4)
-        logger.info(f"JSON data saved to: {filepath}")
+        with open(filepath, "wb") as f:  # Note: "wb" for tomli-w
+            tomli_w.dump(data, f)
+        logger.info(f"TOML data saved to: {filepath}")
     except Exception as e:
-        logger.error(f"Error saving JSON to {filepath}: {e}")
+        logger.error(f"Error saving TOML to {filepath}: {e}")
         raise
 
 
-def load_json(filepath: str) -> dict:
+def load_toml(filepath: str) -> dict:
     """
-    Loads data from a JSON file.
+    Loads data from a TOML file.
 
     Args:
-        filepath (str): The path to the JSON file to be loaded.
+        filepath (str): The path to the TOML file.
 
     Returns:
-        dict: The data loaded from the JSON file.
+        dict: The data loaded from the TOML file.
 
     Raises:
-        FileNotFoundError: If the specified file does not exist.
-        JSONDecodeError: If the file content is not valid JSON.
-        Exception: For other potential file reading errors.
+        FileNotFoundError: If the file does not exist.
+        TOMLDecodeError: If the file content is not valid TOML.
     """
     try:
-        with open(filepath, "r") as f:
-            data = json.load(f)
-        logger.info(f"JSON data loaded from: {filepath}")
+        with open(filepath, "rb") as f:  # Note: "rb" for tomli
+            data = tomli.load(f)
+        logger.info(f"TOML data loaded from: {filepath}")
         return data
     except FileNotFoundError:
-        logger.error(f"JSON file not found: {filepath}")
+        logger.error(f"TOML file not found: {filepath}")
         raise
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON from {filepath}: {e}")
+    except tomli.TOMLDecodeError as e:
+        logger.error(f"Error decoding TOML from {filepath}: {e}")
         raise
     except Exception as e:
-        logger.error(f"Error loading JSON from {filepath}: {e}")
+        logger.error(f"Error loading TOML from {filepath}: {e}")
         raise
 
 
 def save_markdown(text: str, filepath: str) -> None:
     """
-    Saves text content to a Markdown file.
-
-    Args:
-        text (str): The text content to be saved in Markdown format.
-        filepath (str): The path to the file where the Markdown content will be saved.
+    Saves text content to a Markdown file.  (No changes needed)
     """
     try:
         # Ensure directory exists

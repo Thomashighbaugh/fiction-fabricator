@@ -1,5 +1,6 @@
 # core/content_generation/scene_part_generation.py
 from typing import Optional
+import tomli_w # Import tomli_w
 
 from core.book_spec import BookSpec
 from core.plot_outline import ChapterOutline, SceneOutline
@@ -35,7 +36,7 @@ async def generate_scene_part(
         variables = {
             "scene_outline": scene_outline.summary,
             "part_number": str(part_number),
-            "book_spec_text": book_spec.model_dump_json(indent=4),
+            "book_spec_toml": tomli_w.dumps(book_spec.model_dump()),  # Use TOML
             "chapter_outline": chapter_outline.summary,
             "scene_outline_full": scene_outline_full.summary,
         }
@@ -51,7 +52,7 @@ async def generate_scene_part(
             logger.error("Failed to generate scene part.")
             return None
 
-        # Structure Check
+        # Structure Check (Still checking for basic structure, not TOML)
         structure_check_variables = {"scene_part": generated_text}
         structure_check_prompt = structure_check_prompt_template.format(
             **structure_check_variables
@@ -114,7 +115,7 @@ async def enhance_scene_part(
 
         # Prepare variables for the prompts
         variables = {
-            "book_spec": book_spec.model_dump_json(indent=4),
+            "book_spec_toml": tomli_w.dumps(book_spec.model_dump()),  # Use TOML
             "chapter_outline": chapter_outline.summary,
             "scene_outline_full": scene_outline_full.summary,
             "part_number": str(part_number),

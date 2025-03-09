@@ -2,6 +2,9 @@
 import streamlit as st
 
 from core.content_generator import ContentGenerator
+from core.book_spec import BookSpec
+from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
+from core.content_generator import ChapterOutlineMethod
 from llm.llm_client import OllamaClient
 from llm.prompt_manager import PromptManager
 from utils.config import config
@@ -11,45 +14,42 @@ import os
 
 def create_sidebar(session_state):
     """
-    Creates and displays the sidebar in the Streamlit application with enhanced styling.
-
-    Args:
-        session_state: Streamlit session state object.
+    Creates and displays the sidebar.
     """
     with st.sidebar:
-        st.header("⚙️ Settings & Project")  # Added emoji and header styling
+        st.header("⚙️ Settings & Project")
         model_options = session_state.available_models
         if not model_options:
             st.warning(
                 "No models found on local Ollama instance. Ensure Ollama is running and models are pulled."
             )
-            model_options = [session_state.selected_model]
+            model_options = [
+                session_state.selected_model
+            ]  # Use current model as fallback
         selected_model_index = (
             model_options.index(session_state.selected_model)
             if session_state.selected_model in model_options
             else 0
         )
-        st.selectbox(  # Removed 'value' parameter for compatibility
+        st.selectbox(
             "Select Ollama Model",
             model_options,
             index=selected_model_index,
             key="model_selectbox",
         )
         if st.button("Change Model"):
-            session_state.selected_model = (
-                st.session_state.model_selectbox
-            )  # Update session_state here on button click
+            session_state.selected_model = st.session_state.model_selectbox
             session_state.content_generator = ContentGenerator(
                 session_state.prompt_manager, session_state.selected_model
             )
-            st.rerun()
-        st.caption(
-            f"Selected Model: `{session_state.selected_model}`"
-        )  # Changed to caption
+            st.rerun()  # Force re-run to use the new model
+        st.caption(f"Selected Model: `{session_state.selected_model}`")
 
-        st.sidebar.subheader("Project Management")  # Subheader for project management
+        st.sidebar.subheader("Project Management")
         project_dir = config.get_project_directory()
-        project_files = [f[:-5] for f in os.listdir(project_dir) if f.endswith(".json")]
+        project_files = [
+            f[:-5] for f in os.listdir(project_dir) if f.endswith(".toml")
+        ]  # .toml files
         project_options = ["New Project"] + project_files
         selected_project = st.selectbox("Select Project", project_options)
 
@@ -67,7 +67,7 @@ def create_sidebar(session_state):
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("💾 Save Project"):  # Added emoji
+            if st.button("💾 Save Project"):
                 if session_state.project_name:
                     session_state.project_manager.save_project(
                         session_state.project_name,
@@ -83,25 +83,50 @@ def create_sidebar(session_state):
                 else:
                     st.warning("Please enter a project name to save.")
         with col2:
-            if st.button("Load Project"):  # Added emoji
+            if st.button("Load Project"):
                 if session_state.project_name:
                     loaded_data = session_state.project_manager.load_project(
                         session_state.project_name
                     )
                     if loaded_data:
+                        # Robustly handle potentially missing data.
                         for key, value in loaded_data.items():
-                            session_state[key] = value
+                            if key == "book_spec" and value:
+                                session_state[key] = BookSpec(**value)
+                            elif key == "plot_outline" and value:
+                                session_state[key] = PlotOutline(**value)
+                            elif key == "chapter_outlines" and value:
+                                session_state[key] = [
+                                    ChapterOutline(**co) for co in value
+                                ]
+                            elif key == "chapter_outlines_27_method" and value:
+                                session_state[key] = [
+                                    ChapterOutlineMethod(**co) for co in value
+                                ]
+                            elif key == "scene_outlines" and value:
+                                # Handle nested structure of scene_outlines
+                                session_state[key] = {
+                                    int(chapter_num): [
+                                        SceneOutline(**so) for so in scenes
+                                    ]
+                                    for chapter_num, scenes in value.items()
+                                }
+                            elif key == "scene_parts" and value:
+                                # Handle nested structure of scene_parts
+                                session_state[key] = {
+                                    int(chapter_num): {
+                                        int(scene_num): {
+                                            int(part_num): part_text
+                                            for part_num, part_text in parts.items()
+                                        }
+                                        for scene_num, parts in scenes.items()
+                                    }
+                                    for chapter_num, scenes in value.items()
+                                }
 
-                        session_state.book_spec = BookSpec(
-                            **loaded_data.get("book_spec", {})
-                        )
-                        session_state.plot_outline = PlotOutline(
-                            **loaded_data.get("plot_outline", {})
-                        )
-                        session_state.chapter_outlines_27_method = [
-                            ChapterOutlineMethod(**co)
-                            for co in loaded_data.get("chapter_outlines_27_method", [])
-                        ]
+                            elif value is not None:  # Only set if value exists
+                                session_state[key] = value
+
                         session_state.project_loaded = True
                         st.success(f"Project '{session_state.project_name}' loaded!")
                     else:
@@ -110,3 +135,4 @@ def create_sidebar(session_state):
                         )
                 else:
                     st.warning("Please select or enter a project name to load.")
+

@@ -7,7 +7,7 @@ footer {
   visibility: hidden;
 }
 import streamlit as st .css-18e3th9 {
-  padding-top: 0rem;
+  padding-block-start: 0rem;
 }
 .stAppDeployButton {
   display: none;

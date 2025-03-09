@@ -8,19 +8,14 @@ from core.plot_outline import SceneOutline
 
 def scene_outline_ui(session_state):
     """
-    Creates the Scene Outlines section in the Streamlit application with enhanced styling.
-
-    Args:
-        session_state: Streamlit session state object.
+    Creates the Scene Outlines section.
     """
     if (
         session_state.chapter_outlines_27_method
         and len(session_state.chapter_outlines_27_method) > 0
     ):
-        st.subheader("🎬 4. Scene Outlines")  # Added emoji and subheader styling
-        st.caption(
-            "Outline scenes for each chapter to detail the story's progression."
-        )  # Added caption
+        st.subheader("🎬 4. Scene Outlines")
+        st.caption("Outline scenes for each chapter to detail the story's progression.")
 
         session_state.max_scenes_per_chapter = st.number_input(
             "Maximum Scenes per Chapter:",
@@ -44,7 +39,7 @@ def scene_outline_ui(session_state):
         ]
 
         if st.button(
-            f"✨ Generate Scene Outlines for {chapter_options[session_state.current_chapter_index]}",  # Added emoji
+            f"✨ Generate Scene Outlines for {chapter_options[session_state.current_chapter_index]}",
             disabled=session_state.scene_outlines.get(
                 selected_chapter_outline.chapter_number
             ),
@@ -55,30 +50,21 @@ def scene_outline_ui(session_state):
                 num_scenes = random.randint(2, session_state.max_scenes_per_chapter)
                 scene_outlines = asyncio.run(
                     session_state.content_generator.generate_scene_outlines(
-                        selected_chapter_outline, num_scenes
-                    )
+                        selected_chapter_outline, num_scenes, session_state
+                    )  # Pass session_state
                 )
                 if scene_outlines:
                     session_state.scene_outlines[
                         selected_chapter_outline.chapter_number
                     ] = scene_outlines
                     st.success(
-                        f"Scene Outlines Generated for {chapter_options[session_state.current_chapter_index]}! 🎉"  # Added emoji
+                        f"Scene Outlines Generated for {chapter_options[session_state.current_chapter_index]}! 🎉"
                     )
-                    if session_state.project_name:
-                        session_state.project_manager.save_project(
-                            project_name=session_state.project_name,
-                            story_idea=session_state.story_idea,
-                            book_spec=session_state.book_spec,
-                            plot_outline=session_state.plot_outline,
-                            chapter_outlines=session_state.chapter_outlines,
-                            chapter_outlines_27_method=session_state.chapter_outlines_27_method,
-                            scene_outlines=session_state.scene_outlines,
-                            scene_parts=session_state.scene_parts,
-                        )
+                    # REMOVED redundant save: session_state.project_manager.save_project(...)
+
                 else:
                     st.error(
-                        f"Failed to generate Scene Outlines for {chapter_options[session_state.current_chapter_index]}. 😞"  # Added emoji
+                        f"Failed to generate Scene Outlines for {chapter_options[session_state.current_chapter_index]}. 😞"
                     )
 
         if session_state.scene_outlines.get(selected_chapter_outline.chapter_number):
@@ -90,7 +76,7 @@ def scene_outline_ui(session_state):
             ):
                 st.subheader(
                     f"✏️ Edit Scene Outlines - {chapter_options[session_state.current_chapter_index]}"
-                )  # Added subheader for edit form
+                )
                 edited_scene_outlines = []
                 for i, scene_outline in enumerate(chapter_scene_outlines):
                     edited_summary = st.text_area(
@@ -104,30 +90,31 @@ def scene_outline_ui(session_state):
                     )
 
                 col1, col2 = st.columns([3, 1])
+
                 with col1:
                     if st.form_submit_button(
-                        f"💾 Save Scene Outlines (Chapter {selected_chapter_outline.chapter_number})"  # Added emoji
+                        f"💾 Save Scene Outlines (Chapter {selected_chapter_outline.chapter_number})"
                     ):
                         session_state.scene_outlines[
                             selected_chapter_outline.chapter_number
                         ] = edited_scene_outlines
                         st.success(
-                            f"Scene Outlines Saved for Chapter {selected_chapter_outline.chapter_number}! ✅"  # Added emoji
+                            f"Scene Outlines Saved for Chapter {selected_chapter_outline.chapter_number}! ✅"
                         )
-                        if session_state.project_name:
-                            session_state.project_manager.save_project(
-                                project_name=session_state.project_name,
-                                story_idea=session_state.story_idea,
-                                book_spec=session_state.book_spec,
-                                plot_outline=session_state.plot_outline,
-                                chapter_outlines=session_state.chapter_outlines,
-                                chapter_outlines_27_method=session_state.chapter_outlines_27_method,
-                                scene_outlines=session_state.scene_outlines,
-                                scene_parts=session_state.scene_parts,
-                            )
+                        # Only save manually
+                        session_state.project_manager.save_project(
+                            project_name=session_state.project_name,
+                            story_idea=session_state.story_idea,
+                            book_spec=session_state.book_spec,
+                            plot_outline=session_state.plot_outline,
+                            chapter_outlines=session_state.chapter_outlines,
+                            chapter_outlines_27_method=session_state.chapter_outlines_27_method,
+                            scene_outlines=session_state.scene_outlines,
+                            scene_parts=session_state.scene_parts,
+                        )
                 with col2:
                     if st.form_submit_button(
-                        f"✨ Enhance Scene Outlines (Chapter {chapter_options[session_state.current_chapter_index]})"  # Added emoji
+                        f"✨ Enhance Scene Outlines (Chapter {chapter_options[session_state.current_chapter_index]})"
                     ):
 
                         async def enhance_scene_outlines_callback():
@@ -135,39 +122,27 @@ def scene_outline_ui(session_state):
                                 f"Enhancing Scene Outlines for Chapter {chapter_options[session_state.current_chapter_index]}..."
                             ):
                                 enhanced_scene_outlines = await session_state.content_generator.enhance_scene_outlines(
-                                    edited_scene_outlines
-                                )
+                                    edited_scene_outlines, session_state
+                                )  # Pass session state
                                 if enhanced_scene_outlines:
                                     session_state.scene_outlines[
                                         selected_chapter_outline.chapter_number
                                     ] = enhanced_scene_outlines
                                     st.success(
-                                        f"Scene Outlines Enhanced for Chapter {chapter_options[session_state.current_chapter_index]}! 🚀"  # Added emoji
+                                        f"Scene Outlines Enhanced for Chapter {chapter_options[session_state.current_chapter_index]}! 🚀"
                                     )
-                                    if session_state.project_name:
-                                        session_state.project_manager.save_project(
-                                            project_name=session_state.project_name,
-                                            story_idea=session_state.story_idea,
-                                            book_spec=session_state.book_spec,
-                                            plot_outline=session_state.plot_outline,
-                                            chapter_outlines=session_state.chapter_outlines,
-                                            chapter_outlines_27_method=session_state.chapter_outlines_27_method,
-                                            scene_outlines=session_state.scene_outlines,
-                                            scene_parts=session_state.scene_parts,
-                                        )
+                                    # REMOVED redundant save: session_state.project_manager.save_project(...)
                                 else:
                                     st.error(
-                                        f"Failed to enhance Scene Outlines for Chapter {chapter_options[session_state.current_chapter_index]}. 😞"  # Added emoji
+                                        f"Failed to enhance Scene Outlines for Chapter {chapter_options[session_state.current_chapter_index]}. 😞"
                                     )
 
                         asyncio.run(enhance_scene_outlines_callback())
 
             st.subheader(
                 f"📖 Scene Outlines Preview - {chapter_options[session_state.current_chapter_index]}"
-            )  # Added subheader for preview section
-            st.caption(
-                "Review the scene outlines for the selected chapter."
-            )  # Added caption
+            )
+            st.caption("Review the scene outlines for the selected chapter.")
             for scene_outline in session_state.scene_outlines.get(
                 selected_chapter_outline.chapter_number, []
             ):
@@ -176,4 +151,4 @@ def scene_outline_ui(session_state):
     else:
         st.info(
             "No Chapter Outlines available. Please generate them in the '3. 27 Chapter Outline' section."
-        )  # Changed to st.info and more informative message
+        )

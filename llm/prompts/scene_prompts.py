@@ -16,7 +16,7 @@ Chapter Outline:
 For each scene, provide a concise outline (1-2 paragraphs) summarizing the key events, setting, characters present, and purpose of the scene within the chapter and overall story. The scene outlines should:
 - Logically break down the events described in the chapter outline.
 - Detail the setting and characters involved in each scene.
-- Clearly indicate the purpose of each scene in advancing the plot, developing characters, or enhancing themes (especially dark and erotic themes).
+- Clearly indicate the purpose of each scene in advancing the plot, developing characters, or enhancing themes.
 - Be numbered sequentially within the chapter (Scene 1, Scene 2, etc.).
 
 Ensure the scene outlines collectively cover all key events of the chapter and provide a detailed guide for writing the scenes.
@@ -52,7 +52,7 @@ Here is the editor's critique:
 {{critique}}
 ```
 
-Revise the scene outlines based on the critique, focusing on the identified areas for improvement. Ensure that the revised outlines have a strong scene-to-scene flow, good pacing within the chapter, clear contribution of scenes to chapter objectives and plot, effective character development, thematic consistency, and a compelling integration of dark elements.
+Revise the scene outlines based on the critique, focusing on the identified areas for improvement. Ensure that the revised outlines have a strong scene-to-scene flow, good pacing within the chapter, clear contribution of scenes to chapter objectives and plot, effective character development, thematic consistency.
 """
 
 
@@ -62,9 +62,9 @@ def get_scene_part_generation_prompt() -> str:
 You are a world-class novelist who can generate specific parts of scenes from scene outlines.
 Generate part {{part_number}} of the text for the following scene, based on the provided book specification, chapter outline, and scene outline.
 
-Book Specification:
-```json
-{{book_spec_text}}
+Book Specification (in TOML format):
+```toml
+{{book_spec_toml}}
 ```
 
 Chapter Outline:
@@ -82,7 +82,7 @@ Specifically for Part {{part_number}} of the scene, focusing on the following ou
 {{scene_outline}}
 ```
 
-Write this part of the scene in a compelling and descriptive manner, consistent with the tone, themes, and characters established in the book specification. Emphasize the dark and erotic elements as appropriate for this scene and the overall novel. Focus on vivid descriptions, engaging dialogue, and actions that move the scene forward.
+Write this part of the scene in a compelling and descriptive manner, consistent with the tone, themes, and characters established in the book specification. Focus on vivid descriptions, engaging dialogue, and actions that move the scene forward.
 
 The generated text should be suitable for inclusion in a novel and should seamlessly connect with the preceding and subsequent parts of the scene (if applicable).
 """
@@ -105,7 +105,7 @@ Here is the scene part for critique:
 ```
 
 **Context:**
-- Book Specification: {{book_spec}}
+- Book Specification (in TOML format): {{book_spec_toml}}
 - Chapter Outline: {{chapter_outline}}
 - Scene Outline: {{scene_outline_full}}
 - Part Number: {{part_number}}
@@ -131,7 +131,7 @@ Here is the critique:
 ```
 
 Given the following context:
-- Book Specification: {{book_spec}}
+- Book Specification (in TOML format): {{book_spec_toml}}
 - Chapter Outline: {{chapter_outline}}
 - Scene Outline: {{scene_outline_full}}
 - Part Number: {{part_number}}

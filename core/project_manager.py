@@ -1,16 +1,16 @@
 # core/project_manager.py
-import json
 import os
 from core.book_spec import BookSpec
 from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
-from core.content_generator import ChapterOutlineMethod  # Import ChapterOutlineMethod
+from core.content_generator import ChapterOutlineMethod
 from utils.logger import logger
 from utils.config import config
+from utils.file_handler import save_toml, load_toml  # Corrected import
 
 
 class ProjectManager:
     """
-    Manages project saving and loading, now including story_idea.
+    Manages project saving and loading, using TOML.
     """
 
     def __init__(self, book_spec: BookSpec = None):
@@ -26,72 +26,77 @@ class ProjectManager:
         book_spec: BookSpec = None,
         plot_outline: PlotOutline = None,
         chapter_outlines: list[ChapterOutline] = None,
-        chapter_outlines_27_method: list[
-            ChapterOutlineMethod
-        ] = None,  # Add chapter_outlines_27_method here
+        chapter_outlines_27_method: list[ChapterOutlineMethod] = None,
         scene_outlines: dict[int, list[SceneOutline]] = None,
         scene_parts: dict[int, dict[int, str]] = None,
     ) -> None:
         """
-        Saves the current project data to a JSON file, including story_idea.
+        Saves the current project data to a TOML file.  Now with None checks.
         """
         project_data = {
             "story_idea": story_idea,
-            "book_spec": (
-                {
-                    **book_spec.model_dump(),
-                    "setting": json.loads(book_spec.setting) if isinstance(book_spec.setting, str) else book_spec.setting # Ensure setting is saved as dict
-                } if book_spec else None
-            ),
-            "plot_outline": plot_outline.model_dump() if plot_outline else None,
+            "book_spec": book_spec.model_dump_toml() if book_spec else None,
+            "plot_outline": plot_outline.model_dump_toml() if plot_outline else None,
             "chapter_outlines": (
-                [co.model_dump() for co in chapter_outlines]
+                [co.model_dump_toml() for co in chapter_outlines]
                 if chapter_outlines
                 else None
             ),
-            "chapter_outlines_27_method": (  # Add chapter_outlines_27_method here
-                [co.model_dump() for co in chapter_outlines_27_method]
+            "chapter_outlines_27_method": (
+                [co.model_dump_toml() for co in chapter_outlines_27_method]
                 if chapter_outlines_27_method
                 else None
             ),
             "scene_outlines": (
                 {
-                    chapter_num: [so.model_dump() for so in scene_outlines]
+                    str(chapter_num): [so.model_dump_toml() for so in scene_outlines]
                     for chapter_num, scene_outlines in scene_outlines.items()
                 }
                 if scene_outlines
                 else None
             ),
-            "scene_parts": scene_parts if scene_parts else None,
+            "scene_parts": (
+                {
+                    str(chapter_num): {
+                        str(scene_num): {
+                            str(part_number): part_text
+                            for part_number, part_text in parts.items()
+                        }
+                        for scene_num, parts in scenes.items()
+                    }
+                    for chapter_num, scenes in scene_parts.items()
+                }
+                if scene_parts
+                else None
+            ),
         }
 
-        project_dir = config.get_project_directory()
-        os.makedirs(project_dir, exist_ok=True)  # Ensure directory exists
-        filepath = os.path.join(project_dir, f"{project_name}.json")
+        # Check for None values and remove them
+        cleaned_project_data = {}
+        for key, value in project_data.items():
+            if value is not None:
+                cleaned_project_data[key] = value
 
-        with open(filepath, "w") as f:
-            json.dump(project_data, f, indent=4)
-        logger.info(
-            f"Project '{project_name}' saved to '{filepath}' (including story_idea)"
-        )
+        project_dir = config.get_project_directory()
+        os.makedirs(project_dir, exist_ok=True)
+        filepath = os.path.join(project_dir, f"{project_name}.toml")  # .toml extension
+
+        save_toml(cleaned_project_data, filepath)  # Use save_toml and cleaned data
+        logger.info(f"Project '{project_name}' saved to '{filepath}'")
 
     def load_project(self, project_name: str) -> dict | None:
         """
-        Loads project data from a JSON file and returns project data including story_idea.
+        Loads project data from a TOML file.
         """
         project_dir = config.get_project_directory()
-        filepath = os.path.join(project_dir, f"{project_name}.json")
+        filepath = os.path.join(project_dir, f"{project_name}.toml")  # .toml extension
 
         try:
-            with open(filepath, "r") as f:
-                project_data = json.load(f)
+            project_data = load_toml(filepath)  # Use load_toml
             logger.info(f"Project '{project_name}' loaded from '{filepath}'")
             return project_data
         except FileNotFoundError:
             logger.warning(f"Project file '{filepath}' not found.")
-            return None
-        except json.JSONDecodeError:
-            logger.error(f"Error decoding JSON from project file '{filepath}'.")
             return None
         except Exception as e:
             logger.error(f"Error loading project from '{filepath}': {e}")

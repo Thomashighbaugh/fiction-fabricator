@@ -1,50 +1,37 @@
 # core/book_spec.py
-# fiction_fabricator/src/core/book_spec.py
-from typing import List, Dict, Optional, Union  # Import Union
-
+from typing import List, Dict, Union, Any
 from pydantic import BaseModel, field_validator
-import json
 
 
 class BookSpec(BaseModel):
     """
     Represents the specification for a novel.
-
-    This Pydantic model defines the structure for storing and validating
-    the book specification, including title, genre, setting, themes, tone,
-    point of view, characters, and premise.
     """
 
     title: str
-    """The title of the novel."""
     genre: str
-    """The genre and subgenres of the novel (e.g., Dark Fantasy, Erotic Thriller)."""
-    setting: Union[Dict[str, str], str]  # Setting can be a dictionary or a string
-    """Detailed description of the novel's setting(s), as a dictionary with keys like 'location' and 'time_period', or a string."""
-
+    setting: Union[Dict[str, str], str]
     themes: List[str]
-    """List of major themes explored in the novel, particularly dark and erotic themes."""
     tone: str
-    """The overall tone of the novel (e.g., gritty, suspenseful, sensual, melancholic)."""
     point_of_view: str
-    """The narrative point of view (e.g., first-person, third-person limited, third-person omniscient)."""
-    characters: List[str]
-    """Detailed descriptions of 2-3 main characters, including motivations and flaws related to dark and erotic elements."""
+    characters: List[Union[str, Dict[str, str]]]  # Changed to List[Dict[str, str]]
     premise: str
-    """A concise and intriguing premise that sets up the central conflict and hints at the dark and erotic nature of the story."""
 
     @field_validator("setting")
     @classmethod
     def validate_setting(cls, value):
-        """
-        Validates and potentially converts the setting field.
-        Allows setting to be a string or a dictionary.
-        If it's a string, it's kept as is. If it's a dict, it's validated as a dict.
-        """
         if isinstance(value, str):
-            return value  # Accept string as is for backward compatibility
+            return value
         elif isinstance(value, dict):
-            return value  # Accept dict if it's already a dict
+            return value
         else:
             raise ValueError("Setting must be either a string or a dictionary.")
 
+    def model_dump_toml(self) -> Dict:
+        """Dumps the model to a TOML-compatible dictionary."""
+        return self.model_dump()
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "BookSpec":
+        """Creates a BookSpec instance from a dictionary."""
+        return cls(**data)

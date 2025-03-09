@@ -5,16 +5,11 @@ import asyncio
 
 def scene_part_ui(session_state):
     """
-    Creates the Scene Part Generation section in the Streamlit application with enhanced styling.
-
-    Args:
-        session_state: Streamlit session state object.
+    Creates the Scene Part Generation section.
     """
     if session_state.scene_outlines and session_state.chapter_outlines_27_method:
-        st.subheader("✍️ 5. Scene Part Generation")  # Added emoji and subheader styling
-        st.caption(
-            "Generate parts of scenes to gradually build your novel's text."
-        )  # Added caption
+        st.subheader("✍️ 5. Scene Part Generation")
+        st.caption("Generate parts of scenes to gradually build your novel's text.")
 
         chapter_options = [
             f"Chapter {co.chapter_number}: {co.role}"
@@ -55,9 +50,7 @@ def scene_part_ui(session_state):
                 key="scene_part_number_input",
             )
 
-            if st.button(
-                "✨ Generate Scene Part", key="generate_scene_part_button"
-            ):  # Added emoji
+            if st.button("✨ Generate Scene Part", key="generate_scene_part_button"):
                 with st.spinner(
                     f"Generating Part {part_number} of Scene {selected_scene_outline.scene_number}..."
                 ):
@@ -67,7 +60,8 @@ def scene_part_ui(session_state):
                             part_number=part_number,
                             book_spec=session_state.book_spec,
                             chapter_outline=selected_chapter_outline,
-                            scene_outline_full=selected_scene_outline,  # passing the same scene_outline as full for now
+                            scene_outline_full=selected_scene_outline,
+                            session_state=session_state,  # Pass session_state
                         )
                     )
                     if scene_part_text:
@@ -78,22 +72,12 @@ def scene_part_ui(session_state):
                         ] = scene_part_text
                         st.success(
                             f"Part {part_number} of Scene {selected_scene_outline.scene_number} Generated! 🎉"
-                        )  # Added emoji
-                        if session_state.project_name:
-                            session_state.project_manager.save_project(
-                                project_name=session_state.project_name,
-                                story_idea=session_state.story_idea,
-                                book_spec=session_state.book_spec,
-                                plot_outline=session_state.plot_outline,
-                                chapter_outlines=session_state.chapter_outlines,
-                                chapter_outlines_27_method=session_state.chapter_outlines_27_method,
-                                scene_outlines=session_state.scene_outlines,
-                                scene_parts=session_state.scene_parts,
-                            )
+                        )
+                        # REMOVED redundant save:  session_state.project_manager.save_project()
                     else:
                         st.error(
                             f"Failed to generate Part {part_number} of Scene {selected_scene_outline.scene_number}. 😞"
-                        )  # Added emoji
+                        )
 
             if (
                 st.session_state.scene_parts.get(
@@ -104,7 +88,7 @@ def scene_part_ui(session_state):
             ):
                 st.subheader(
                     f"📝 Part {part_number} of Scene {selected_scene_outline.scene_number} Preview"
-                )  # Added subheader for preview section
+                )
                 st.write(
                     st.session_state.scene_parts[
                         selected_chapter_outline.chapter_number
@@ -113,4 +97,4 @@ def scene_part_ui(session_state):
         else:
             st.info(
                 "Generate Scene Outlines first in '4. Scene Outlines' section to generate Scene Parts."
-            )  # Changed to st.info and more informative message
+            )

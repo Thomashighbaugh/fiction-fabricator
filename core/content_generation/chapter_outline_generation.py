@@ -2,6 +2,8 @@
 from typing import Optional, List
 
 import re
+import tomli  # Import tomli
+import tomli_w
 
 from core.book_spec import BookSpec
 from llm.llm_client import OllamaClient
@@ -11,65 +13,27 @@ from .content_generation_utils import (
     ChapterOutline,
     ChapterOutlineMethod,
     PlotOutline,
-)  # Import ChapterOutline and ChapterOutlineMethod models
+)
 
 
 async def generate_chapter_outlines(
     content_generator, plot_outline: PlotOutline
 ) -> Optional[List[ChapterOutline]]:
     """
-    Generates chapter outlines based on a PlotOutline.
+    Generates chapter outlines based on a PlotOutline. Now requests and parses TOML.
     """
     ollama_client = OllamaClient()
     prompt_manager = PromptManager()
-    chapter_outlines: List[ChapterOutline] = []
     try:
         generation_prompt_template = (
             prompt_manager.create_chapter_outlines_generation_prompt()
         )
-
-        num_chapters = sum(
-            len(block)
-            for act_blocks in [
-                [
-                    plot_outline.act_one_block_one,
-                    plot_outline.act_one_block_two,
-                    plot_outline.act_one_block_three,
-                ],
-                [
-                    plot_outline.act_two_block_one,
-                    plot_outline.act_two_block_two,
-                    plot_outline.act_two_block_three,
-                ],
-                [
-                    plot_outline.act_three_block_one,
-                    plot_outline.act_three_block_two,
-                    plot_outline.act_three_block_three,
-                ],
-            ]
-            for block in act_blocks
-        )  # Dynamically determine num_chapters from all blocks
+        # Convert PlotOutline to TOML for the prompt
+        plot_outline_toml = tomli_w.dumps(plot_outline.model_dump())
 
         variables = {
-            "plot_outline": "\n".join(
-                [
-                    "Act One - Block 1:\n" + "\n".join(plot_outline.act_one_block_one),
-                    "Act One - Block 2:\n" + "\n".join(plot_outline.act_one_block_two),
-                    "Act One - Block 3:\n"
-                    + "\n".join(plot_outline.act_one_block_three),
-                    "Act Two - Block 1:\n" + "\n".join(plot_outline.act_two_block_one),
-                    "Act Two - Block 2:\n" + "\n".join(plot_outline.act_two_block_two),
-                    "Act Two - Block 3:\n"
-                    + "\n".join(plot_outline.act_two_block_three),
-                    "Act Three - Block 1:\n"
-                    + "\n".join(plot_outline.act_three_block_one),
-                    "Act Three - Block 2:\n"
-                    + "\n".join(plot_outline.act_three_block_two),
-                    "Act Three - Block 3:\n"
-                    + "\n".join(plot_outline.act_three_block_three),
-                ]
-            ),
-            "num_chapters": str(num_chapters),  # Pass num_chapters to prompt
+            "plot_outline_toml": plot_outline_toml,  # Pass TOML to prompt
+            "num_chapters": "27",  # default
         }
 
         generation_prompt = generation_prompt_template.format(**variables)
@@ -85,37 +49,43 @@ async def generate_chapter_outlines(
             return None
 
         logger.debug(f"Raw LLM Chapter Outline Response: {generated_text}")
+        # --- TOML Validation and Correction ---
+        expected_schema = """
+        chapters = [
+            {chapter_number = 1, summary = "string"},
+            {chapter_number = 2, summary = "string"},
+            # ... more chapters
+        ]
+        """
+        validated_text = await content_generator._validate_and_correct_toml(
+            generated_text, expected_schema
+        )
+        if not validated_text:
+            logger.error("TOML Validation Failed")
+            return None
+        generated_text = validated_text
+        # --- End TOML Validation ---
 
         try:
-            chapter_pattern = re.compile(
-                r"Chapter\s*(\d+):?\s*(.*?)(?=(?:\nChapter|$))",
-                re.DOTALL | re.IGNORECASE,
+            # Parse the TOML
+            chapter_data = tomli.loads(generated_text)
+            chapter_outlines = []
+            for chapter_info in chapter_data.get("chapters", []):
+                chapter_outlines.append(
+                    ChapterOutline(
+                        chapter_number=chapter_info["chapter_number"],
+                        summary=chapter_info["summary"],
+                    )
+                )
+            logger.info(
+                f"{len(chapter_outlines)} chapter outlines generated successfully."
             )
-            chapter_matches = chapter_pattern.finditer(generated_text)
+            return chapter_outlines
 
-            found_chapters = 0
-            for match in chapter_matches:
-                chapter_number = int(match.group(1))
-                chapter_summary = match.group(2).strip()
-                if chapter_summary:
-                    chapter_outlines.append(
-                        ChapterOutline(
-                            chapter_number=chapter_number, summary=chapter_summary
-                        )
-                    )
-                    found_chapters += 1
-                    logger.debug(
-                        f"Parsed chapter {chapter_number} outline: {chapter_summary[:50]}..."
-                    )
-        except Exception as e:
+        except (tomli.TOMLDecodeError, KeyError, TypeError) as e:
             logger.error(f"Error processing ChapterOutline responses: {e}")
             logger.debug("Raw LLM response: %s", generated_text)
             return None
-
-        logger.info(
-            "%d chapter outlines generated successfully.", len(chapter_outlines)
-        )
-        return chapter_outlines
 
     except Exception as e:
         logger.error(f"Error generating chapter outlines: {e}")
@@ -126,16 +96,14 @@ async def enhance_chapter_outlines(
     content_generator, current_outlines: List[ChapterOutline]
 ) -> Optional[List[ChapterOutline]]:
     """
-    Enhances existing chapter outlines using critique and rewrite.
+    Enhances existing chapter outlines.  Now uses TOML.
     """
     ollama_client = OllamaClient()
     prompt_manager = PromptManager()
     try:
-        # Convert ChapterOutline objects to text
-        outline_texts = [
-            f"Chapter {co.chapter_number}:\n{co.summary}" for co in current_outlines
-        ]
-        current_outlines_text = "\n\n".join(outline_texts)
+        # Convert ChapterOutline objects to TOML
+        outlines_dict = {"chapters": [co.model_dump() for co in current_outlines]}
+        current_outlines_toml = tomli_w.dumps(outlines_dict)
 
         # Define prompt templates for critique and rewrite
         critique_prompt_template = (
@@ -147,7 +115,7 @@ async def enhance_chapter_outlines(
 
         # Prepare variables for the prompts
         variables = {
-            "current_outlines": current_outlines_text,
+            "current_outlines_toml": current_outlines_toml,  # Pass TOML
         }
 
         critique_prompt_str = critique_prompt_template.format(**variables)
@@ -164,31 +132,50 @@ async def enhance_chapter_outlines(
         rewrite_prompt_str = rewrite_prompt_template.format(
             **variables,
             critique=critique,
-            current_outlines=current_outlines_text,
+            current_outlines_toml=current_outlines_toml,  # Pass TOML
         )
         # Rewrite content based on the critique
-        enhanced_outlines_text = await ollama_client.generate_text(
+        enhanced_outlines_toml = await ollama_client.generate_text(
             prompt=rewrite_prompt_str,
             model_name=content_generator.model_name,
         )
 
-        if enhanced_outlines_text:
-            enhanced_chapter_outlines: List[ChapterOutline] = []
-            try:
-                chapter_splits = enhanced_outlines_text.strip().split("Chapter ")
-                for i, chapter_text in enumerate(chapter_splits[1:], start=1):
-                    chapter_summary = chapter_text.split("Chapter")[0].strip()
-                    enhanced_chapter_outlines.append(
-                        ChapterOutline(chapter_number=i, summary=chapter_summary)
+        if not enhanced_outlines_toml:
+            logger.error("Failed to generate enhanced chapter outlines")
+            return None
+
+        # --- TOML Validation and Correction ---
+        expected_schema = """
+        chapters = [
+            {chapter_number = 1, summary = "string"},
+            {chapter_number = 2, summary = "string"},
+            # ... more chapters
+        ]
+        """
+        validated_text = await content_generator._validate_and_correct_toml(
+            enhanced_outlines_toml, expected_schema
+        )
+        if not validated_text:
+            logger.error("TOML Validation Failed")
+            return None
+        enhanced_outlines_toml = validated_text
+        # --- End TOML Validation ---
+
+        try:
+            enhanced_chapter_data = tomli.loads(enhanced_outlines_toml)
+            enhanced_chapter_outlines = []
+            for chapter_info in enhanced_chapter_data.get("chapters", []):
+                enhanced_chapter_outlines.append(
+                    ChapterOutline(
+                        chapter_number=chapter_info["chapter_number"],
+                        summary=chapter_info["summary"],
                     )
-                logger.info("Chapter outlines enhanced successfully.")
-                return enhanced_chapter_outlines
-            except (TypeError, ValueError) as e:
-                logger.error(f"Error processing enhanced ChapterOutline responses: {e}")
-                logger.debug("Raw LLM response: %s", enhanced_outlines_text)
-                return None
-        else:
-            logger.error("Failed to rewrite chapter outlines.")
+                )
+            logger.info("Chapter outlines enhanced successfully.")
+            return enhanced_chapter_outlines
+        except (tomli.TOMLDecodeError, KeyError, TypeError) as e:
+            logger.error(f"Error processing enhanced ChapterOutline responses: {e}")
+            logger.debug("Raw LLM response: %s", enhanced_outlines_toml)
             return None
 
     except Exception as e:
@@ -200,18 +187,19 @@ async def generate_chapter_outline_27_method(
     content_generator, book_spec: BookSpec
 ) -> Optional[List[ChapterOutlineMethod]]:
     """
-    Generates 27 chapter outlines using the 27-chapter method.
+    Generates 27 chapter outlines (27-chapter method). Requests TOML output.
     """
     ollama_client = OllamaClient()
     prompt_manager = PromptManager()
-    chapter_outlines_27_method: List[ChapterOutlineMethod] = []
     try:
         generation_prompt_template = (
             prompt_manager.create_chapter_outline_27_method_generation_prompt()
         )
+        # Convert book_spec to TOML
+        book_spec_toml = tomli_w.dumps(book_spec.model_dump())
 
         variables = {
-            "book_spec_json": book_spec.model_dump_json(indent=4),
+            "book_spec_toml": book_spec_toml,  # Use TOML in prompt
             "methodology_markdown": prompt_manager.methodology_markdown,
         }
         generation_prompt = generation_prompt_template.format(**variables)
@@ -230,36 +218,47 @@ async def generate_chapter_outline_27_method(
 
         logger.debug(f"Raw LLM Chapter Outline 27 Method Response: {generated_text}")
 
-        chapter_pattern = re.compile(
-            r"Chapter\s*(\d+)\s*–\s*(.*?)\s*–\s*(.*?)(?=(?:\nChapter|$))",
-            re.DOTALL | re.IGNORECASE,
+        # --- TOML Validation and Correction ---
+        expected_schema = """
+        chapters = [
+            {chapter_number = 1, role = "string", summary = "string"},
+            {chapter_number = 2, role = "string", summary = "string"},
+            # ... more chapters
+        ]
+        """
+        validated_text = await content_generator._validate_and_correct_toml(
+            generated_text, expected_schema
         )
-        chapter_matches = chapter_pattern.finditer(generated_text)
-        found_chapters = 0
+        if not validated_text:
+            logger.error("TOML Validation Failed")
+            return None
+        generated_text = validated_text
+        # --- End TOML Validation ---
 
-        for match in chapter_matches:
-            chapter_number = int(match.group(1))
-            chapter_role = match.group(2).strip()
-            chapter_summary = match.group(3).strip()
-
-            if chapter_summary and chapter_role:
+        try:
+            # Parse the TOML
+            chapter_data = tomli.loads(generated_text)
+            chapter_outlines_27_method = []
+            for chapter_info in chapter_data.get("chapters", []):
                 chapter_outlines_27_method.append(
                     ChapterOutlineMethod(
-                        chapter_number=chapter_number,
-                        role=chapter_role,
-                        summary=chapter_summary,
+                        chapter_number=chapter_info["chapter_number"],
+                        role=chapter_info["role"],
+                        summary=chapter_info["summary"],
                     )
                 )
-                found_chapters += 1
-                logger.debug(
-                    f"Parsed chapter {chapter_number} outline: {chapter_summary[:50]}..."
-                )
+            logger.info(
+                "%d chapter outlines (27 method) generated successfully.",
+                len(chapter_outlines_27_method),
+            )
+            return chapter_outlines_27_method
 
-        logger.info(
-            "%d chapter outlines (27 method) generated successfully.",
-            len(chapter_outlines_27_method),
-        )
-        return chapter_outlines_27_method
+        except (tomli.TOMLDecodeError, KeyError, TypeError) as e:
+            logger.error(
+                f"Error processing ChapterOutlineMethod responses: {e}, {chapter_data}"
+            )
+            logger.debug("Raw LLM response: %s", generated_text)
+            return None
 
     except Exception as e:
         logger.error(f"Error generating 27 chapter outlines: {e}")
@@ -270,17 +269,14 @@ async def enhance_chapter_outlines_27_method(
     content_generator, current_outlines: List[ChapterOutlineMethod]
 ) -> Optional[List[ChapterOutlineMethod]]:
     """
-    Asynchronously enhances existing 27 chapter outlines using critique and rewrite.
+    Enhances existing 27 chapter outlines (27-chapter method). Uses TOML.
     """
     ollama_client = OllamaClient()
     prompt_manager = PromptManager()
     try:
-        # Convert ChapterOutlineMethod objects to text
-        outline_texts = [
-            f"Chapter {co.chapter_number} – {co.role}:\n{co.summary}"
-            for co in current_outlines
-        ]
-        current_outlines_text = "\n\n".join(outline_texts)
+        # Convert ChapterOutlineMethod objects to TOML
+        outlines_dict = {"chapters": [co.model_dump() for co in current_outlines]}
+        current_outlines_toml = tomli_w.dumps(outlines_dict)
 
         # Define prompt templates for critique and rewrite
         critique_prompt_template = (
@@ -292,7 +288,7 @@ async def enhance_chapter_outlines_27_method(
 
         # Prepare variables for the prompts
         variables = {
-            "current_outlines": current_outlines_text,
+            "current_outlines_toml": current_outlines_toml,  # Pass TOML
         }
 
         critique_prompt_str = critique_prompt_template.format(**variables)
@@ -307,45 +303,55 @@ async def enhance_chapter_outlines_27_method(
             rewrite_prompt_str = rewrite_prompt_template.format(
                 **variables,
                 critique=critique,
-                current_outlines=current_outlines_text,
+                current_outlines_toml=current_outlines_toml,  # Pass TOML
             )
             # Rewrite content based on the critique
-            enhanced_outlines_text = await ollama_client.generate_text(
+            enhanced_outlines_toml = await ollama_client.generate_text(
                 prompt=rewrite_prompt_str,
                 model_name=content_generator.model_name,
             )
 
-            if enhanced_outlines_text:
-                enhanced_chapter_outlines_27_method: List[ChapterOutlineMethod] = []
-                try:
-                    chapter_pattern = re.compile(
-                        r"Chapter\s*(\d+)\s*–\s*(.*?)\s*–\s*(.*?)(?=(?:\nChapter|$))",
-                        re.DOTALL | re.IGNORECASE,
-                    )
-                    chapter_matches = chapter_pattern.finditer(enhanced_outlines_text)
+            if not enhanced_outlines_toml:
+                logger.error("Failed to enhance chapter outlines")
+                return None
 
-                    for match in chapter_matches:
-                        chapter_number = int(match.group(1))
-                        chapter_role = match.group(2).strip()
-                        chapter_summary = match.group(3).strip()
-                        enhanced_chapter_outlines_27_method.append(
-                            ChapterOutlineMethod(
-                                chapter_number=chapter_number,
-                                role=chapter_role,
-                                summary=chapter_summary,
-                            )
+            # --- TOML Validation and Correction ---
+            expected_schema = """
+            chapters = [
+                {chapter_number = 1, role = "string", summary = "string"},
+                {chapter_number = 2, role = "string", summary = "string"},
+                # ... more chapters
+            ]
+            """
+            validated_text = await content_generator._validate_and_correct_toml(
+                enhanced_outlines_toml, expected_schema
+            )
+            if not validated_text:
+                logger.error("TOML Validation Failed")
+                return None
+            enhanced_outlines_toml = validated_text
+            # --- End TOML Validation ---
+
+            try:
+                # Parse TOML
+                enhanced_chapter_data = tomli.loads(enhanced_outlines_toml)
+                enhanced_chapter_outlines_27_method = []
+
+                for chapter_info in enhanced_chapter_data.get("chapters", []):
+                    enhanced_chapter_outlines_27_method.append(
+                        ChapterOutlineMethod(
+                            chapter_number=chapter_info["chapter_number"],
+                            role=chapter_info["role"],
+                            summary=chapter_info["summary"],
                         )
-                    logger.info("Chapter outlines (27 method) enhanced successfully.")
-                    return enhanced_chapter_outlines_27_method
-                except (TypeError, ValueError) as e:
-                    logger.error(
-                        "Error processing enhanced ChapterOutlineMethod responses: %s",
-                        e,
                     )
-                    logger.debug("Raw LLM response: %s", enhanced_outlines_text)
-                    return None
-            else:
-                logger.error("Failed to rewrite chapter outlines (27 method).")
+                logger.info("Chapter outlines (27 method) enhanced successfully.")
+                return enhanced_chapter_outlines_27_method
+            except (tomli.TOMLDecodeError, KeyError, TypeError) as e:
+                logger.error(
+                    "Error processing enhanced ChapterOutlineMethod responses: %s", e
+                )
+                logger.debug("Raw LLM response: %s", enhanced_outlines_toml)
                 return None
         else:
             logger.error(

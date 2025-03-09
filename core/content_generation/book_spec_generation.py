@@ -1,8 +1,9 @@
 # core/content_generation/book_spec_generation.py
 from typing import Optional
 
-import json
 import re
+import tomli
+import tomli_w
 
 from core.book_spec import BookSpec
 from llm.llm_client import OllamaClient
@@ -13,23 +14,15 @@ from pydantic import ValidationError
 
 async def generate_book_spec(content_generator, idea: str) -> Optional[BookSpec]:
     """
-    Generates a BookSpec object from a story idea using LLM.
+    Generates a BookSpec object from a story idea, expecting TOML output.
     """
-    ollama_client = OllamaClient()
-    prompt_manager = PromptManager()
+    ollama_client = content_generator.ollama_client
+    prompt_manager = content_generator.prompt_manager
     try:
-        generation_prompt_template = prompt_manager.create_book_spec_generation_prompt()
-        structure_check_prompt_template = (
-            prompt_manager.create_book_spec_structure_check_prompt()
-        )
-        structure_fix_prompt_template = (
-            prompt_manager.create_book_spec_structure_fix_prompt()
-        )
-
-        variables = {
-            "idea": idea,
-        }
-
+        generation_prompt_template = (
+            prompt_manager.create_book_spec_generation_prompt()
+        )  # Will be updated in prompt_manager
+        variables = {"idea": idea}
         generation_prompt = generation_prompt_template.format(**variables)
 
         generated_text = await ollama_client.generate_text(
@@ -40,67 +33,32 @@ async def generate_book_spec(content_generator, idea: str) -> Optional[BookSpec]
             logger.error("Failed to generate book specification.")
             return None
 
-        # Structure Check
-        structure_check_variables = {"book_spec_json": generated_text}
-        structure_check_prompt = structure_check_prompt_template.format(
-            **structure_check_variables
-        )
-
-        structure_check_result = await ollama_client.generate_text(
-            model_name=content_generator.model_name,
-            prompt=structure_check_prompt,
-        )
-        if structure_check_result != "STRUCTURE_OK":
-            logger.warning("BookSpec structure check failed. Attempting to fix...")
-            structure_fix_variables = {
-                "book_spec_json": generated_text,
-                "structure_problems": structure_check_result,
-            }
-            structure_fix_prompt = structure_fix_prompt_template.format(
-                **structure_fix_variables
-            )
-            fixed_text = await ollama_client.generate_text(
-                model_name=content_generator.model_name,
-                prompt=structure_fix_prompt,
-            )
-            if fixed_text:
-                generated_text = fixed_text
-                logger.info("BookSpec structure fixed successfully.")
-            else:
-                logger.error("Failed to fix BookSpec structure.")
-                return None
+        # --- TOML Validation and Correction ---
+        expected_schema = """
+title = "string"
+genre = "string"
+setting = "string"
+themes = ["string", "string"]
+tone = "string"
+point_of_view = "string"
+characters = [ { name = "string", description = "string"  } ] #example
+premise = "string"
+"""
+        validated_text = await content_generator._validate_and_correct_toml(
+            generated_text, expected_schema
+        )  # New helper function
+        if not validated_text:
+            logger.error("TOML Validation Failed")
+            return None
+        generated_text = validated_text
+        # --- End TOML Validation ---
 
         try:
-            # Enhanced JSON cleaning: Remove markdown delimiters and common issues
-            generated_text = generated_text.strip()
-            if generated_text.startswith("```json") and generated_text.endswith("```"):
-                generated_text = generated_text[7:-3].strip()
-            if generated_text.startswith("```") and generated_text.endswith("```"):
-                generated_text = generated_text[
-                    3:-3
-                ].strip()  # strip generic code block
-            generated_text = re.sub(
-                r"^.*?\{", "{", generated_text, flags=re.DOTALL
-            )  # Remove leading text before JSON
-            generated_text = re.sub(
-                r"\}[^\}]*$", "}", generated_text, flags=re.DOTALL
-            )  # Remove trailing text after JSON
-            generated_text = re.sub(
-                r']\s*"premise":', '], "premise":', generated_text
-            )  # Fix missing comma before "premise"
-            generated_text = generated_text.replace(
-                "\\\n", "\n"
-            )  # Handle escaped newlines
-            generated_text = generated_text.replace('\\"', '"')  # Handle escaped quotes
-            generated_text = re.sub(
-                r'""([^"]+)""', r'"\1"', generated_text
-            )  # Remove extra double quotes
-
-            book_spec_dict = json.loads(generated_text)
+            book_spec_dict = tomli.loads(generated_text)  # Use tomli.loads()
             book_spec = BookSpec(**book_spec_dict)
             logger.info("Book specification generated successfully.")
             return book_spec
-        except (json.JSONDecodeError, ValidationError) as e:
+        except (tomli.TOMLDecodeError, ValidationError) as e:
             error_message = f"Error decoding or validating BookSpec: {e}"
             logger.error(error_message)
             logger.debug("Raw LLM response: %s", generated_text)
@@ -115,92 +73,68 @@ async def enhance_book_spec(
     content_generator, current_spec: BookSpec
 ) -> Optional[BookSpec]:
     """
-    Enhances an existing BookSpec object using critique and rewrite.
+    Enhances a BookSpec, expecting TOML input and output.
     """
-    ollama_client = OllamaClient()
-    prompt_manager = PromptManager()
+    ollama_client = content_generator.ollama_client
+    prompt_manager = content_generator.prompt_manager
     try:
-        # Define prompt templates for critique and rewrite
         critique_prompt_template = prompt_manager.create_book_spec_critique_prompt()
         rewrite_prompt_template = prompt_manager.create_book_spec_rewrite_prompt()
 
-        # Prepare variables for the prompts
         variables = {
-            "current_spec_json": current_spec.model_dump_json(indent=4),
+            "current_spec_toml": tomli_w.dumps(
+                current_spec.model_dump()
+            ),  # Convert to TOML
+            "critique": "",  # Placeholder, will be filled in later
         }
-
         critique_prompt_str = critique_prompt_template.format(**variables)
-
-        # Generate actionable critique
         critique = await ollama_client.generate_text(
-            model_name=content_generator.model_name,
-            prompt=critique_prompt_str,
+            model_name=content_generator.model_name, prompt=critique_prompt_str
         )
 
         if not critique:
-            logger.error("Failed to generate critique for book specification.")
+            logger.error("Failed to generate critique")
             return None
 
-        # Rewrite content based on the critique
-        rewrite_prompt_str = rewrite_prompt_template.format(
-            **variables, critique=critique
+        variables["critique"] = critique
+        rewrite_prompt_str = rewrite_prompt_template.format(**variables)
+        enhanced_spec_toml = await ollama_client.generate_text(
+            model_name=content_generator.model_name, prompt=rewrite_prompt_str
         )
-        enhanced_spec_json = await ollama_client.generate_text(
-            model_name=content_generator.model_name,
-            prompt=rewrite_prompt_str,
-        )
-
-        if not enhanced_spec_json:
-            logger.error("Failed to rewrite book specification.")
+        if not enhanced_spec_toml:
+            logger.error("Failed to generate enhanced book spec")
             return None
+        # --- TOML Validation and Correction ---
+        expected_schema = """
+title = "string"
+genre = "string"
+setting = "string"
+themes = ["string", "string"]
+tone = "string"
+point_of_view = "string"
+characters = [ { name = "string", description = "string"  } ] #example
+premise = "string"
+"""
+
+        validated_text = await content_generator._validate_and_correct_toml(
+            enhanced_spec_toml, expected_schema
+        )
+        if not validated_text:
+            logger.error("TOML Validation Failed")
+            return None
+        enhanced_spec_toml = validated_text
+        # --- End TOML Validation ---
 
         try:
-            # Enhanced JSON cleaning: Remove markdown delimiters and common issues
-            enhanced_spec_json = enhanced_spec_json.strip()
-            if enhanced_spec_json.startswith("```json") and enhanced_spec_json.endswith(
-                "```"
-            ):
-                enhanced_spec_json = enhanced_spec_json[7:-3].strip()
-            if enhanced_spec_json.startswith("```") and enhanced_spec_json.endswith(
-                "```"
-            ):
-                enhanced_spec_json = enhanced_spec_json[
-                    3:-3
-                ].strip()  # strip generic code block
-            enhanced_spec_json = re.sub(
-                r"^.*?\{", "{", enhanced_spec_json, flags=re.DOTALL
-            )  # Remove leading text before JSON
-            enhanced_spec_json = re.sub(
-                r"\}[^\}]*$", "}", enhanced_spec_json, flags=re.DOTALL
-            )  # Remove trailing text after JSON
-            enhanced_spec_json = re.sub(
-                r']\s*"premise":', '], "premise":', enhanced_spec_json
-            )  # Fix missing comma before "premise"
-            enhanced_spec_json = enhanced_spec_json.replace(
-                "\\\n", "\n"
-            )  # Handle escaped newlines
-            enhanced_spec_json = enhanced_spec_json.replace(
-                '\\"', '"'
-            )  # Handle escaped quotes
-            enhanced_spec_json = re.sub(
-                r'""([^"]+)""', r'"\1"', enhanced_spec_json
-            )  # Remove extra double quotes
-
-            book_spec_dict = json.loads(enhanced_spec_json)
+            book_spec_dict = tomli.loads(enhanced_spec_toml)
             enhanced_spec = BookSpec(**book_spec_dict)
             logger.info("Book specification enhanced successfully.")
             return enhanced_spec
-        except (json.JSONDecodeError, ValidationError) as e:
-            error_message = f"Error decoding or validating enhanced BookSpec: {e}"
-            logger.error(error_message)
-            logger.debug("Raw LLM response: %s", enhanced_spec_json)
-            logger.debug(
-                f"Raw LLM response before cleaning: %s", enhanced_spec_json
-            )  # Added raw response logging
 
+        except (tomli.TOMLDecodeError, ValidationError) as e:
+            logger.error(f"Error decoding/validating enhanced book spec: {e}")
+            logger.debug(f"Raw TOML: {enhanced_spec_toml}")
             return None
-
     except Exception as e:
-        logger.exception("Exception occurred during book specification enhancement.")
+        logger.exception("Exception during book spec enhancement")
         return None
-

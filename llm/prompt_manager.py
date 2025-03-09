@@ -1,4 +1,4 @@
-# /home/tlh/fiction-fabricator/llm/prompt_manager.py
+# llm/prompt_manager.py
 from llm.prompts import base_prompts
 from llm.prompts import book_spec_prompts
 from llm.prompts import chapter_outline_prompts
@@ -12,12 +12,14 @@ class PromptManager:
         self.methodology_markdown = base_prompts.METHODOLOGY_MARKDOWN
 
     def create_book_spec_generation_prompt(self) -> str:
-        return book_spec_prompts.get_book_spec_generation_prompt("{idea}")
+        return book_spec_prompts.get_book_spec_generation_prompt(
+            "{idea}"
+        )  # Corrected Call
 
     def create_book_spec_enhancement_prompt(self, current_spec) -> str:
         return book_spec_prompts.get_book_spec_enhancement_prompt(
-            current_spec.model_dump_json(indent=4)
-        )
+            current_spec
+        )  # No change needed - handled in generation function
 
     def create_book_spec_critique_prompt(self) -> str:
         return book_spec_prompts.get_book_spec_critique_prompt()
