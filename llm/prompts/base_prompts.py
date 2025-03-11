@@ -56,6 +56,8 @@ CRITIQUE_REQUEST = """Provide a concise critique (2-3 sentences) that identifies
 
 REWRITE_REQUEST = """Rewrite the following based on the critique, focusing on the identified areas for improvement. Maintain consistency with any provided context (book specification, chapter outline, scene outline, etc.). The rewritten content should be more engaging, immersive, and thematically resonant."""
 
+ENHANCE_REQUEST = """Enhance the following, taking into account the provided critique and any existing context. Focus on improving clarity, detail, coherence, and thematic resonance."""
+
 METHODOLOGY_MARKDOWN = """
 # 27 Chapter Plot Outline Method
 
@@ -109,5 +111,4 @@ Instead of being intended to provide a strict course of the action within a nove
         -   Chapter 25 – Battle – the time has come for the final battle (can be literal or figurative) (setup)
         -   Chapter 26 – Climax– the battle is either lost or won (depending on the type of story you’re telling) (conflict)
         -   Chapter 27 – Resolution – the aftermath of the battle, the character(s) have grown into different people from those at the beginning of the story(resolution)
-```
 """

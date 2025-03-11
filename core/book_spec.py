@@ -1,5 +1,6 @@
 # core/book_spec.py
-from typing import List, Dict, Union, Any
+# core/book_spec.py
+from typing import List, Dict, Union
 from pydantic import BaseModel, field_validator
 
 
@@ -14,7 +15,7 @@ class BookSpec(BaseModel):
     themes: List[str]
     tone: str
     point_of_view: str
-    characters: List[Union[str, Dict[str, str]]]  # Changed to List[Dict[str, str]]
+    characters: List[str]  # Changed to List[str] - single string for character
     premise: str
 
     @field_validator("setting")

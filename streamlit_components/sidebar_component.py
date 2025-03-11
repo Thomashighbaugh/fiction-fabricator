@@ -1,4 +1,5 @@
 # streamlit_components/sidebar_component.py
+# streamlit_components/sidebar_component.py
 import streamlit as st
 
 from core.content_generator import ContentGenerator
@@ -92,6 +93,9 @@ def create_sidebar(session_state):
                         # Robustly handle potentially missing data.
                         for key, value in loaded_data.items():
                             if key == "book_spec" and value:
+                                # Handle potential old format of characters
+                                if isinstance(value.get("characters"), list) and all(isinstance(char, dict) for char in value["characters"]):
+                                    value["characters"] = [char.get("description", "") for char in value["characters"]] # Extract descriptions
                                 session_state[key] = BookSpec(**value)
                             elif key == "plot_outline" and value:
                                 session_state[key] = PlotOutline(**value)
@@ -135,4 +139,3 @@ def create_sidebar(session_state):
                         )
                 else:
                     st.warning("Please select or enter a project name to load.")
-

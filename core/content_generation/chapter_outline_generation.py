@@ -1,7 +1,6 @@
 # core/content_generation/chapter_outline_generation.py
 from typing import Optional, List
 
-import re
 import tomli  # Import tomli
 import tomli_w
 
@@ -29,7 +28,7 @@ async def generate_chapter_outlines(
             prompt_manager.create_chapter_outlines_generation_prompt()
         )
         # Convert PlotOutline to TOML for the prompt
-        plot_outline_toml = tomli_w.dumps(plot_outline.model_dump())
+        plot_outline_toml = tomli_w.dumps(plot_outline.model_dump_toml())
 
         variables = {
             "plot_outline_toml": plot_outline_toml,  # Pass TOML to prompt
@@ -49,6 +48,36 @@ async def generate_chapter_outlines(
             return None
 
         logger.debug(f"Raw LLM Chapter Outline Response: {generated_text}")
+
+        # --- Critique and Rewrite ---
+        critique_prompt_template = prompt_manager.create_chapter_outlines_critique_prompt()
+        rewrite_prompt_template = prompt_manager.create_chapter_outlines_rewrite_prompt()
+
+        critique_variables = {
+            "current_outlines_toml": generated_text
+        }
+        critique_prompt = critique_prompt_template.format(**critique_variables)
+        critique = await ollama_client.generate_text(
+            model_name=content_generator.model_name,
+            prompt=critique_prompt
+        )
+
+        if critique:
+            rewrite_variables = {
+                "current_outlines_toml": generated_text,
+                "critique": critique
+            }
+            rewrite_prompt = rewrite_prompt_template.format(**rewrite_variables)
+            generated_text = await ollama_client.generate_text(
+                model_name=content_generator.model_name,
+                prompt=rewrite_prompt
+            )
+            if not generated_text:
+                logger.error("Failed to rewrite chapter outlines after critique.")
+                return None
+        else:
+            logger.warning("No critique generated; proceeding with original output.")
+
         # --- TOML Validation and Correction ---
         expected_schema = """
         chapters = [
@@ -102,7 +131,7 @@ async def enhance_chapter_outlines(
     prompt_manager = PromptManager()
     try:
         # Convert ChapterOutline objects to TOML
-        outlines_dict = {"chapters": [co.model_dump() for co in current_outlines]}
+        outlines_dict = {"chapters": [co.model_dump_toml() for co in current_outlines]}
         current_outlines_toml = tomli_w.dumps(outlines_dict)
 
         # Define prompt templates for critique and rewrite
@@ -196,7 +225,7 @@ async def generate_chapter_outline_27_method(
             prompt_manager.create_chapter_outline_27_method_generation_prompt()
         )
         # Convert book_spec to TOML
-        book_spec_toml = tomli_w.dumps(book_spec.model_dump())
+        book_spec_toml = tomli_w.dumps(book_spec.model_dump_toml())
 
         variables = {
             "book_spec_toml": book_spec_toml,  # Use TOML in prompt
@@ -217,6 +246,35 @@ async def generate_chapter_outline_27_method(
             return None
 
         logger.debug(f"Raw LLM Chapter Outline 27 Method Response: {generated_text}")
+
+
+        # --- Critique and Rewrite ---
+        critique_prompt_template = prompt_manager.create_chapter_outline_27_method_critique_prompt()
+        rewrite_prompt_template = prompt_manager.create_chapter_outline_27_method_rewrite_prompt()
+
+        critique_variables = {
+            "current_outlines_toml" : generated_text
+        }
+        critique_prompt = critique_prompt_template.format(**critique_variables)
+        critique = await ollama_client.generate_text(
+            model_name=content_generator.model_name,
+            prompt=critique_prompt
+        )
+        if critique:
+            rewrite_variables = {
+                "current_outlines_toml": generated_text,
+                "critique": critique
+            }
+            rewrite_prompt = rewrite_prompt_template.format(**rewrite_variables)
+            generated_text = await ollama_client.generate_text(
+                model_name=content_generator.model_name,
+                prompt=rewrite_prompt
+            )
+            if not generated_text:
+                logger.error("Failed to rewrite 27 chapter outlines after critique")
+                return None
+        else:
+            logger.warning("No critique generated; proceeding with original output.")
 
         # --- TOML Validation and Correction ---
         expected_schema = """
@@ -275,7 +333,7 @@ async def enhance_chapter_outlines_27_method(
     prompt_manager = PromptManager()
     try:
         # Convert ChapterOutlineMethod objects to TOML
-        outlines_dict = {"chapters": [co.model_dump() for co in current_outlines]}
+        outlines_dict = {"chapters": [co.model_dump_toml() for co in current_outlines]}
         current_outlines_toml = tomli_w.dumps(outlines_dict)
 
         # Define prompt templates for critique and rewrite

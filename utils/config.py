@@ -16,7 +16,7 @@ class Config(BaseSettings):
     project_directory: str = "data"
     log_level: str = "DEBUG"
     ollama_model_name: str = (
-        "huggingface.co/DavidAU/Mistral-MOE-4X7B-Dark-MultiVerse-Uncensored-Enhanced32-24B-gguf:latest"
+        "huggingface.co/DavidAU/Llama-3.2-4X3B-MOE-Hell-California-Uncensored-10B-GGUF:latest"
     )
     ollama_base_url: str = "http://localhost:11434"
     ollama_timeout: float | None = None

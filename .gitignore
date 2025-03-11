@@ -15,3 +15,4 @@ prompt.txt
 **/*.patch
 **/prompt.txt 
 **/*prompt*
+**/*code2prompt*

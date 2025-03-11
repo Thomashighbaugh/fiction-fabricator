@@ -1,68 +1,87 @@
-# llm/prompts/scene_prompts.py
-from llm.prompts import base_prompts
 
+# llm/prompts/scene_outline_prompts.py
+from llm.prompts.base_prompts import COMMON_PREAMBLE, CRITIQUE_REQUEST, REWRITE_REQUEST, ENHANCE_REQUEST
 
-def get_scene_outlines_generation_prompt() -> str:
-    return f"""{base_prompts.COMMON_PREAMBLE}
+def create_scene_outlines_generation_prompt():
+    """
+    Creates the prompt for generating scene outlines for a chapter.
+    """
+    prompt = f"""{COMMON_PREAMBLE}
 
-You are a world-class scene writer who can break-down chapter outlines into comprehensive lists of scene outlines.
-Based on the following chapter outline, create detailed outlines for {{num_scenes_per_chapter}} scenes within this chapter. Ensure the scenes logically break down the chapter's events and contribute to the overall narrative.
-
-Chapter Outline:
+Generate scene outlines for a chapter with the following summary:
 ```
 {{chapter_outline}}
 ```
-
-For each scene, provide a concise outline (1-2 paragraphs) summarizing the key events, setting, characters present, and purpose of the scene within the chapter and overall story. The scene outlines should:
-- Logically break down the events described in the chapter outline.
-- Detail the setting and characters involved in each scene.
-- Clearly indicate the purpose of each scene in advancing the plot, developing characters, or enhancing themes.
-- Be numbered sequentially within the chapter (Scene 1, Scene 2, etc.).
-
-Ensure the scene outlines collectively cover all key events of the chapter and provide a detailed guide for writing the scenes.
+Generate approximately {{num_scenes_per_chapter}} scene outlines.
+Each scene should include a scene number and a brief summary.
+Output (Plain Text):
 """
+    return prompt
 
 
-def get_scene_outlines_critique_prompt() -> str:
-    return f"""{base_prompts.COMMON_PREAMBLE}
+def create_scene_outlines_critique_prompt():
+    """Creates the prompt for critiquing scene outlines."""
+    prompt = f"""{COMMON_PREAMBLE}
 
-You are a novel editor providing feedback on a set of scene outlines. Your goal is to identify areas where the outlines can be strengthened to create a more compelling and well-structured chapter.
+{CRITIQUE_REQUEST}
 
-Here are the current scene outlines:
+Provide a critique of the following scene outlines:
+```
+{{current_outlines}}
+```
+"""
+    return prompt
+
+
+def create_scene_outlines_rewrite_prompt():
+    """Creates the prompt for rewriting scene outlines based on a critique."""
+    prompt = f"""{COMMON_PREAMBLE}
+
+{REWRITE_REQUEST}
+
+Original Scene Outlines:
 ```
 {{current_outlines}}
 ```
 
-{base_prompts.CRITIQUE_REQUEST}
-"""
-
-
-def get_scene_outlines_rewrite_prompt() -> str:
-    return f"""{base_prompts.COMMON_PREAMBLE}
-
-You are a novelist revising a set of scene outlines based on editor feedback. Your goal is to create a more compelling and well-structured chapter.
-
-Here are the current scene outlines:
-```
-{{current_outlines}}
-```
-
-Here is the editor's critique:
+Critique:
 ```
 {{critique}}
 ```
 
-Revise the scene outlines based on the critique, focusing on the identified areas for improvement. Ensure that the revised outlines have a strong scene-to-scene flow, good pacing within the chapter, clear contribution of scenes to chapter objectives and plot, effective character development, thematic consistency.
+Enhanced Scene Outlines:
 """
+    return prompt
+
+def create_scene_outlines_enhancement_prompt():
+    prompt = f"""{COMMON_PREAMBLE}
+    {ENHANCE_REQUEST}
+Original Scene Outlines:
+```
+{{current_outlines}}
+```
+
+Critique:
+```
+{{critique}}
+```
+
+Enhanced Scene Outlines:
+"""
+    return prompt
 
 
-def get_scene_part_generation_prompt() -> str:
-    return f"""{base_prompts.COMMON_PREAMBLE}
+def create_scene_part_generation_prompt():
+    """Creates prompt for generating a scene part."""
+    prompt = f"""{COMMON_PREAMBLE}
 
-You are a world-class novelist who can generate specific parts of scenes from scene outlines.
-Generate part {{part_number}} of the text for the following scene, based on the provided book specification, chapter outline, and scene outline.
+Generate part {{part_number}} of a scene with the following outline:
+Scene Outline:
+```
+{{scene_outline}}
+```
 
-Book Specification (in TOML format):
+Book Specification (TOML):
 ```toml
 {{book_spec_toml}}
 ```
@@ -72,106 +91,155 @@ Chapter Outline:
 {{chapter_outline}}
 ```
 
-Scene Outline:
+Full Scene Outline:
 ```
 {{scene_outline_full}}
 ```
 
-Specifically for Part {{part_number}} of the scene, focusing on the following outline points:
-```
-{{scene_outline}}
-```
-
-Write this part of the scene in a compelling and descriptive manner, consistent with the tone, themes, and characters established in the book specification. Focus on vivid descriptions, engaging dialogue, and actions that move the scene forward.
-
-The generated text should be suitable for inclusion in a novel and should seamlessly connect with the preceding and subsequent parts of the scene (if applicable).
+Output (Scene Part):
 """
+    return prompt
 
 
-def get_scene_part_critique_prompt() -> str:
-    return f"""{base_prompts.COMMON_PREAMBLE}
+def create_scene_part_critique_prompt():
+    """Creates prompt for critiquing a scene part."""
+    prompt = f"""{COMMON_PREAMBLE}
 
-You are a world-class editor providing concise and actionable feedback to improve a scene part in a novel.
+{CRITIQUE_REQUEST}
 
-**Critique Guidelines:**
-- **Actionable and Specific:** Focus on concrete areas for improvement (e.g., "dialogue is weak," "description too vague," "pacing too slow").
-- **Concise:** Keep the critique to 2-3 sentences.  Prioritize the most impactful feedback.
-- **Constructive Tone:** Frame feedback positively to encourage improvement.
-- **Focus Areas:** Sentence structure, vocabulary, character emotions, pacing, thematic integration and consistency.
+Critique the following scene part, considering the book specification, chapter outline, and full scene outline:
 
-Here is the scene part for critique:
+Book Specification (TOML):
+```toml
+{{book_spec_toml}}
+```
+
+Chapter Outline:
+```
+{{chapter_outline}}
+```
+
+Full Scene Outline:
+```
+{{scene_outline_full}}
+```
+
+Part Number:
+```
+{{part_number}}
+```
+
+Scene Part Content:
 ```
 {{content}}
 ```
-
-**Context:**
-- Book Specification (in TOML format): {{book_spec_toml}}
-- Chapter Outline: {{chapter_outline}}
-- Scene Outline: {{scene_outline_full}}
-- Part Number: {{part_number}}
-
-**Provide your critique:** (2-3 sentences max)
 """
+    return prompt
 
 
-def get_scene_part_rewrite_prompt() -> str:
-    return f"""{base_prompts.COMMON_PREAMBLE}
+def create_scene_part_rewrite_prompt():
+    """Creates prompt for rewriting a scene part based on a critique."""
+    prompt = f"""{COMMON_PREAMBLE}
 
-You are a skilled writer tasked with rewriting a scene part from a novel based on a critique.
-Your goal is to improve the writing quality, narrative impact, and thematic depth of the scene part.
+{REWRITE_REQUEST}
 
-Here is the scene part:
+Book Specification (TOML):
+```toml
+{{book_spec_toml}}
 ```
-{{content}}
+
+Chapter Outline:
+```
+{{chapter_outline}}
 ```
 
-Here is the critique:
+Full Scene Outline:
+```
+{{scene_outline_full}}
+```
+
+Part Number: {{part_number}}
+
+Critique:
 ```
 {{critique}}
 ```
 
-Given the following context:
-- Book Specification (in TOML format): {{book_spec_toml}}
-- Chapter Outline: {{chapter_outline}}
-- Scene Outline: {{scene_outline_full}}
-- Part Number: {{part_number}}
+Original Content:
+```
+{{content}}
+```
 
-Rewrite the scene part based on the critique, focusing on the identified areas for improvement.
-Maintain consistency with the book specification, chapter outline, and scene outline.
-The rewritten scene part should be more engaging, immersive, and thematically resonant.
+Enhanced Scene Part:
 """
+    return prompt
 
 
-def get_scene_part_structure_check_prompt() -> str:
-    return """You are a meticulous editor reviewing a scene part for its structure, grammar and narrative consistency.
+def create_scene_part_structure_check_prompt():
+    """Checks if the generated scene part has a basic, coherent structure."""
+    prompt = f"""{COMMON_PREAMBLE}
 
-Here is the scene part:
+Check if the following scene part has a basic, coherent structure (e.g., clear sentences, logical flow):
 ```
-{scene_part}
+{{scene_part}}
 ```
-
-Your task is to ensure that the scene part:
-- Is grammatically correct and uses proper sentence structure
-- Follows logically from any previous scene parts and introduces and plot elements correctly to transition to the next portion.
-
-If the scene part adheres to the correct structure, respond with "STRUCTURE_OK".
-If there are any structural issues, respond with a detailed explanation of the problems.
+If the structure is OK, output ONLY 'STRUCTURE_OK'.
+If there are structural problems, output a concise description of the issues.
+Output:
 """
+    return prompt
 
 
-def get_scene_part_structure_fix_prompt() -> str:
-    return """You are a meticulous editor tasked with fixing structure and grammar issues in a scene part.
+def create_scene_part_structure_fix_prompt():
+    """Attempts to fix structural issues in a scene part."""
+    prompt = f"""{COMMON_PREAMBLE}
 
-Here is the flawed scene part:
+The following scene part has structural problems.  Rewrite it to improve clarity, flow, and coherence:
+
+Original Scene Part:
 ```
-{scene_part}
+{{scene_part}}
 ```
 
-Here is a detailed list of structural and grammatical problems and how to fix them:
+Identified Structural Problems:
 ```
-{structure_problems}
+{{structure_problems}}
 ```
 
-Your task is to modify the scene part to address the identified problems.
-Return a corrected version of the scene part, without deviations or extra explanation. Focus on grammar and clarity.
+Fixed Scene Part:
 """
+    return prompt
+
+def create_scene_part_enhancement_prompt():
+    prompt = f"""{COMMON_PREAMBLE}
+
+{ENHANCE_REQUEST}
+
+Book Specification (TOML):
+```toml
+{{book_spec_toml}}
+```
+
+Chapter Outline:
+```
+{{chapter_outline}}
+```
+
+Full Scene Outline:
+```
+{{scene_outline_full}}
+```
+
+Part Number: {{part_number}}
+
+Critique:
+```
+{{critique}}
+```
+
+Original Content:
+```
+{{content}}
+```
+Enhanced Scene Part:"""
+    return prompt

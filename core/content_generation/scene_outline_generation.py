@@ -37,6 +37,35 @@ async def generate_scene_outlines(
             logger.error("Failed to generate scene outlines.")
             return None
 
+
+        # --- Critique and Rewrite ---
+        critique_prompt_template = prompt_manager.create_scene_outlines_critique_prompt()
+        rewrite_prompt_template = prompt_manager.create_scene_outlines_rewrite_prompt()
+
+        critique_variables = {
+            "current_outlines": generated_text
+        }
+        critique_prompt = critique_prompt_template.format(**critique_variables)
+        critique = await ollama_client.generate_text(
+            model_name=content_generator.model_name,
+            prompt=critique_prompt
+        )
+        if critique:
+            rewrite_variables = {
+                "current_outlines": generated_text,
+                "critique": critique
+            }
+            rewrite_prompt = rewrite_prompt_template.format(**rewrite_variables)
+            generated_text = await ollama_client.generate_text(
+                model_name=content_generator.model_name,
+                prompt=rewrite_prompt
+            )
+            if not generated_text:
+                logger.error("Failed to rewrite scene outlines after critique.")
+                return None
+        else:
+            logger.warning("Critique failed; proceeding with original output.")
+
         scene_outlines: List[SceneOutline] = []
         scene_pattern = re.compile(
             r"Scene\s*(\d+):?\s*(.*?)(?=(?:\nScene|$))",
@@ -92,7 +121,7 @@ async def generate_scene_outlines(
 
 async def enhance_scene_outlines(
     content_generator, current_outlines: List[SceneOutline]
-) -> Optional[List[SceneOutline]]: # Returns List
+) -> Optional[List[SceneOutline]]:
     """
     Asynchronously enhances existing scene outlines.
     """

@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from utils.logger import logger
 
 
-def book_spec_ui(session_state):
+def book_spec_ui(session_state, max_characters=5):
     """
     Creates the Book Specification section.
     """
@@ -42,12 +42,39 @@ def book_spec_ui(session_state):
                 value=session_state.book_spec.point_of_view,
                 key="pov_input",
             )
-            characters_str = st.text_area(
-                "Characters (comma-separated descriptions)",
-                value="\n".join(session_state.book_spec.characters),
-                height=150,
-                key="characters_input",
-            )
+
+            # --- Character Input Handling ---
+            st.markdown("**Characters**")
+
+            # Initialize session_state for characters if it doesn't exist
+            if 'characters_input' not in session_state:
+                session_state.characters_input = []
+                for char_str in session_state.book_spec.characters:
+                    parts = char_str.split(":", 1)
+                    name = parts[0].strip() if len(parts) > 0 else ""
+                    description = parts[1].strip() if len(parts) > 1 else ""
+                    session_state.characters_input.append({"name": name, "description": description})
+
+             # Add extra blank entries for up to max_characters
+            while len(session_state.characters_input) < max_characters:
+                session_state.characters_input.append({"name": "", "description": ""})
+
+            # Display input fields for each character
+            for i in range(len(session_state.characters_input)):
+                cols = st.columns(2)
+                with cols[0]:
+                    session_state.characters_input[i]["name"] = st.text_input(
+                        f"Name",
+                        value=session_state.characters_input[i]["name"],
+                        key=f"character_name_{i}",
+                    )
+                with cols[1]:
+                    session_state.characters_input[i]["description"] = st.text_area(
+                        f"Description",
+                        value=session_state.characters_input[i]["description"],
+                        height=70, # INCREASED HEIGHT to 70px (minimum 68px)
+                        key=f"character_description_{i}",
+                    )
             premise = st.text_area(
                 "Premise",
                 value=session_state.book_spec.premise,
@@ -65,8 +92,9 @@ def book_spec_ui(session_state):
                     ]
                     session_state.book_spec.tone = tone
                     session_state.book_spec.point_of_view = point_of_view
+                    # Combine character data back into strings
                     session_state.book_spec.characters = [
-                        c.strip() for c in characters_str.split("\n")
+                        f"{char['name']}: {char['description']}" for char in session_state.characters_input if char['name'].strip() or char['description'].strip()
                     ]
                     session_state.book_spec.premise = premise
                     st.success("Book Specification Saved! ✅")
@@ -97,6 +125,7 @@ def book_spec_ui(session_state):
                                     enhanced_spec  # Update session_state
                                 )
                                 st.success("Book Specification Enhanced! 🚀")
+                                st.rerun()  # ADDED: Force Streamlit rerun to update form
                                 # REMOVED redundant save: session_state.project_manager.save_project(...)
                             else:
                                 st.error("Failed to enhance Book Specification. 😞")

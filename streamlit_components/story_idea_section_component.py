@@ -24,6 +24,16 @@ def story_idea_ui(session_state):
             )
         if session_state.book_spec:
             st.success("Book Specification Generated! 🎉")
-            # REMOVED redundant save:  session_state.project_manager.save_project(...)
+            st.rerun()
+            session_state.project_manager.save_project( # RESTORED save
+                project_name=session_state.project_name,
+                story_idea=session_state.story_idea,
+                book_spec=session_state.book_spec,
+                plot_outline=session_state.plot_outline,
+                chapter_outlines=session_state.chapter_outlines,
+                chapter_outlines_27_method=session_state.chapter_outlines_27_method,
+                scene_outlines=session_state.scene_outlines,
+                scene_parts=session_state.scene_parts,
+            )
         else:
             st.error("Failed to generate Book Specification. 😞")
