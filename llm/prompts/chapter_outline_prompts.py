@@ -1,9 +1,10 @@
-
 # llm/prompts/chapter_outline_prompts.py
 from llm.prompts.base_prompts import COMMON_PREAMBLE, TOML_FORMAT_INSTRUCTIONS_CHAPTER_OUTLINE, TOML_FORMAT_INSTRUCTIONS_CHAPTER_OUTLINE_27, CRITIQUE_REQUEST, REWRITE_REQUEST, METHODOLOGY_MARKDOWN, ENHANCE_REQUEST
 
 def create_chapter_outlines_generation_prompt():
-    """Prompt for generating chapter outlines in TOML format."""
+    """
+    Prompt for generating chapter outlines in TOML format.
+    """
     prompt = f"""{COMMON_PREAMBLE}
 
 {TOML_FORMAT_INSTRUCTIONS_CHAPTER_OUTLINE}
@@ -18,7 +19,9 @@ Provide summaries for {{num_chapters}} chapters.
 
 
 def create_chapter_outlines_critique_prompt():
-    """Prompt for critiquing chapter outlines."""
+    """
+    Prompt for critiquing chapter outlines.
+    """
     prompt = f"""{COMMON_PREAMBLE}
 
 {CRITIQUE_REQUEST}
@@ -32,7 +35,9 @@ Critique the following chapter outlines (in TOML format):
 
 
 def create_chapter_outlines_rewrite_prompt():
-    """Prompt for rewriting chapter outlines."""
+    """
+    Prompt for rewriting chapter outlines.
+    """
     prompt = f"""{COMMON_PREAMBLE}
 
 {REWRITE_REQUEST}
@@ -86,6 +91,7 @@ Book Specification (TOML):
 ```
 """
     return prompt
+
 
 def create_chapter_outline_27_method_critique_prompt():
     """Critique prompt for 27 chapter outlines."""

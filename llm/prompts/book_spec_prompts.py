@@ -1,3 +1,4 @@
+
 # llm/prompts/book_spec_prompts.py
 from llm.prompts.base_prompts import COMMON_PREAMBLE, TOML_FORMAT_INSTRUCTIONS_BOOKS_SPEC, CRITIQUE_REQUEST, REWRITE_REQUEST, ENHANCE_REQUEST
 
@@ -68,10 +69,7 @@ def create_book_spec_validation_prompt():
     """
     Creates the prompt for validating a book specification in TOML format.
     """
-    prompt = f"""{COMMON_PREAMBLE}
-
-Validate the following TOML data as a book specification, and rewrite to fit this schema:
-
+    schema = """
 title = "string"
 genre = "string"
 setting = "string"
@@ -80,11 +78,33 @@ tone = "string"
 point_of_view = "string"
 characters = ["string", "string"] # characters is now list of strings
 premise = "string"
+"""
+    prompt = f"""{COMMON_PREAMBLE}
 
-Input TOML:
+{TOML_FORMAT_INSTRUCTIONS_BOOKS_SPEC}
+
+**CRITICAL INSTRUCTION: TOML VALIDATION AND CORRECTION ONLY**
+
+Your task is to validate the following TOML data as a book specification. You MUST ensure it strictly conforms to the schema below. If the TOML is valid, return it EXACTLY AS IS, without ANY modifications. If it is invalid, you MUST CORRECT IT to strictly adhere to the schema.
+
+**SCHEMA:**
+```toml
+{schema}
+```
+
+**Input TOML:**
 ```toml
 {{toml_input}}
 ```
-Output (Corrected TOML - ONLY THIS):
+
+**IMPORTANT:**
+
+*   **Output ONLY VALID TOML.**
+*   **Do NOT include ANY text, explanations, or markdown formatting in your response.**
+*   **If the input TOML is already valid, return it UNCHANGED.**
+*   **If correction is needed, output ONLY the corrected TOML.**
+*   **ABSOLUTELY NO EXTRA TEXT BEFORE OR AFTER THE TOML OUTPUT.**
+
+**Output (Corrected TOML - VALID TOML ONLY - ABSOLUTELY NOTHING ELSE):**
 """
     return prompt

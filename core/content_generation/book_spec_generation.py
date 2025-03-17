@@ -1,5 +1,4 @@
 # core/content_generation/book_spec_generation.py
-
 from typing import Optional, List, Dict
 
 import tomli
@@ -19,9 +18,12 @@ async def generate_book_spec(content_generator, idea: str) -> Optional[BookSpec]
     ollama_client = content_generator.ollama_client
     prompt_manager = content_generator.prompt_manager
     try:
-        generation_prompt = prompt_manager.create_book_spec_generation_prompt()(
-            idea
-        )  # Call function and pass idea
+        generation_prompt_template = prompt_manager.create_book_spec_generation_prompt()
+        generation_prompt = generation_prompt_template()  # Get the template
+        generation_prompt = generation_prompt.replace(
+            "{idea}", idea
+        )  # Manually replace {idea}
+
         logger.debug(f"generate_book_spec: Formatted Prompt:\n{generation_prompt}")
 
         generated_text = await ollama_client.generate_text(
@@ -35,31 +37,45 @@ async def generate_book_spec(content_generator, idea: str) -> Optional[BookSpec]
         logger.debug(f"generate_book_spec: Raw LLM response:\n{generated_text}")
 
         # --- TOML Validation and Correction ---
-        validation_prompt = prompt_manager.create_book_spec_validation_prompt()
-        validated_text = await ollama_client.generate_text(
-            model_name=content_generator.model_name,
-            prompt=validation_prompt.format(toml_input=generated_text)
+        validated_text = await content_generator._validate_and_correct_toml(
+            generated_text,
+            """
+title = "string"
+genre = "string"
+setting = "string"
+themes = ["string"]
+tone = "string"
+point_of_view = "string"
+characters = ["string"]
+premise = "string"
+""",
         )
-
         if not validated_text:
             logger.error("TOML Validation Failed after multiple attempts.")
             return None
-
+        logger.debug(f"generate_book_spec: Validated TOML:\n{validated_text}")
 
         # --- End TOML Validation ---
 
         try:
             logger.debug(
                 f"generate_book_spec: Attempting to parse TOML:\n{validated_text}"
-            )  # DEBUG LOG - BEFORE PARSING
-            book_spec_dict = tomli.loads(validated_text)  # Use tomli.loads()
+            )
+            book_spec_dict = tomli.loads(validated_text)
             logger.debug(
-                f"generate_book_spec: Parsed TOML Dictionary:\n{book_spec_dict}"  # DEBUG LOG
+                f"generate_book_spec: Parsed TOML Dictionary:\n{book_spec_dict}"
             )
             # Transform character data:
-            if 'characters' in book_spec_dict and isinstance(book_spec_dict['characters'], list):
-                book_spec_dict['characters'] = [f"{char['name']}: {char['description']}"
-                                                for char in book_spec_dict['characters'] if isinstance(char, dict) and 'name' in char and 'description' in char]
+            if "characters" in book_spec_dict and isinstance(
+                book_spec_dict["characters"], list
+            ):
+                book_spec_dict["characters"] = [
+                    f"{char['name']}: {char['description']}"
+                    for char in book_spec_dict["characters"]
+                    if isinstance(char, dict)
+                    and "name" in char
+                    and "description" in char
+                ]
 
             # --- Data Transformation ---
 
@@ -116,7 +132,9 @@ async def enhance_book_spec(
             ),  # Convert to TOML
             "critique": "",  # Placeholder, will be filled in later
         }
-        critique_prompt_str = critique_prompt_template.format(**variables)
+        critique_prompt_str = critique_prompt_template(
+            **variables
+        )  # Get template, THEN call.
         logger.debug(
             f"enhance_book_spec: Formatted Critique Prompt:\n{critique_prompt_str}"
         )
@@ -132,7 +150,9 @@ async def enhance_book_spec(
         logger.debug(f"enhance_book_spec: Critique from LLM:\n{critique}")
 
         variables["critique"] = critique
-        rewrite_prompt_str = rewrite_prompt_template.format(**variables)
+        rewrite_prompt_str = rewrite_prompt_template(
+            **variables
+        )  # Get template, THEN call.
         logger.debug(
             f"enhance_book_spec: Formatted Rewrite Prompt:\n{rewrite_prompt_str}"
         )
@@ -149,17 +169,25 @@ async def enhance_book_spec(
         )
 
         # --- TOML Validation and Correction ---
-        validation_prompt = prompt_manager.create_book_spec_validation_prompt()
-        validated_text = await ollama_client.generate_text(
-            model_name=content_generator.model_name,
-            prompt=validation_prompt.format(toml_input=enhanced_spec_toml)
+        validated_text = await content_generator._validate_and_correct_toml(
+            enhanced_spec_toml,
+            """
+title = "string"
+genre = "string"
+setting = "string"
+themes = ["string"]
+tone = "string"
+point_of_view = "string"
+characters = ["string"]
+premise = "string"
+""",
         )
         if not validated_text:
             logger.error("TOML Validation Failed")
             return None
 
         logger.debug(
-            f"enhance_book_spec: Validated Enhanced Spec TOML:\n{validated_text}"  # DEBUG LOG
+            f"enhance_book_spec: Validated Enhanced Spec TOML:\n{validated_text}"
         )
 
         # --- End TOML Validation ---
@@ -167,16 +195,23 @@ async def enhance_book_spec(
         try:
             logger.debug(
                 f"enhance_book_spec: Attempting to parse TOML:\n{validated_text}"
-            )  # DEBUG LOG - BEFORE PARSING
+            )
             book_spec_dict = tomli.loads(validated_text)
             logger.debug(
-                f"enhance_book_spec: Parsed Enhanced Spec Dictionary:\n{book_spec_dict}"  # DEBUG LOG
+                f"enhance_book_spec: Parsed Enhanced Spec Dictionary:\n{book_spec_dict}"
             )
 
-             # Transform character data:
-            if 'characters' in book_spec_dict and isinstance(book_spec_dict['characters'], list):
-                book_spec_dict['characters'] = [f"{char['name']}: {char['description']}"
-                                                for char in book_spec_dict['characters'] if isinstance(char, dict) and 'name' in char and 'description' in char]
+            # Transform character data:
+            if "characters" in book_spec_dict and isinstance(
+                book_spec_dict["characters"], list
+            ):
+                book_spec_dict["characters"] = [
+                    f"{char['name']}: {char['description']}"
+                    for char in book_spec_dict["characters"]
+                    if isinstance(char, dict)
+                    and "name" in char
+                    and "description" in char
+                ]
 
             # --- Data Transformation (as in generate_book_spec)---
 

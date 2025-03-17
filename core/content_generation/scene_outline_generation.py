@@ -20,13 +20,15 @@ async def generate_scene_outlines(
     try:
         generation_prompt_template = (
             prompt_manager.create_scene_outlines_generation_prompt()
-        )
+        )  # Correct: Get template
         variables = {
-            "chapter_outline": chapter_outline.summary, # Remains a string.
+            "chapter_outline": chapter_outline.summary,  # Remains a string.
             "num_scenes_per_chapter": str(num_scenes),
         }
 
-        generation_prompt = generation_prompt_template.format(**variables)
+        generation_prompt = generation_prompt_template(
+            **variables
+        )  # Correct: THEN call with variables
 
         generated_text = await ollama_client.generate_text(
             prompt=generation_prompt,
@@ -37,28 +39,27 @@ async def generate_scene_outlines(
             logger.error("Failed to generate scene outlines.")
             return None
 
-
         # --- Critique and Rewrite ---
-        critique_prompt_template = prompt_manager.create_scene_outlines_critique_prompt()
-        rewrite_prompt_template = prompt_manager.create_scene_outlines_rewrite_prompt()
+        critique_prompt_template = (
+            prompt_manager.create_scene_outlines_critique_prompt()
+        )  # Correct
+        rewrite_prompt_template = (
+            prompt_manager.create_scene_outlines_rewrite_prompt()
+        )  # Correct
 
-        critique_variables = {
-            "current_outlines": generated_text
-        }
-        critique_prompt = critique_prompt_template.format(**critique_variables)
+        critique_variables = {"current_outlines": generated_text}
+        critique_prompt = critique_prompt_template(**critique_variables)  # Correct
         critique = await ollama_client.generate_text(
-            model_name=content_generator.model_name,
-            prompt=critique_prompt
+            model_name=content_generator.model_name, prompt=critique_prompt
         )
         if critique:
             rewrite_variables = {
                 "current_outlines": generated_text,
-                "critique": critique
+                "critique": critique,
             }
-            rewrite_prompt = rewrite_prompt_template.format(**rewrite_variables)
+            rewrite_prompt = rewrite_prompt_template(**rewrite_variables)  # Correct
             generated_text = await ollama_client.generate_text(
-                model_name=content_generator.model_name,
-                prompt=rewrite_prompt
+                model_name=content_generator.model_name, prompt=rewrite_prompt
             )
             if not generated_text:
                 logger.error("Failed to rewrite scene outlines after critique.")
@@ -89,28 +90,26 @@ async def generate_scene_outlines(
                     scene_summary[:50],
                 )
 
-        if found_scenes < num_scenes:
-            logger.warning(
-                "Expected %d scenes, but only parsed %d for chapter %d. "
-                "Review LLM output for parsing errors.",
-                num_scenes,
-                found_scenes,
-                chapter_outline.chapter_number,
-            )
-        elif found_scenes > num_scenes:
-            scene_outlines = scene_outlines[:num_scenes]  # Trim if LLM over-generates
-            logger.warning(
-                "LLM generated %d scenes, trimming to requested %d for chapter %d.",
-                found_scenes,
-                num_scenes,
-                chapter_outline.chapter_number,
-            )
-
+            if found_scenes < num_scenes:
+                logger.warning(
+                    "Expected %d scenes, but only parsed %d for chapter %d. "
+                    "Review LLM output for parsing errors.",
+                    num_scenes,
+                    found_scenes,
+                    chapter_outline.chapter_number,
+                )
+            elif found_scenes > num_scenes:
+                scene_outlines = scene_outlines[:num_scenes]
+                logger.warning(
+                    "LLM generated %d scenes, trimming to requested %d, for chapter %d.",
+                    found_scenes,
+                    num_scenes,
+                    chapter_outline.chapter_number,
+                )
         logger.debug(
-            "%d scene outlines generated for chapter %d successfully.",
-            len(scene_outlines),
-            chapter_outline.chapter_number,
+            f"{len(scene_outlines)} scene outlines generated for chapter {chapter_outline.chapter_number} successfully."
         )
+
         return scene_outlines
 
     except (TypeError, ValueError, re.error) as e:
@@ -130,14 +129,18 @@ async def enhance_scene_outlines(
     outline_texts = [
         f"Scene {so.scene_number}:\n{so.summary}" for so in current_outlines
     ]
-    critique_prompt_template = prompt_manager.create_scene_outlines_critique_prompt()
-    rewrite_prompt_template = prompt_manager.create_scene_outlines_rewrite_prompt()
+    critique_prompt_template = (
+        prompt_manager.create_scene_outlines_critique_prompt()
+    )  # Correct
+    rewrite_prompt_template = (
+        prompt_manager.create_scene_outlines_rewrite_prompt()
+    )  # Correct
 
     current_outlines_text = "\n".join(outline_texts)
     variables = {
         "current_outlines": current_outlines_text,
     }
-    critique_prompt_str = critique_prompt_template.format(**variables)
+    critique_prompt_str = critique_prompt_template(**variables)  # Correct
 
     try:
         critique = await ollama_client.generate_text(
@@ -149,7 +152,7 @@ async def enhance_scene_outlines(
             logger.error("Failed to generate critique for scene outlines.")
             return None
 
-        rewrite_prompt_str = rewrite_prompt_template.format(
+        rewrite_prompt_str = rewrite_prompt_template(  # Correct
             **variables,
             critique=critique,
             current_outlines=current_outlines_text,

@@ -1,6 +1,7 @@
 # core/content_generation/scene_part_generation.py
 from typing import Optional
 import tomli_w # Import tomli_w
+import tomli
 
 from core.book_spec import BookSpec
 from core.plot_outline import ChapterOutline, SceneOutline
@@ -25,13 +26,13 @@ async def generate_scene_part(
     try:
         generation_prompt_template = (
             prompt_manager.create_scene_part_generation_prompt()
-        )
+        ) # Correct: get template
         structure_check_prompt_template = (
             prompt_manager.create_scene_part_structure_check_prompt()
-        )
+        ) # Correct
         structure_fix_prompt_template = (
             prompt_manager.create_scene_part_structure_fix_prompt()
-        )
+        ) # Correct
 
         variables = {
             "scene_outline": scene_outline.summary,
@@ -41,7 +42,7 @@ async def generate_scene_part(
             "scene_outline_full": scene_outline_full.summary,
         }
 
-        generation_prompt = generation_prompt_template.format(**variables)
+        generation_prompt = generation_prompt_template(**variables) # Correct: THEN call
 
         generated_text = await ollama_client.generate_text(
             prompt=generation_prompt,
@@ -54,9 +55,7 @@ async def generate_scene_part(
 
         # Structure Check (Still checking for basic structure, not TOML)
         structure_check_variables = {"scene_part": generated_text}
-        structure_check_prompt = structure_check_prompt_template.format(
-            **structure_check_variables
-        )
+        structure_check_prompt = structure_check_prompt_template(**structure_check_variables) # Correct
         structure_check_result = await ollama_client.generate_text(
             model_name=content_generator.model_name,
             prompt=structure_check_prompt,
@@ -69,12 +68,8 @@ async def generate_scene_part(
                 "scene_part": generated_text,
                 "structure_problems": structure_check_result,
             }
-            structure_fix_prompt = structure_fix_prompt_template.format(
-                **structure_fix_variables
-            )
-            structure_fix_prompt_formatted = structure_fix_prompt.format(
-                **structure_fix_variables
-            )
+            structure_fix_prompt = structure_fix_prompt_template(**structure_fix_variables) # Correct
+            structure_fix_prompt_formatted = structure_fix_prompt_template(**structure_fix_variables) # Correct
 
             fixed_text = await ollama_client.generate_text(
                 model_name=content_generator.model_name,
@@ -110,10 +105,10 @@ async def enhance_scene_part(
     prompt_manager = PromptManager()
     try:
         # Get prompt templates from PromptManager
-        critique_prompt_template = prompt_manager.create_scene_part_critique_prompt()
-        rewrite_prompt_template = prompt_manager.create_scene_part_rewrite_prompt()
-        structure_check_prompt_template = prompt_manager.create_scene_part_structure_check_prompt() # ADDED for enhance
-        structure_fix_prompt_template = prompt_manager.create_scene_part_structure_fix_prompt() # ADDED for enhance
+        critique_prompt_template = prompt_manager.create_scene_part_critique_prompt() # Correct
+        rewrite_prompt_template = prompt_manager.create_scene_part_rewrite_prompt() # Correct
+        structure_check_prompt_template = prompt_manager.create_scene_part_structure_check_prompt() # Correct
+        structure_fix_prompt_template = prompt_manager.create_scene_part_structure_fix_prompt() # Correct
 
 
         # Prepare variables for the prompts
@@ -125,7 +120,7 @@ async def enhance_scene_part(
             'content': scene_part
         }
 
-        critique_prompt_str = critique_prompt_template.format(**variables)
+        critique_prompt_str = critique_prompt_template(**variables) # Correct
 
         # Generate actionable critique
         critique = await ollama_client.generate_text(
@@ -134,9 +129,7 @@ async def enhance_scene_part(
         )
 
         if critique:
-            rewrite_prompt_str = rewrite_prompt_template.format(
-                **variables, critique=critique, content=scene_part
-            )
+            rewrite_prompt_str = rewrite_prompt_template(**variables, critique=critique, content=scene_part) # Correct
             # Rewrite content based on the critique
             enhanced_scene_part = await ollama_client.generate_text(
                 prompt=rewrite_prompt_str,
@@ -158,9 +151,7 @@ async def enhance_scene_part(
 
         # Structure Check on ENHANCED (or original if critique failed) scene part
         structure_check_variables = {"scene_part": generated_text}
-        structure_check_prompt = structure_check_prompt_template.format(
-            **structure_check_variables
-        )
+        structure_check_prompt = structure_check_prompt_template(**structure_check_variables) # Correct
         structure_check_result = await ollama_client.generate_text(
             model_name=content_generator.model_name,
             prompt=structure_check_prompt,
@@ -173,12 +164,8 @@ async def enhance_scene_part(
                 "scene_part": generated_text,
                 "structure_problems": structure_check_result,
             }
-            structure_fix_prompt = structure_fix_prompt_template.format(
-                **structure_fix_variables
-            )
-            structure_fix_prompt_formatted = structure_fix_prompt.format(
-                **structure_fix_variables
-            )
+            structure_fix_prompt = structure_fix_prompt_template(**structure_fix_variables) # Correct
+            structure_fix_prompt_formatted = structure_fix_prompt_template(**structure_fix_variables) # Correct
 
             fixed_text = await ollama_client.generate_text(
                 model_name=content_generator.model_name,

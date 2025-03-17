@@ -3,9 +3,10 @@ import os
 from core.book_spec import BookSpec
 from core.plot_outline import PlotOutline, ChapterOutline, SceneOutline
 from core.content_generator import ChapterOutlineMethod
+from core.output_formatter import OutputFormatter  # NEW
 from utils.logger import logger
 from utils.config import config
-from utils.file_handler import save_toml, load_toml  # Corrected import
+from utils.file_handler import save_toml, load_toml
 
 
 class ProjectManager:
@@ -18,6 +19,7 @@ class ProjectManager:
         Initializes the ProjectManager.
         """
         self.book_spec = book_spec
+        self.output_formatter = OutputFormatter()  # NEW
 
     def save_project(
         self,
@@ -101,3 +103,29 @@ class ProjectManager:
         except Exception as e:
             logger.error(f"Error loading project from '{filepath}': {e}")
             return None
+
+    def output_project(
+        self,
+        project_name: str,
+        story_idea: str = None,
+        book_spec: BookSpec = None,
+        plot_outline: PlotOutline = None,
+        chapter_outlines_27_method: list[ChapterOutlineMethod] = None,
+        scene_outlines: dict[int, list[SceneOutline]] = None,
+        scene_parts: dict[int, dict[int, str]] = None,
+    ) -> str:
+        """
+        Calls Output Formatter, Returns zip file path.
+        """
+        project_directory = config.get_project_directory()
+        self.output_formatter.generate_markdown_files(
+            project_name,
+            project_directory,
+            story_idea,
+            book_spec,
+            plot_outline,
+            chapter_outlines_27_method,
+            scene_outlines,
+            scene_parts,
+        )
+        return self.output_formatter.create_zip_archive(project_name, project_directory)

@@ -1,5 +1,4 @@
-
-# llm/prompts/scene_outline_prompts.py
+# llm/prompts/scene_prompts.py
 from llm.prompts.base_prompts import COMMON_PREAMBLE, CRITIQUE_REQUEST, REWRITE_REQUEST, ENHANCE_REQUEST
 
 def create_scene_outlines_generation_prompt():

@@ -9,7 +9,7 @@ import re
 
 from core.book_spec import BookSpec
 from core.plot_outline import ChapterOutline, SceneOutline, PlotOutline
-from core.content_generator import ChapterOutlineMethod
+from core.content_generation.content_generation_utils import ChapterOutlineMethod
 from core.content_generator import ContentGenerator
 from core import project_manager
 from llm.llm_client import OllamaClient
@@ -23,12 +23,13 @@ from streamlit_components.story_idea_section_component import story_idea_ui
 from streamlit_components.book_spec_section_component import book_spec_ui
 from streamlit_components.chapter_outline_section_component import (
     chapter_outline_ui,
-)  # Corrected import path
+)
 from streamlit_components.scene_outline_section_component import scene_outline_ui
 from streamlit_components.scene_part_section_component import (
     scene_part_ui,
 )  # Import the new component
 import utils.app as utils
+from core.output_formatter import OutputFormatter  # NEW
 
 
 def main():
@@ -87,6 +88,8 @@ def main():
         st.session_state.project_loaded = False
     if "new_project_requested" not in st.session_state:
         st.session_state.new_project_requested = False
+    if "output_formatter" not in st.session_state:  # NEW
+        st.session_state.output_formatter = OutputFormatter()
 
     if "act_one_text" not in st.session_state:
         st.session_state.act_one_text = ""
@@ -103,6 +106,36 @@ def main():
     chapter_outline_ui(st.session_state)  # Corrected function name
     scene_outline_ui(st.session_state)
     scene_part_ui(st.session_state)  # Call the new scene part component
+
+    # --- Output Section ---
+    st.sidebar.subheader("Output Project")
+    if st.sidebar.button("Output to Markdown & Zip"):
+        if st.session_state.project_name:
+            zip_file_path = st.session_state.project_manager.output_project(
+                project_name=st.session_state.project_name,
+                story_idea=st.session_state.story_idea,
+                book_spec=st.session_state.book_spec,
+                plot_outline=st.session_state.plot_outline,
+                chapter_outlines_27_method=st.session_state.chapter_outlines_27_method,
+                scene_outlines=st.session_state.scene_outlines,
+                scene_parts=st.session_state.scene_parts,
+            )
+            # Create a download button for the zip file.
+            with open(zip_file_path, "rb") as file:
+                st.sidebar.download_button(
+                    label="Download ZIP",
+                    data=file,
+                    file_name=f"{st.session_state.project_name}.zip",
+                    mime="application/zip",
+                )
+
+            st.sidebar.success(
+                f"Project output to Markdown and zipped to: {zip_file_path}"
+            )
+        else:
+            st.sidebar.warning(
+                "Please save the project first, so that the name field is not blank."
+            )
 
 
 if __name__ == "__main__":

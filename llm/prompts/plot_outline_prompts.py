@@ -1,9 +1,10 @@
-
 # llm/prompts/plot_outline_prompts.py
 from llm.prompts.base_prompts import COMMON_PREAMBLE, TOML_FORMAT_INSTRUCTIONS_PLOT_OUTLINE, CRITIQUE_REQUEST, REWRITE_REQUEST, ENHANCE_REQUEST
 
 def create_plot_outline_generation_prompt():
-    """Prompt for generating a plot outline in TOML."""
+    """
+    Prompt for generating a plot outline in TOML.
+    """
     prompt = f"""{COMMON_PREAMBLE}
 
 {TOML_FORMAT_INSTRUCTIONS_PLOT_OUTLINE}
@@ -17,7 +18,9 @@ Generate a three-act plot outline in TOML format, based on the following book sp
 
 
 def create_plot_outline_critique_prompt():
-    """Prompt for critiquing a plot outline."""
+    """
+    Prompt for critiquing a plot outline.
+    """
     prompt = f"""{COMMON_PREAMBLE}
 
 {CRITIQUE_REQUEST}
@@ -31,7 +34,9 @@ Critique the following plot outline (in TOML format):
 
 
 def create_plot_outline_rewrite_prompt():
-    """Prompt for rewriting a plot outline."""
+    """
+    Prompt for rewriting a plot outline.
+    """
     prompt = f"""{COMMON_PREAMBLE}
 
 {REWRITE_REQUEST}
