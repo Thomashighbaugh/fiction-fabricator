@@ -1,15 +1,4 @@
-aiohttp
-black
-mypy
 ollama
-pillow
-pydantic
-pydantic-settings
-pytest
+termcolor
+google.generativeai
 python-dotenv
-requests
-sphinx
-streamlit
-tiktoken
-tomli
-tomli-w

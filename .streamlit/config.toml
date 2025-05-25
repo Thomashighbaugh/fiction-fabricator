@@ -1,8 +1,0 @@
-[theme] # You have to add this line
-
-primaryColor = '#ed5d86' # Bright Orange
-
-backgroundColor = '#252a2f'
-
-secondaryBackgroundColor = '#33383f' # Lighter Blue
-textColor = '#f8f8f8'
