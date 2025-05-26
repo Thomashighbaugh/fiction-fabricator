@@ -14,8 +14,9 @@ The script constructs and executes a command string that calls `../Write.py`.
 
 import os
 import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from typing import Any, Dict
-from Config import Config
+from Writer.Config import Config
 
 # Predefined model configurations (can be expanded)
 # Each key is a menu option, value is a dictionary of model arguments for Write.py

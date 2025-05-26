@@ -1,327 +1,315 @@
-# File: AIStoryWriter/Writer/LLMEditor.py
-# Purpose: Handles LLM-based feedback, critique, and quality rating for outlines and chapters.
+# File: AIStoryWriter/Writer/Chapter/ChapterGenerator.py
+# Purpose: Orchestrates the generation of a complete chapter by creating and assembling scenes.
 
 """
-LLM-Powered Editorial Module.
+Chapter Generation Orchestrator.
 
-This module provides functions to:
-1.  Generate constructive criticism (feedback) on story outlines and individual chapters
-    using an LLM.
-2.  Obtain a quality rating or completion status (e.g., "IsComplete": true/false)
-    for outlines and chapters, also using an LLM.
-
-The feedback and ratings are used in iterative revision loops to improve the
-quality of the generated story content. Optimized prompts are crucial for
-eliciting useful and actionable responses from the LLMs performing these
-editorial tasks.
+This module manages the process of generating a full chapter. It uses a
+scene-by-scene approach:
+1.  It calls `SceneOutliner` to break down the chapter's plot outline into
+    a list of detailed scene outlines (blueprints).
+2.  It then iterates through these scene blueprints, calling `SceneGenerator`
+    to write the narrative text for each scene.
+3.  Context (summaries of previous scenes/chapters) is passed along to ensure
+    narrative continuity.
+4.  The generated scene narratives are compiled into a single chapter text.
+5.  Optionally, this assembled chapter can undergo further refinement or revision
+    using LLM-based feedback to improve flow, pacing, and overall cohesion.
 """
 
 import Writer.Config as Config
 import Writer.Prompts as Prompts
-from Writer.Interface.Wrapper import Interface  # LLM interaction
-from Writer.PrintUtils import Logger  # Logging
-import json
-from typing import List, Dict, Any
+import Writer.Scene.SceneOutliner as SceneOutliner
+import Writer.Scene.SceneGenerator as SceneGenerator
+import Writer.Chapter.ChapterContext as ChapterContext
+import Writer.LLMEditor as LLMEditor
+from Writer.Interface.Wrapper import Interface
+from Writer.PrintUtils import Logger
+from Writer.Statistics import get_word_count
+from typing import List, Dict, Any, Optional
 
 
-def GetFeedbackOnOutline(
-    interface: Interface, logger: Logger, outline_text: str
+def generate_chapter_by_scenes(  # Ensure this exact function name exists
+    interface: Interface,
+    logger: Logger,
+    chapter_num: int,
+    total_chapters: int,
+    overall_story_outline: str,
+    current_chapter_plot_outline: str,
+    previous_chapter_context_summary: Optional[str],
+    base_story_context: Optional[str],
 ) -> str:
     """
-    Generates LLM-based feedback on a given story outline.
+    Generates a complete chapter by first outlining scenes and then writing each scene.
 
     Args:
         interface (Interface): The LLM interaction wrapper.
         logger (Logger): The logging instance.
-        outline_text (str): The story outline text to be critiqued.
+        chapter_num (int): The current chapter number being generated.
+        total_chapters (int): The total number of chapters in the story.
+        overall_story_outline (str): The main outline of the entire story (chapter summaries).
+        current_chapter_plot_outline (str): The specific plot outline/summary for this chapter,
+                                            used as input for scene breakdown.
+        previous_chapter_context_summary (Optional[str]): Contextual summary from the end
+                                                          of the previous chapter. None if first chapter.
+        base_story_context (Optional[str]): Overarching story context or user instructions.
 
     Returns:
-        str: Constructive feedback from the LLM. Returns an error message string
-             if feedback generation fails.
-    """
-    logger.Log("Requesting LLM feedback on the current story outline...", 4)
-
-    if not outline_text or not outline_text.strip():
-        logger.Log("Outline text is empty. Cannot get feedback.", 6)
-        return "Feedback Error: Outline text was empty."
-
-    try:
-        prompt_template = Prompts.OPTIMIZED_CRITIC_OUTLINE_PROMPT
-        formatted_prompt = prompt_template.format(_Outline=outline_text)
-    except KeyError as e:
-        logger.Log(
-            f"Formatting error in OPTIMIZED_CRITIC_OUTLINE_PROMPT: Missing key {e}", 7
-        )
-        return f"Feedback Error: Prompt template key error - {e}."
-    except Exception as e:
-        logger.Log(f"Unexpected error formatting outline feedback prompt: {e}", 7)
-        return f"Feedback Error: Unexpected prompt formatting error - {e}."
-
-    messages: List[Dict[str, Any]] = [
-        interface.build_system_query(
-            Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # Persona: Discerning editor
-        interface.build_user_query(formatted_prompt),
-    ]
-
-    try:
-        # REVISION_MODEL should be good at analytical tasks and providing constructive criticism.
-        response_messages = interface.safe_generate_text(
-            logger,
-            messages,
-            Config.REVISION_MODEL,
-            min_word_count=70,  # Expect reasonably detailed feedback
-        )
-
-        feedback: str = interface.get_last_message_text(response_messages)
-
-        if not feedback or "Error:" in feedback:
-            logger.Log(
-                "LLM failed to generate valid feedback for the outline or returned an error.",
-                6,
-            )
-            return (
-                f"Feedback Error: LLM failed for outline. Response: {feedback[:100]}..."
-            )
-
-        logger.Log("LLM feedback on outline received successfully.", 4)
-        return feedback
-
-    except Exception as e:
-        logger.Log(
-            f"An unexpected critical error occurred during outline feedback generation: {e}",
-            7,
-        )
-        return f"Feedback Error: Unexpected critical error - {e}."
-
-
-def GetOutlineRating(interface: Interface, logger: Logger, outline_text: str) -> bool:
-    """
-    Obtains an LLM-based quality rating (IsComplete: true/false) for a story outline.
-
-    Args:
-        interface (Interface): The LLM interaction wrapper.
-        logger (Logger): The logging instance.
-        outline_text (str): The story outline text to be rated.
-
-    Returns:
-        bool: True if the LLM deems the outline complete and of high quality,
-              False otherwise or if rating fails.
-    """
-    logger.Log("Requesting LLM rating (completion check) for the story outline...", 4)
-
-    if not outline_text or not outline_text.strip():
-        logger.Log(
-            "Outline text is empty. Cannot get rating. Defaulting to False (not complete).",
-            6,
-        )
-        return False
-
-    try:
-        prompt_template = Prompts.OUTLINE_COMPLETE_PROMPT
-        formatted_prompt = prompt_template.format(_Outline=outline_text)
-    except KeyError as e:
-        logger.Log(f"Formatting error in OUTLINE_COMPLETE_PROMPT: Missing key {e}", 7)
-        return False  # Cannot proceed
-    except Exception as e:
-        logger.Log(f"Unexpected error formatting outline rating prompt: {e}", 7)
-        return False
-
-    messages: List[Dict[str, Any]] = [
-        # System prompt can guide the LLM on its role as an evaluator
-        interface.build_system_query(
-            "You are an AI assistant that evaluates content quality and adherence to instructions, responding in precise JSON."
-        ),
-        interface.build_user_query(formatted_prompt),
-    ]
-
-    try:
-        # EVAL_MODEL should be reliable for JSON output and boolean checks.
-        _response_messages, parsed_json = interface.safe_generate_json(
-            logger, messages, Config.EVAL_MODEL, required_attribs=["IsComplete"]
-        )
-
-        is_complete = parsed_json.get("IsComplete")
-
-        if isinstance(is_complete, bool):
-            logger.Log(
-                f"LLM outline completion rating received: IsComplete = {is_complete}", 4
-            )
-            return is_complete
-        else:
-            logger.Log(
-                f"LLM returned an invalid type for 'IsComplete' (Expected bool, got {type(is_complete)}). Value: '{is_complete}'. Defaulting to False.",
-                6,
-            )
-            return False
-
-    except Exception as e:
-        # This catches failures from safe_generate_json (e.g., max retries exceeded) or other issues.
-        logger.Log(
-            f"An critical error occurred during outline rating: {e}. Defaulting to False.",
-            7,
-        )
-        return False
-
-
-def GetFeedbackOnChapter(
-    interface: Interface, logger: Logger, chapter_text: str, overall_story_outline: str
-) -> str:
-    """
-    Generates LLM-based feedback on a single chapter's text.
-
-    Args:
-        interface (Interface): The LLM interaction wrapper.
-        logger (Logger): The logging instance.
-        chapter_text (str): The text of the chapter to be critiqued.
-        overall_story_outline (str): The main story outline for context.
-
-    Returns:
-        str: Constructive feedback from the LLM. Returns an error message string
-             if feedback generation fails.
+        str: The full text of the generated chapter. Returns an error message string
+             or placeholder if critical failures occur.
     """
     logger.Log(
-        f"Requesting LLM feedback on chapter text (length: {len(chapter_text)} chars)...",
-        4,
+        f"--- Starting Generation for Chapter {chapter_num}/{total_chapters} (Scene-by-Scene Pipeline) ---",
+        2,
     )
 
-    if not chapter_text or not chapter_text.strip():
-        logger.Log("Chapter text is empty. Cannot get feedback.", 6)
-        return "Feedback Error: Chapter text was empty."
-    if not overall_story_outline or not overall_story_outline.strip():
-        logger.Log(
-            "Overall story outline is empty. Context for chapter feedback is missing.",
-            6,
+    if not current_chapter_plot_outline or not current_chapter_plot_outline.strip():
+        error_msg = (
+            f"Chapter {chapter_num} plot outline is empty. Cannot generate chapter."
         )
-        # Proceed but feedback might be less effective
-        overall_story_outline = "Overall story outline not provided for context."
+        logger.Log(error_msg, 7)
+        return f"// {error_msg} //"
 
-    try:
-        prompt_template = Prompts.OPTIMIZED_CRITIC_CHAPTER_PROMPT
-        formatted_prompt = prompt_template.format(
-            _ChapterText=chapter_text,  # Corrected placeholder from _Chapter to _ChapterText
-            _OverallStoryOutline=overall_story_outline,
-        )
-    except KeyError as e:
-        logger.Log(
-            f"Formatting error in OPTIMIZED_CRITIC_CHAPTER_PROMPT: Missing key {e}", 7
-        )
-        return f"Feedback Error: Prompt template key error - {e}."
-    except Exception as e:
-        logger.Log(f"Unexpected error formatting chapter feedback prompt: {e}", 7)
-        return f"Feedback Error: Unexpected prompt formatting error - {e}."
-
-    messages: List[Dict[str, Any]] = [
-        interface.build_system_query(
-            Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # Persona: Experienced manuscript editor
-        interface.build_user_query(formatted_prompt),
-    ]
-
-    try:
-        response_messages = interface.safe_generate_text(
-            logger,
-            messages,
-            Config.REVISION_MODEL,
-            min_word_count=100,  # Expect detailed chapter feedback
-        )
-
-        feedback: str = interface.get_last_message_text(response_messages)
-
-        if not feedback or "Error:" in feedback:
-            logger.Log(
-                "LLM failed to generate valid feedback for the chapter or returned an error.",
-                6,
-            )
-            return (
-                f"Feedback Error: LLM failed for chapter. Response: {feedback[:100]}..."
-            )
-
-        logger.Log("LLM feedback on chapter received successfully.", 4)
-        return feedback
-
-    except Exception as e:
-        logger.Log(
-            f"An unexpected critical error occurred during chapter feedback generation: {e}",
-            7,
-        )
-        return f"Feedback Error: Unexpected critical error - {e}."
-
-
-def GetChapterRating(interface: Interface, logger: Logger, chapter_text: str) -> bool:
-    """
-    Obtains an LLM-based quality rating (IsComplete: true/false) for a chapter.
-
-    Args:
-        interface (Interface): The LLM interaction wrapper.
-        logger (Logger): The logging instance.
-        chapter_text (str): The chapter text to be rated.
-
-    Returns:
-        bool: True if the LLM deems the chapter complete and of high quality,
-              False otherwise or if rating fails.
-    """
+    # 1. Get detailed scene outlines for this chapter
     logger.Log(
-        f"Requesting LLM rating (completion check) for chapter text (length: {len(chapter_text)} chars)...",
-        4,
+        f"Step 1: Generating detailed scene outlines for Chapter {chapter_num}.", 3
+    )
+    list_of_scene_outlines = SceneOutliner.generate_detailed_scene_outlines(
+        interface,
+        logger,
+        current_chapter_plot_outline,
+        overall_story_outline,
+        chapter_num,
+        previous_chapter_context_summary,
+        base_story_context,
     )
 
-    if not chapter_text or not chapter_text.strip():
+    if not list_of_scene_outlines:
+        error_msg = f"No scene outlines were generated for Chapter {chapter_num}. Chapter generation aborted."
+        logger.Log(error_msg, 7)
+        return f"// Chapter {chapter_num} - Generation Error: {error_msg} //"
+
+    logger.Log(
+        f"Successfully generated {len(list_of_scene_outlines)} scene outlines for Chapter {chapter_num}.",
+        3,
+    )
+
+    # 2. Generate narrative for each scene and compile them
+    logger.Log(
+        f"Step 2: Generating narrative for each of the {len(list_of_scene_outlines)} scenes in Chapter {chapter_num}.",
+        3,
+    )
+    compiled_scene_texts: List[str] = []
+
+    current_scene_context_summary = (
+        previous_chapter_context_summary
+        if previous_chapter_context_summary
+        else f"This is the very first scene of Chapter {chapter_num}. Refer to the chapter's plot outline and overall story outline for initial context."
+    )
+
+    for scene_idx, scene_outline_blueprint in enumerate(list_of_scene_outlines):
+        scene_number_in_chapter = scene_idx + 1
+        scene_title = scene_outline_blueprint.get(
+            "scene_title", f"C{chapter_num}.S{scene_number_in_chapter}"
+        )
         logger.Log(
-            "Chapter text is empty. Cannot get rating. Defaulting to False (not complete).",
-            6,
-        )
-        return False
-
-    try:
-        prompt_template = Prompts.CHAPTER_COMPLETE_PROMPT
-        formatted_prompt = prompt_template.format(
-            _Chapter=chapter_text
-        )  # Corrected placeholder
-    except KeyError as e:
-        logger.Log(f"Formatting error in CHAPTER_COMPLETE_PROMPT: Missing key {e}", 7)
-        return False  # Cannot proceed
-    except Exception as e:
-        logger.Log(f"Unexpected error formatting chapter rating prompt: {e}", 7)
-        return False
-
-    messages: List[Dict[str, Any]] = [
-        interface.build_system_query(
-            "You are an AI assistant that evaluates content quality and adherence to instructions, responding in precise JSON."
-        ),
-        interface.build_user_query(formatted_prompt),
-    ]
-
-    try:
-        _response_messages, parsed_json = interface.safe_generate_json(
-            logger, messages, Config.EVAL_MODEL, required_attribs=["IsComplete"]
+            f"Writing narrative for Scene {scene_number_in_chapter}/{len(list_of_scene_outlines)}: '{scene_title}'...",
+            4,
         )
 
-        is_complete = parsed_json.get("IsComplete")
+        scene_narrative = SceneGenerator.write_scene_narrative(
+            interface,
+            logger,
+            scene_outline_blueprint,
+            overall_story_outline,
+            current_scene_context_summary,
+            chapter_num,
+            scene_number_in_chapter,
+            base_story_context,
+        )
 
-        if isinstance(is_complete, bool):
+        if "Error:" in scene_narrative:
             logger.Log(
-                f"LLM chapter completion rating received: IsComplete = {is_complete}", 4
-            )
-            return is_complete
-        else:
-            logger.Log(
-                f"LLM returned an invalid type for 'IsComplete' (Expected bool, got {type(is_complete)}). Value: '{is_complete}'. Defaulting to False.",
+                f"Error generating narrative for scene '{scene_title}': {scene_narrative}. Skipping scene.",
                 6,
             )
-            return False
+            compiled_scene_texts.append(
+                f"\n\n// Scene '{scene_title}' - Generation Error: {scene_narrative} //\n\n"
+            )
+            current_scene_context_summary = f"Context after failed scene '{scene_title}': An error occurred. Attempting to proceed."
+        else:
+            compiled_scene_texts.append(scene_narrative)
+            logger.Log(
+                f"Narrative for scene '{scene_title}' complete. Word count: {get_word_count(scene_narrative)}.",
+                4,
+            )
 
-    except Exception as e:
+            if scene_idx < len(list_of_scene_outlines) - 1:
+                current_scene_context_summary = (
+                    ChapterContext.generate_previous_scene_summary(
+                        interface, logger, scene_narrative, scene_outline_blueprint
+                    )
+                )
+                if "Error:" in current_scene_context_summary:
+                    logger.Log(
+                        f"Error generating context summary after scene '{scene_title}'. Proceeding with caution.",
+                        6,
+                    )
+                    current_scene_context_summary = (
+                        f"Context after scene '{scene_title}': Summary generation failed. "
+                        f"The scene involved characters: {scene_outline_blueprint.get('characters_present',[])} "
+                        f"and events: {scene_outline_blueprint.get('key_events_actions',[])}."
+                    )
+
+    scene_separator = "\n\n* * *\n\n"
+    full_chapter_text_from_scenes = scene_separator.join(compiled_scene_texts)
+    logger.Log(
+        f"Chapter {chapter_num} text assembled from {len(compiled_scene_texts)} scenes. Preliminary word count: {get_word_count(full_chapter_text_from_scenes)}.",
+        3,
+    )
+
+    refined_chapter_text = full_chapter_text_from_scenes
+    if not Config.CHAPTER_NO_REVISIONS and len(compiled_scene_texts) > 1:
         logger.Log(
-            f"An critical error occurred during chapter rating: {e}. Defaulting to False.",
-            7,
+            f"Step 3: Performing refinement pass on assembled Chapter {chapter_num}...",
+            3,
         )
-        return False
+        try:
+            refinement_prompt_text = (
+                f"The following text is a draft of Chapter {chapter_num}, assembled from multiple individually-written scenes.\n"
+                f"Your task is to review and refine this draft to ensure:\n"
+                f"- Smooth and natural transitions between scenes.\n"
+                f"- Consistent narrative voice and tone throughout the chapter.\n"
+                f"- Good overall pacing and flow for the chapter as a whole.\n"
+                f"- Elimination of any jarring breaks, awkward phrasing, or minor redundancies that may have arisen from scene assembly.\n\n"
+                f"Do NOT significantly alter the core plot events, character actions, or dialogue of the individual scenes.\n"
+                f"Focus on enhancing readability, cohesion, and the literary quality of the chapter as a unified piece.\n\n"
+                f"Overall Story Outline (for context on this chapter's role):\n"
+                f"<OverallStoryOutline>\n{overall_story_outline}\n</OverallStoryOutline>\n\n"
+                f"Assembled Draft of Chapter {chapter_num}:\n---\n{full_chapter_text_from_scenes}\n---\n\n"
+                f"Provide ONLY the refined and improved text for Chapter {chapter_num}."
+            )
+            refinement_messages = [
+                interface.build_system_query(Prompts.DEFAULT_SYSTEM_PROMPT),
+                interface.build_user_query(refinement_prompt_text),
+            ]
+
+            response_refinement_messages = interface.safe_generate_text(
+                logger,
+                refinement_messages,
+                Config.MODEL_CHAPTER_ASSEMBLY_REFINER,
+                min_word_count=int(
+                    get_word_count(full_chapter_text_from_scenes) * 0.75
+                ),
+            )
+            refined_chapter_text = interface.get_last_message_text(
+                response_refinement_messages
+            )
+            logger.Log(
+                f"Chapter {chapter_num} refinement pass complete. Word count: {get_word_count(refined_chapter_text)}",
+                3,
+            )
+        except Exception as e:
+            logger.Log(
+                f"Error during chapter refinement pass for Chapter {chapter_num}: {e}. Using pre-refinement text.",
+                6,
+            )
+
+    final_chapter_text = refined_chapter_text
+    if not Config.CHAPTER_NO_REVISIONS:
+        logger.Log(
+            f"Step 4: Entering feedback/revision loop for Chapter {chapter_num} (post-assembly/refinement)...",
+            3,
+        )
+
+        current_revision_history: List[Dict[str, Any]] = [
+            interface.build_system_query(Prompts.DEFAULT_SYSTEM_PROMPT),
+            interface.build_assistant_query(final_chapter_text),
+        ]
+
+        revision_iterations = 0
+        while revision_iterations < Config.CHAPTER_MAX_REVISIONS:
+            revision_iterations += 1
+            logger.Log(
+                f"Chapter {chapter_num} - Revision Iteration {revision_iterations}/{Config.CHAPTER_MAX_REVISIONS}",
+                4,
+            )
+
+            try:
+                feedback_on_chapter = LLMEditor.GetFeedbackOnChapter(
+                    interface, logger, final_chapter_text, overall_story_outline
+                )
+                is_chapter_complete = LLMEditor.GetChapterRating(
+                    interface, logger, final_chapter_text
+                )
+
+                if (
+                    is_chapter_complete
+                    and revision_iterations >= Config.CHAPTER_MIN_REVISIONS
+                ):  # Ensure min revisions are met
+                    logger.Log(
+                        f"Chapter {chapter_num} meets quality standards post-assembly. Exiting revision.",
+                        4,
+                    )
+                    break
+
+                if (
+                    revision_iterations >= Config.CHAPTER_MAX_REVISIONS
+                ):  # Use >= for clarity
+                    logger.Log(
+                        f"Max revisions ({Config.CHAPTER_MAX_REVISIONS}) reached for Chapter {chapter_num}. Proceeding with current version (IsComplete: {is_chapter_complete}).",
+                        6 if not is_chapter_complete else 4,
+                    )
+                    break
+
+                logger.Log(
+                    f"Revising Chapter {chapter_num} based on feedback (IsComplete: {is_chapter_complete})...",
+                    4,
+                )
+                chapter_revision_prompt_text = Prompts.CHAPTER_REVISION_PROMPT.format(
+                    _Chapter=final_chapter_text, _Feedback=feedback_on_chapter
+                )
+
+                messages_for_this_revision = current_revision_history[:]
+                messages_for_this_revision.append(
+                    interface.build_user_query(chapter_revision_prompt_text)
+                )
+
+                response_revised_chapter_messages = interface.safe_generate_text(
+                    logger,
+                    messages_for_this_revision,
+                    Config.CHAPTER_REVISION_WRITER_MODEL,
+                    min_word_count=int(get_word_count(final_chapter_text) * 0.7),
+                )
+
+                final_chapter_text = interface.get_last_message_text(
+                    response_revised_chapter_messages
+                )
+                current_revision_history = response_revised_chapter_messages
+                logger.Log(
+                    f"Chapter {chapter_num} revised. New word count: {get_word_count(final_chapter_text)}.",
+                    4,
+                )
+
+            except Exception as e:
+                logger.Log(
+                    f"Error during Chapter {chapter_num} revision loop (iteration {revision_iterations}): {e}. Using last good version.",
+                    7,
+                )
+                break
+
+    logger.Log(
+        f"--- Finished Generation for Chapter {chapter_num}/{total_chapters}. Final word count: {get_word_count(final_chapter_text)} ---",
+        2,
+    )
+    return final_chapter_text
 
 
-# Example usage (typically called from OutlineGenerator.py or ChapterGenerator.py)
+# Example usage (typically called from Write.py)
 if __name__ == "__main__":
     # This is for testing purposes only.
+    # A full integration test would require mocking all sub-modules (SceneOutliner, SceneGenerator, ChapterContext, LLMEditor)
+    # and the Interface. This is a simplified placeholder.
     class MockLogger:
         def Log(self, item: str, level: int, stream: bool = False):
             print(f"LOG L{level}: {item}")
@@ -330,129 +318,133 @@ if __name__ == "__main__":
             print(f"LANGCHAIN_SAVE: {label}")
 
     class MockInterface:
-        def __init__(self):
-            self.rating_call_count = 0
-
         def build_system_query(self, q: str):
             return {"role": "system", "content": q}
 
         def build_user_query(self, q: str):
             return {"role": "user", "content": q}
 
+        def build_assistant_query(self, q: str):
+            return {"role": "assistant", "content": q}
+
         def get_last_message_text(self, msgs):
             return msgs[-1]["content"] if msgs else ""
 
         def safe_generate_text(self, l, m, mo, min_word_count):
             print(
-                f"Mock LLM Call (safe_generate_text) to {mo} for feedback. Min words: {min_word_count}"
+                f"Mock LLM Call to {mo} with min_words {min_word_count} for ChapterGenerator sub-task."
             )
-            if "OPTIMIZED_CRITIC_OUTLINE_PROMPT" in m[-1]["content"]:
+            if mo == Config.MODEL_CHAPTER_ASSEMBLY_REFINER:
                 return [
                     *m,
                     {
                         "role": "assistant",
-                        "content": "Outline Feedback: Needs more plot twists.",
+                        "content": "This is the REFINED chapter text after assembly.",
                     },
                 ]
-            if "OPTIMIZED_CRITIC_CHAPTER_PROMPT" in m[-1]["content"]:
+            if mo == Config.CHAPTER_REVISION_WRITER_MODEL:
                 return [
                     *m,
                     {
                         "role": "assistant",
-                        "content": "Chapter Feedback: Dialogue is a bit stiff.",
+                        "content": "This is the REVISED chapter text after feedback.",
                     },
                 ]
-            return [*m, {"role": "assistant", "content": "Generic mock feedback."}]
+            return [
+                *m,
+                {
+                    "role": "assistant",
+                    "content": "Default mock response for chapter sub-task.",
+                },
+            ]
 
-        def safe_generate_json(self, l, m, mo, required_attribs):
-            self.rating_call_count += 1
-            print(
-                f"Mock LLM Call (safe_generate_json) to {mo} for rating. Required: {required_attribs}"
-            )
-            is_complete_response = False
-            if "OUTLINE_COMPLETE_PROMPT" in m[-1]["content"]:
-                is_complete_response = (
-                    True if self.rating_call_count > 1 else False
-                )  # Simulate needs one revision
-            elif "CHAPTER_COMPLETE_PROMPT" in m[-1]["content"]:
-                is_complete_response = (
-                    True if self.rating_call_count > 2 else False
-                )  # Simulate needs two revisions
+    # Mock sub-module functions
+    def mock_generate_detailed_scene_outlines(
+        iface, log, chap_plot, overall, chap_num, prev_sum, base_ctx
+    ):
+        log.Log(f"MOCK SceneOutliner called for Ch.{chap_num}", 0)
+        return [
+            {
+                "scene_title": f"Mock Scene {chap_num}.1",
+                "key_events_actions": ["Event 1.1"],
+            },
+            {
+                "scene_title": f"Mock Scene {chap_num}.2",
+                "key_events_actions": ["Event 1.2"],
+            },
+        ]
 
-            json_content = json.dumps(
-                {"IsComplete": is_complete_response, "extra_key": "value"}
-            )
-            return (
-                [*m, {"role": "assistant", "content": json_content}],
-                json.loads(json_content),
-            )
+    def mock_write_scene_narrative(
+        iface, log, scene_outline, overall, prev_ctx, chap_num, scene_num, base_ctx
+    ):
+        log.Log(f"MOCK SceneGenerator called for {scene_outline['scene_title']}", 0)
+        return f"Narrative for {scene_outline['scene_title']}. It included: {scene_outline['key_events_actions'][0]}."
+
+    def mock_generate_previous_scene_summary(iface, log, scene_text, scene_outline):
+        log.Log(
+            f"MOCK ChapterContext (scene summary) called for {scene_outline['scene_title']}",
+            0,
+        )
+        return f"Summary after {scene_outline['scene_title']}: Key things happened."
+
+    def mock_get_feedback_on_chapter(iface, log, chapter_text, overall_outline):
+        log.Log(f"MOCK LLMEditor (GetFeedbackOnChapter) called.", 0)
+        return "This chapter is okay, but could be more exciting."
+
+    def mock_get_chapter_rating(iface, log, chapter_text):
+        log.Log(f"MOCK LLMEditor (GetChapterRating) called.", 0)
+        # Simulate it becoming complete after one revision for testing loop
+        # Ensure this attribute is handled if function is called multiple times in a test run
+        if not hasattr(mock_get_chapter_rating, "call_count"):
+            mock_get_chapter_rating.call_count = 0
+        mock_get_chapter_rating.call_count += 1
+        return True if mock_get_chapter_rating.call_count > 1 else False
+
+    # mock_get_chapter_rating.call_count = 0 # Reset outside if needed for multiple test runs in one script
+
+    # Monkey-patch the imported modules with mocks
+    SceneOutliner.generate_detailed_scene_outlines = (
+        mock_generate_detailed_scene_outlines
+    )
+    SceneGenerator.write_scene_narrative = mock_write_scene_narrative
+    ChapterContext.generate_previous_scene_summary = (
+        mock_generate_previous_scene_summary
+    )
+    LLMEditor.GetFeedbackOnChapter = mock_get_feedback_on_chapter
+    LLMEditor.GetChapterRating = mock_get_chapter_rating
 
     mock_logger = MockLogger()
     mock_interface = MockInterface()
 
-    Config.REVISION_MODEL = "mock_revision_model"
-    Config.EVAL_MODEL = "mock_eval_model_for_editor"
-    Prompts.DEFAULT_SYSTEM_PROMPT = "System prompt for LLMEditor test."
-    # Simplified prompts for testing placeholders
-    Prompts.OPTIMIZED_CRITIC_OUTLINE_PROMPT = "Critique Outline: {_Outline}"
-    Prompts.OUTLINE_COMPLETE_PROMPT = "Rate Outline: {_Outline}"
-    Prompts.OPTIMIZED_CRITIC_CHAPTER_PROMPT = "Critique Chapter: {_ChapterText} with Outline: {_OverallStoryOutline}"  # Corrected placeholder
-    Prompts.CHAPTER_COMPLETE_PROMPT = (
-        "Rate Chapter: {_Chapter}"  # Corrected placeholder
-    )
+    # Setup Config for the test
+    Config.MODEL_CHAPTER_ASSEMBLY_REFINER = "mock_refiner_model"
+    Config.CHAPTER_REVISION_WRITER_MODEL = "mock_chapter_revision_model"
+    Config.CHAPTER_NO_REVISIONS = False
+    Config.CHAPTER_MIN_REVISIONS = 0
+    Config.CHAPTER_MAX_REVISIONS = 1
+    Prompts.DEFAULT_SYSTEM_PROMPT = "System prompt for ChapterGenerator test."
+    Prompts.CHAPTER_REVISION_PROMPT = "Revise: {_Chapter} with feedback: {_Feedback}"
 
-    print("--- Testing GetFeedbackOnOutline ---")
-    outline_fb = GetFeedbackOnOutline(
-        mock_interface, mock_logger, "Chapter 1: A start. Chapter 2: An end."
-    )
-    print(f"Outline Feedback: {outline_fb}\n")
-    assert "plot twists" in outline_fb
+    print("\n--- Testing generate_chapter_by_scenes ---")
+    # Reset call count for GetChapterRating if it's stateful across tests
+    if hasattr(mock_get_chapter_rating, "call_count"):
+        mock_get_chapter_rating.call_count = 0
 
-    print("--- Testing GetOutlineRating (simulating one revision needed) ---")
-    mock_interface.rating_call_count = 0  # Reset for this specific test sequence
-    rating1_false = GetOutlineRating(
-        mock_interface, mock_logger, "Initial Outline Draft"
-    )
-    print(f"Outline Rating (1st call): {rating1_false}")
-    assert rating1_false == False
-    rating1_true = GetOutlineRating(
-        mock_interface, mock_logger, "Revised Outline Draft"
-    )
-    print(f"Outline Rating (2nd call): {rating1_true}")
-    assert rating1_true == True
-
-    print("\n--- Testing GetFeedbackOnChapter ---")
-    chapter_fb = GetFeedbackOnChapter(
+    chapter_text_result = generate_chapter_by_scenes(
         mock_interface,
         mock_logger,
-        "He said, 'Hello.' She said, 'Hi.'",
-        "A short story outline.",
+        chapter_num=1,
+        total_chapters=3,
+        overall_story_outline="A three-chapter saga.",
+        current_chapter_plot_outline="The hero starts their journey and faces a small test.",
+        previous_chapter_context_summary=None,
+        base_story_context="A fantasy world.",
     )
-    print(f"Chapter Feedback: {chapter_fb}\n")
-    assert "Dialogue is a bit stiff" in chapter_fb
 
-    print("--- Testing GetChapterRating (simulating two revisions needed) ---")
-    mock_interface.rating_call_count = 0  # Reset for this specific test sequence
-    chap_rating_false1 = GetChapterRating(
-        mock_interface, mock_logger, "First chapter draft."
-    )
-    print(f"Chapter Rating (1st call): {chap_rating_false1}")
-    assert chap_rating_false1 == False
-    chap_rating_false2 = GetChapterRating(
-        mock_interface, mock_logger, "Second chapter draft."
-    )
-    print(f"Chapter Rating (2nd call): {chap_rating_false2}")
-    assert chap_rating_false2 == False
-    chap_rating_true = GetChapterRating(
-        mock_interface, mock_logger, "Third chapter draft."
-    )
-    print(f"Chapter Rating (3rd call): {chap_rating_true}")
-    assert chap_rating_true == True
+    print("\n--- Final Generated Chapter Text (Mocked) ---")
+    print(chapter_text_result)
 
-    print("\n--- Testing with empty inputs ---")
-    empty_outline_fb = GetFeedbackOnOutline(mock_interface, mock_logger, "")
-    print(f"Empty Outline Feedback: {empty_outline_fb}")
-    assert "Error:" in empty_outline_fb
-    empty_outline_rating = GetOutlineRating(mock_interface, mock_logger, "")
-    print(f"Empty Outline Rating: {empty_outline_rating}")
-    assert empty_outline_rating == False
+    assert "Narrative for Mock Scene 1.1" in chapter_text_result
+    assert "Narrative for Mock Scene 1.2" in chapter_text_result
+    assert "REFINED" in chapter_text_result
+    assert "REVISED" in chapter_text_result
