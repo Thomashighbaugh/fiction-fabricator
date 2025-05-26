@@ -21,20 +21,20 @@ These default values can be overridden by command-line arguments at runtime.
 
 # Core Creative Models
 INITIAL_OUTLINE_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF"
-MODEL_STORY_ELEMENTS_GENERATOR: str = "ollama://llama3:latest" # For generating detailed story elements
-MODEL_SCENE_OUTLINER: str = "ollama://llama3:latest" # For breaking chapters into scene outlines
-MODEL_SCENE_NARRATIVE_GENERATOR: str = "ollama://llama3:latest" # For writing individual scene narratives
-MODEL_CHAPTER_ASSEMBLY_REFINER: str = "ollama://llama3:latest" # For refining assembled scenes into a cohesive chapter
+MODEL_STORY_ELEMENTS_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For generating detailed story elements
+MODEL_SCENE_OUTLINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For breaking chapters into scene outlines
+MODEL_SCENE_NARRATIVE_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For writing individual scene narratives
+MODEL_CHAPTER_ASSEMBLY_REFINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For refining assembled scenes into a cohesive chapter
 
 # Supporting and Utility Models
-MODEL_CHAPTER_CONTEXT_SUMMARIZER: str = "ollama://llama3:latest" # For summarizing previous chapter/scene for context
-REVISION_MODEL: str = "ollama://llama3:latest" # For providing critique/feedback
-CHAPTER_REVISION_WRITER_MODEL: str = "ollama://llama3:latest" # For revising chapters based on feedback
-EVAL_MODEL: str = "ollama://llama3:latest" # For evaluation tasks (e.g., IsComplete checks, JSON ratings)
-INFO_MODEL: str = "ollama://llama3:latest" # For extracting story metadata (title, summary, tags)
-SCRUB_MODEL: str = "ollama://llama3:latest" # For cleaning final output
-CHECKER_MODEL: str = "ollama://llama3:latest" # For JSON parsing checks or simple validations
-TRANSLATOR_MODEL: str = "ollama://llama3:latest" # For translation tasks
+MODEL_CHAPTER_CONTEXT_SUMMARIZER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For summarizing previous chapter/scene for context
+REVISION_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For providing critique/feedback
+CHAPTER_REVISION_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For revising chapters based on feedback
+EVAL_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For evaluation tasks (e.g., IsComplete checks, JSON ratings)
+INFO_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For extracting story metadata (title, summary, tags)
+SCRUB_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For cleaning final output
+CHECKER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For JSON parsing checks or simple validations
+TRANSLATOR_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For translation tasks
 
 # --- API and System Settings ---
 OLLAMA_CTX: int = 8192  # Default context window size for Ollama models

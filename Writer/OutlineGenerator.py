@@ -1,209 +1,228 @@
 # File: AIStoryWriter/Writer/OutlineGenerator.py
-# Purpose: Generates the main story outline (chapter-by-chapter plot summaries)
-#          based on user prompt and generated story elements. Includes a revision loop.
+# Purpose: Generates the main story outline, chapter by chapter, using story elements and LLM feedback.
 
 """
-This module orchestrates the generation of the overall story outline.
-It takes the initial user prompt and the detailed story elements (from StoryElements.py)
-to produce a chapter-by-chapter plot outline. This outline serves as the primary
-roadmap for subsequent scene breakdown and narrative generation.
+Overall Story Outline Generation Module.
 
-The process includes:
-1. Extracting any overarching "base context" or meta-instructions from the user's prompt.
-2. Generating an initial chapter-level outline using the story elements and user prompt.
-3. Iteratively refining this outline using an LLM-based feedback and revision loop
-   until it meets quality standards or a maximum number of revisions is reached.
+This module orchestrates the creation of a chapter-by-chapter plot outline
+for the entire story. It leverages previously generated story elements and
+employs an iterative feedback loop with an LLM to refine the outline's
+quality, coherence, and pacing.
+
+The final output is a structured Markdown document detailing each chapter's
+key events, character developments, and narrative purpose.
 """
 
-from typing import Tuple, List, Dict
-
-from .. import Config  # Relative import for Config
-from .. import Prompts  # Relative import for Prompts
-from ..Interface.Wrapper import Interface  # Relative import for Interface
-from ..PrintUtils import Logger  # Relative import for Logger
-from .Outline import StoryElements  # Relative import for StoryElements module
-from ..LLMEditor import (
-    GetFeedbackOnOutline,
-    GetOutlineRating,
-)  # Relative import for LLMEditor functions
+import Writer.Config as Config
+import Writer.Prompts as Prompts
+import Writer.LLMEditor as LLMEditor  # For feedback and rating functions
+import Writer.Outline.StoryElements as StoryElements  # To generate story elements first
+from Writer.Interface.Wrapper import Interface  # LLM interaction
+from Writer.PrintUtils import Logger  # Logging
+import json
+from typing import Tuple, List, Dict, Any
 
 
-def GenerateOutline(
+def generate_outline(
     interface: Interface, logger: Logger, user_story_prompt: str
 ) -> Tuple[str, str, str, str]:
     """
-    Generates and refines the main story outline.
+    Generates a comprehensive, chapter-by-chapter story outline.
+
+    The process involves:
+    1. Extracting any overarching context or instructions from the user's prompt.
+    2. Generating foundational story elements (genre, characters, plot synopsis, etc.).
+    3. Producing an initial chapter-level outline based on the elements and prompt.
+    4. Iteratively refining this outline using LLM-based feedback and quality checks.
 
     Args:
-        interface: The LLM interface wrapper instance.
-        logger: The Logger instance for logging.
-        user_story_prompt: The user's initial story idea.
+        interface (Interface): The LLM interaction wrapper instance.
+        logger (Logger): The logging instance.
+        user_story_prompt (str): The user's initial story idea or prompt.
 
     Returns:
-        A tuple containing:
-        - printable_full_outline (str): A string combining base context, story elements,
-                                        and the final chapter-level outline for output.
-        - story_elements_markdown (str): The generated story elements in Markdown.
-        - final_chapter_level_outline (str): The refined chapter-by-chapter plot outline.
-        - base_story_context (str): Extracted meta-instructions from the user prompt.
+        Tuple[str, str, str, str]:
+            - printable_full_outline (str): A string containing the base context,
+              story elements, and the final chapter-level outline, suitable for printing or saving.
+            - story_elements_markdown (str): The Markdown content of the generated story elements.
+            - final_chapter_level_outline (str): The refined chapter-by-chapter plot outline.
+            - base_story_context (str): Extracted important context/instructions from the user prompt.
     """
     logger.Log("Starting Overall Story Outline Generation Process...", 2)
 
-    # --- 1. Extract Base Context from User Prompt ---
+    if not user_story_prompt or not user_story_prompt.strip():
+        error_msg = "User story prompt is empty. Cannot generate outline."
+        logger.Log(error_msg, 7)
+        return (
+            error_msg,
+            error_msg,
+            error_msg,
+            error_msg,
+        )  # Return error for all tuple elements
+
+    # 1. Extract Base Context/Instructions from the user's main prompt
     logger.Log("Extracting base context from user prompt...", 3)
-    base_context_prompt_template = Prompts.GET_IMPORTANT_BASE_PROMPT_INFO
-    formatted_base_context_prompt = base_context_prompt_template.format(
-        _Prompt=user_story_prompt
-    )
+    base_story_context = ""
+    try:
+        prompt_ctx_template = Prompts.GET_IMPORTANT_BASE_PROMPT_INFO
+        formatted_prompt_ctx = prompt_ctx_template.format(_Prompt=user_story_prompt)
+        messages_ctx = [interface.build_user_query(formatted_prompt_ctx)]
+        # Using EVAL_MODEL as it's usually good for simple extraction and instruction following
+        response_ctx_messages = interface.safe_generate_text(
+            logger, messages_ctx, Config.EVAL_MODEL, min_word_count=5
+        )
+        base_story_context = interface.get_last_message_text(response_ctx_messages)
+        logger.Log(
+            f"Base story context extracted (first 100 chars): '{base_story_context[:100].replace('\n', ' ')}...'",
+            3,
+        )
+    except KeyError as e:
+        logger.Log(
+            f"Formatting error in GET_IMPORTANT_BASE_PROMPT_INFO prompt: Missing key {e}",
+            6,
+        )  # Warning, not fatal
+        base_story_context = (
+            "Warning: Could not extract base context due to prompt template error."
+        )
+    except Exception as e:
+        logger.Log(f"Unexpected error during base context extraction: {e}", 6)
+        base_story_context = f"Warning: Error extracting base context - {e}."
 
-    base_context_messages = [
-        interface.BuildSystemQuery(
-            Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # A capable system prompt
-        interface.BuildUserQuery(formatted_base_context_prompt),
-    ]
-
-    # Using EVAL_MODEL as it's typically good for structured extraction/simple tasks
-    base_context_response_messages = interface.SafeGenerateText(
-        messages=base_context_messages,
-        model_uri=Config.EVAL_MODEL,
-        min_word_count=5,  # Expect at least "None found" or some points
-    )
-    base_story_context: str = interface.GetLastMessageText(
-        base_context_response_messages
-    )
-    logger.Log(
-        f"Base context extracted (snippet): {base_story_context[:150].strip()}...", 3
-    )
-
-    # --- 2. Generate Story Elements ---
-    # This function is already robust and uses its own configured model
-    story_elements_markdown = StoryElements.GenerateStoryElements(
+    # 2. Generate Foundational Story Elements
+    logger.Log("Generating foundational story elements...", 3)
+    story_elements_markdown = StoryElements.generate_story_elements(
         interface, logger, user_story_prompt
     )
-    if "// ERROR:" in story_elements_markdown:
-        logger.Log(
-            "Critical error during story elements generation. Aborting outline generation.",
-            7,
-        )
-        # Return placeholders to indicate failure
+    if "Error:" in story_elements_markdown:  # Check if element generation failed
+        logger.Log(f"Failed to generate story elements: {story_elements_markdown}", 7)
+        # Propagate the error message
         return (
-            "// ERROR IN STORY ELEMENTS //",
             story_elements_markdown,
-            "// OUTLINE GENERATION ABORTED //",
+            story_elements_markdown,
+            story_elements_markdown,
             base_story_context,
         )
 
-    # --- 3. Generate Initial Chapter-Level Outline ---
+    # 3. Generate Initial Chapter-Level Outline
     logger.Log("Generating initial chapter-level outline...", 3)
-    initial_outline_prompt_template = Prompts.OPTIMIZED_OVERALL_OUTLINE_GENERATION
-    formatted_initial_outline_prompt = initial_outline_prompt_template.format(
-        _UserStoryPrompt=user_story_prompt,
-        _StoryElementsMarkdown=story_elements_markdown,
-    )
-
-    initial_outline_messages = [
-        interface.BuildSystemQuery(Prompts.DEFAULT_SYSTEM_PROMPT),
-        interface.BuildUserQuery(formatted_initial_outline_prompt),
-    ]
-
-    initial_outline_response_messages = interface.SafeGenerateText(
-        messages=initial_outline_messages,
-        model_uri=Config.INITIAL_OUTLINE_WRITER_MODEL,
-        min_word_count=200,  # Expect a substantial outline
-    )
-    current_outline: str = interface.GetLastMessageText(
-        initial_outline_response_messages
-    )
-
-    if not current_outline.strip() or "// ERROR:" in current_outline:
-        logger.Log("LLM failed to generate a valid initial outline.", 6)
-        return (
-            f"{base_story_context}\n\n{story_elements_markdown}\n\n// ERROR: INITIAL OUTLINE FAILED //",
-            story_elements_markdown,
-            "// ERROR: INITIAL OUTLINE FAILED //",
-            base_story_context,
+    current_outline = ""
+    current_history_for_revision: List[Dict[str, Any]] = []
+    try:
+        prompt_initial_outline_template = Prompts.OPTIMIZED_OVERALL_OUTLINE_GENERATION
+        formatted_prompt_initial_outline = prompt_initial_outline_template.format(
+            _UserStoryPrompt=user_story_prompt,
+            _StoryElementsMarkdown=story_elements_markdown,
         )
-    logger.Log("Initial chapter-level outline generated successfully.", 3)
+        messages_initial_outline = [
+            interface.build_system_query(Prompts.DEFAULT_SYSTEM_PROMPT),
+            interface.build_user_query(formatted_prompt_initial_outline),
+        ]
 
-    # --- 4. Revision Loop for Overall Outline ---
-    logger.Log("Starting outline revision loop...", 2)
-    revision_iteration = 0
-    # Start history with the system prompt and the assistant's first outline generation
-    current_revision_history: List[Dict[str, str]] = [
-        interface.BuildSystemQuery(Prompts.DEFAULT_SYSTEM_PROMPT),
-        # We don't include the user's prompt for OPTIMIZED_OVERALL_OUTLINE_GENERATION in history
-        # because ReviseOutline will receive _CurrentOutline and _Feedback directly.
-        # The history for ReviseOutline starts fresh or with the last specific revision interaction.
-        # For LLMEditor.GetFeedbackOnOutline, it builds its own small history.
-    ]
-    # To give ReviseOutline context, its history should be the one that led to current_outline.
-    # So, initial_outline_response_messages contains the full exchange for the first outline.
-    current_revision_history_for_revise_func = initial_outline_response_messages
+        response_initial_outline_messages = interface.safe_generate_text(
+            logger,
+            messages_initial_outline,
+            Config.INITIAL_OUTLINE_WRITER_MODEL,
+            min_word_count=200,  # Expect a reasonably detailed initial outline
+        )
+        current_outline = interface.get_last_message_text(
+            response_initial_outline_messages
+        )
+        current_history_for_revision = (
+            response_initial_outline_messages  # Save for revision loop context
+        )
+        logger.Log("Initial chapter-level outline generated.", 4)
+    except KeyError as e:
+        error_msg = f"Formatting error in OPTIMIZED_OVERALL_OUTLINE_GENERATION prompt: Missing key {e}"
+        logger.Log(error_msg, 7)
+        return error_msg, story_elements_markdown, error_msg, base_story_context
+    except Exception as e:
+        error_msg = f"Unexpected error during initial outline generation: {e}"
+        logger.Log(error_msg, 7)
+        return error_msg, story_elements_markdown, error_msg, base_story_context
 
-    while revision_iteration < Config.OUTLINE_MAX_REVISIONS:
-        revision_iteration += 1
+    if not current_outline or "Error:" in current_outline:
+        error_msg = (
+            f"Initial outline generation failed or returned error: {current_outline}"
+        )
+        logger.Log(error_msg, 7)
+        return error_msg, story_elements_markdown, current_outline, base_story_context
+
+    # 4. Iterative Revision Loop for the Chapter-Level Outline
+    logger.Log("Entering outline revision loop...", 3)
+    iterations = 0
+
+    while iterations < Config.OUTLINE_MAX_REVISIONS:
+        iterations += 1
         logger.Log(
-            f"Outline Revision Iteration {revision_iteration}/{Config.OUTLINE_MAX_REVISIONS}",
-            3,
+            f"Outline Revision Iteration {iterations}/{Config.OUTLINE_MAX_REVISIONS}", 3
         )
 
-        feedback_on_outline = GetFeedbackOnOutline(interface, logger, current_outline)
-        logger.Log(
-            f"Feedback received for outline (iteration {revision_iteration}).", 3
-        )
-        if Config.DEBUG:
+        try:
+            feedback_on_outline = LLMEditor.GetFeedbackOnOutline(
+                interface, logger, current_outline
+            )
             logger.Log(
-                f"Outline Feedback (Iter {revision_iteration}):\n{feedback_on_outline[:300]}...",
-                1,
+                f"Feedback received for outline (first 100 chars): '{feedback_on_outline[:100].replace('\n', ' ')}...'",
+                3,
             )
 
-        # GetOutlineRating returns True if complete/good, False otherwise
-        is_outline_complete = GetOutlineRating(interface, logger, current_outline)
-        logger.Log(
-            f"Outline 'IsComplete' rating (iteration {revision_iteration}): {is_outline_complete}",
-            3,
-        )
-
-        if is_outline_complete and revision_iteration > Config.OUTLINE_MIN_REVISIONS:
-            logger.Log(
-                "Outline meets quality standards and minimum revisions. Exiting revision loop.",
-                2,
+            is_outline_complete = LLMEditor.GetOutlineRating(
+                interface, logger, current_outline
             )
-            break
+            logger.Log(f"Outline completion status: {is_outline_complete}", 3)
 
-        if (
-            revision_iteration >= Config.OUTLINE_MAX_REVISIONS
-        ):  # Check here to log before breaking
-            logger.Log("Maximum outline revisions reached. Exiting revision loop.", 2)
-            break
+            if is_outline_complete and iterations > Config.OUTLINE_MIN_REVISIONS:
+                logger.Log(
+                    "Outline meets quality standards and minimum revision count. Exiting revision loop.",
+                    4,
+                )
+                break
 
-        logger.Log(
-            f"Revising outline based on feedback (iteration {revision_iteration})...", 3
-        )
-        current_outline, current_revision_history_for_revise_func = (
-            _revise_outline_internal(
+            # If it's the last iteration and still not "complete" by rating, we proceed anyway but log it.
+            if iterations == Config.OUTLINE_MAX_REVISIONS and not is_outline_complete:
+                logger.Log(
+                    f"Max outline revisions ({Config.OUTLINE_MAX_REVISIONS}) reached. Proceeding with current outline despite IsComplete={is_outline_complete}.",
+                    6,
+                )
+                break
+            if (
+                iterations == Config.OUTLINE_MAX_REVISIONS and is_outline_complete
+            ):  # If complete on last iteration
+                logger.Log(
+                    f"Max outline revisions ({Config.OUTLINE_MAX_REVISIONS}) reached. Outline deemed complete. Exiting revision loop.",
+                    4,
+                )
+                break
+
+            logger.Log("Revising outline based on feedback...", 3)
+            current_outline, current_history_for_revision = _revise_outline_internal(
                 interface,
                 logger,
                 current_outline,
                 feedback_on_outline,
-                current_revision_history_for_revise_func,
+                current_history_for_revision,
             )
-        )
-        if "// ERROR:" in current_outline:
-            logger.Log("Error during outline revision. Using previous version.", 6)
-            # current_outline would retain its pre-error value due to how _revise_outline_internal returns
+            if "Error:" in current_outline:  # Check if revision step itself failed
+                logger.Log(f"Outline revision failed: {current_outline}", 7)
+                break  # Exit loop if revision fails critically
+
+            logger.Log("Outline revised successfully.", 4)
+
+        except Exception as e:
+            logger.Log(
+                f"Error during outline revision loop (iteration {iterations}): {e}", 7
+            )
+            # Potentially break or decide to proceed with the current_outline
+            # For now, let's break to avoid further issues with a problematic outline
             break
-        logger.Log(f"Outline revised (iteration {revision_iteration}).", 3)
 
     final_chapter_level_outline = current_outline
-    logger.Log("Outline revision loop finished.", 2)
 
     # Assemble the full printable outline
     printable_full_outline = (
-        f"# Base Story Context & Instructions\n{base_story_context}\n\n"
-        f"---\n# Generated Story Elements\n{story_elements_markdown}\n\n"
-        f"---\n# Final Chapter-Level Plot Outline\n{final_chapter_level_outline}"
+        f"# Base Story Context/Instructions:\n{base_story_context}\n\n---\n\n"
+        f"# Story Elements:\n{story_elements_markdown}\n\n---\n\n"
+        f"# Chapter-by-Chapter Outline:\n{final_chapter_level_outline}"
     )
 
     logger.Log("Overall Story Outline Generation Process Complete.", 2)
@@ -220,214 +239,216 @@ def _revise_outline_internal(
     logger: Logger,
     current_outline_text: str,
     feedback_text: str,
-    current_history_for_llm: List[Dict[str, str]],
-) -> Tuple[str, List[Dict[str, str]]]:
+    history_messages: List[Dict[str, Any]],
+) -> Tuple[str, List[Dict[str, Any]]]:
     """
-    Internal helper to call the LLM for revising an outline.
-    Manages the message history specifically for the revision call.
+    Internal helper function to revise an outline based on feedback.
+    Manages the LLM call for revision.
+
+    Args:
+        interface: LLM interface.
+        logger: Logger instance.
+        current_outline_text: The current version of the outline.
+        feedback_text: The feedback to apply.
+        history_messages: The message history leading to the current outline, for context.
+
+    Returns:
+        Tuple[str, List[Dict[str, Any]]]: The revised outline text and the updated message history.
     """
-    revision_prompt_template = Prompts.OUTLINE_REVISION_PROMPT
-    formatted_revision_prompt = revision_prompt_template.format(
-        _Outline=current_outline_text, _Feedback=feedback_text
-    )
+    try:
+        revision_prompt_template = Prompts.OUTLINE_REVISION_PROMPT
+        formatted_revision_prompt = revision_prompt_template.format(
+            _Outline=current_outline_text, _Feedback=feedback_text
+        )
+    except KeyError as e:
+        error_msg = f"Formatting error in OUTLINE_REVISION_PROMPT: Missing key {e}"
+        logger.Log(error_msg, 7)
+        return (
+            f"Error: {error_msg}",
+            history_messages,
+        )  # Return error and original history
+    except Exception as e:
+        error_msg = f"Unexpected error formatting revision prompt: {e}"
+        logger.Log(error_msg, 7)
+        return f"Error: {error_msg}", history_messages
 
-    # The history for a revision should ideally be the conversation that LED to the current_outline_text,
-    # then the feedback, then the request to revise.
-    # However, to keep it simpler and avoid overly long context, we can also just send the current outline and feedback.
-    # The `current_history_for_llm` here is passed from the main loop, representing the conversation so far
-    # that produced `current_outline_text`. We append the new user request for revision to this.
+    # Use a copy of the history and append the new user query for revision
+    messages_for_revision = history_messages[:]
+    messages_for_revision.append(interface.build_user_query(formatted_revision_prompt))
 
-    messages_for_revision = current_history_for_llm[
-        :
-    ]  # Start with the history that produced the current outline
-    # The last message in current_history_for_llm is the assistant's `current_outline_text`.
-    # We now add a user message asking to revise it based on new feedback.
-    # The `formatted_revision_prompt` itself contains the outline and feedback.
-    # So, we can just append a new user query with formatted_revision_prompt.
-    # However, standard practice is: System, User, Assistant, User, Assistant...
-    # The current_history_for_llm ends with an assistant message (the outline).
-    # So, we should append a user message.
+    try:
+        response_revised_outline_messages = interface.safe_generate_text(
+            logger,
+            messages_for_revision,
+            Config.INITIAL_OUTLINE_WRITER_MODEL,  # Or a dedicated REVISION_MODEL if preferred for this step
+            min_word_count=len(current_outline_text.split())
+            // 2,  # Expect substantial revision, not just minor tweaks
+        )
 
-    messages_for_revision.append(interface.BuildUserQuery(formatted_revision_prompt))
-    # The LLM will see its previous output (the outline, as part of the prompt) and the new feedback.
+        revised_outline_text: str = interface.get_last_message_text(
+            response_revised_outline_messages
+        )
 
-    response_messages = interface.SafeGenerateText(
-        messages=messages_for_revision,  # Send the continued conversation
-        model_uri=Config.INITIAL_OUTLINE_WRITER_MODEL,  # Or a dedicated REVISION_MODEL if configured
-        min_word_count=len(current_outline_text.split())
-        // 2,  # Expect revision to be substantial
-    )
+        if not revised_outline_text or "Error:" in revised_outline_text:
+            logger.Log(
+                f"LLM failed to revise outline or returned an error: {revised_outline_text}",
+                6,
+            )
+            return (
+                current_outline_text,
+                history_messages,
+            )  # Return original outline and history on failure
 
-    revised_outline_text: str = interface.GetLastMessageText(response_messages)
+        return revised_outline_text, response_revised_outline_messages
 
-    if not revised_outline_text.strip() or "// ERROR:" in revised_outline_text:
+    except Exception as e:
         logger.Log(
-            "LLM failed to generate a valid revised outline. Returning original.", 6
+            f"An unexpected error occurred during internal outline revision call: {e}",
+            7,
         )
         return (
-            current_outline_text,
-            current_history_for_llm,
-        )  # Return original and its history
-
-    return (
-        revised_outline_text,
-        response_messages,
-    )  # Return new outline and its full generating history
+            f"Error: Unexpected critical error during revision - {e}",
+            history_messages,
+        )
 
 
-# Example usage (typically not run directly from here)
+# Example usage (typically called from Write.py)
 if __name__ == "__main__":
-    # This is for testing OutlineGenerator.py itself.
-    # Requires mock or actual Interface, Logger, StoryElements, LLMEditor, Config, Prompts.
-
-    class MockConfigOutline:
-        INITIAL_OUTLINE_WRITER_MODEL = "ollama://mistral:latest"
-        EVAL_MODEL = "ollama://mistral:latest"  # For base context and rating
-        REVISION_MODEL = "ollama://mistral:latest"  # For feedback
-        OUTLINE_MIN_REVISIONS = 0
-        OUTLINE_MAX_REVISIONS = 1  # Quick test
-        DEBUG = True
-        DEBUG_LEVEL = 1
-
-    Config = MockConfigOutline()  # type: ignore
-    Prompts.DEFAULT_SYSTEM_PROMPT = "You are an assistant."
-
-    class MockLoggerOutline:
-        def Log(self, item: str, level: int, stream_chunk: bool = False):
+    # This is for testing purposes only.
+    class MockLogger:
+        def Log(self, item: str, level: int, stream: bool = False):
             print(f"LOG L{level}: {item}")
 
-        def SaveLangchain(self, suffix: str, messages: list):
-            print(f"LANGCHAIN_SAVE ({suffix}): {len(messages)} messages")
+        def save_langchain_interaction(self, label: str, messages: list):
+            print(f"LANGCHAIN_SAVE: {label}")
 
-    class MockStoryElements:
-        @staticmethod
-        def GenerateStoryElements(interface, logger, prompt):
-            logger.Log("MockStoryElements.GenerateStoryElements called.", 1)
-            return "# Mock Story Elements\n- Genre: Sci-Fi\n- Character: Captain Astra"
+    class MockInterface:
+        def __init__(self):
+            self.call_count = 0
 
-    StoryElements = MockStoryElements()  # type: ignore
-
-    class MockLLMEditor:
-        _feedback_count = 0
-        _rating_val = False
-
-        @staticmethod
-        def GetFeedbackOnOutline(interface, logger, outline):
-            MockLLMEditor._feedback_count += 1
-            logger.Log(
-                f"MockLLMEditor.GetFeedbackOnOutline called (call {MockLLMEditor._feedback_count}).",
-                1,
-            )
-            if MockLLMEditor._feedback_count == 1:
-                return "Feedback: Needs more detail in chapter 2."
-            return "Feedback: Looks good now."
-
-        @staticmethod
-        def GetOutlineRating(interface, logger, outline):
-            logger.Log(
-                f"MockLLMEditor.GetOutlineRating called. Current rating val: {MockLLMEditor._rating_val}",
-                1,
-            )
-            # Simulate improvement: first False, then True
-            current_val = MockLLMEditor._rating_val
-            MockLLMEditor._rating_val = True  # Next time it will be true
-            return current_val
-
-    # Monkey patch LLMEditor for testing this module
-    import sys
-
-    # Create a mock module for LLMEditor
-    mock_llm_editor_module = type(sys)("LLMEditor")
-    mock_llm_editor_module.GetFeedbackOnOutline = MockLLMEditor.GetFeedbackOnOutline  # type: ignore
-    mock_llm_editor_module.GetOutlineRating = MockLLMEditor.GetOutlineRating  # type: ignore
-    sys.modules["AIStoryWriter.LLMEditor"] = mock_llm_editor_module  # type: ignore
-    # And update the local import
-    GetFeedbackOnOutline = MockLLMEditor.GetFeedbackOnOutline  # type: ignore
-    GetOutlineRating = MockLLMEditor.GetOutlineRating  # type: ignore
-
-    class MockInterfaceOutline:
-        def __init__(self, models, logger_instance):
-            pass
-
-        def BuildSystemQuery(self, q: str):
+        def build_system_query(self, q: str):
             return {"role": "system", "content": q}
 
-        def BuildUserQuery(self, q: str):
+        def build_user_query(self, q: str):
             return {"role": "user", "content": q}
 
-        _gen_text_call = 0
+        def get_last_message_text(self, msgs):
+            return msgs[-1]["content"] if msgs else ""
 
-        def SafeGenerateText(self, messages: list, model_uri: str, min_word_count: int):
-            MockInterfaceOutline._gen_text_call += 1
+        def safe_generate_text(self, l, m, mo, min_word_count):
+            self.call_count += 1
             print(
-                f"MockInterface.SafeGenerateText called for {model_uri} (call {MockInterfaceOutline._gen_text_call}). Min words: {min_word_count}. Prompt: {messages[-1]['content'][:60]}..."
+                f"Mock LLM Call ({self.call_count}) to {mo} with min_words {min_word_count}. Prompt preview: {m[-1]['content'][:50]}..."
             )
-            if "GET_IMPORTANT_BASE_PROMPT_INFO" in messages[-1]["content"]:
+            if "GET_IMPORTANT_BASE_PROMPT_INFO" in m[-1]["content"]:
                 return [
-                    *messages,
+                    *m,
                     {
                         "role": "assistant",
-                        "content": "# Important Additional Context\n- Write in first person.",
+                        "content": "# Important Additional Context\n- Make it epic.",
                     },
                 ]
-            if "OPTIMIZED_OVERALL_OUTLINE_GENERATION" in messages[-1]["content"]:
+            if "OPTIMIZED_STORY_ELEMENTS_GENERATION" in m[-1]["content"]:
                 return [
-                    *messages,
+                    *m,
+                    {"role": "assistant", "content": "## Genre:\n- Epic Fantasy"},
+                ]
+            if "OPTIMIZED_OVERALL_OUTLINE_GENERATION" in m[-1]["content"]:
+                return [
+                    *m,
                     {
                         "role": "assistant",
-                        "content": "# Chapter 1\nPlot A\n# Chapter 2\nPlot B",
+                        "content": "Chapter 1: The Beginning\nChapter 2: The Middle",
                     },
                 ]
+            if "OPTIMIZED_CRITIC_OUTLINE_PROMPT" in m[-1]["content"]:
+                return [*m, {"role": "assistant", "content": "Needs more dragons."}]
             if (
-                "OUTLINE_REVISION_PROMPT" in messages[-1]["content"]
-            ):  # Simulate revision
+                "OUTLINE_COMPLETE_PROMPT" in m[-1]["content"]
+            ):  # Simulate GetOutlineRating
+                # To test the loop, make it return False first, then True
+                if self.call_count < 6:  # Adjust this threshold based on expected calls
+                    return [
+                        *m,
+                        {
+                            "role": "assistant",
+                            "content": json.dumps({"IsComplete": False}),
+                        },
+                    ]
+                else:
+                    return [
+                        *m,
+                        {
+                            "role": "assistant",
+                            "content": json.dumps({"IsComplete": True}),
+                        },
+                    ]
+            if "OUTLINE_REVISION_PROMPT" in m[-1]["content"]:
                 return [
-                    *messages,
+                    *m,
                     {
                         "role": "assistant",
-                        "content": "# Chapter 1\nPlot A revised\n# Chapter 2\nPlot B with more detail.",
+                        "content": "Chapter 1: The Beginning with Dragons\nChapter 2: The Middle with More Dragons",
                     },
                 ]
-            # Fallback for GetFeedback/GetRating if they use SafeGenerateText
-            if "CRITIC_OUTLINE_PROMPT" in messages[-1]["content"]:
-                return [
-                    *messages,
-                    {
-                        "role": "assistant",
-                        "content": MockLLMEditor.GetFeedbackOnOutline(
-                            self, MockLoggerOutline(), "dummy outline"
-                        ),
-                    },
-                ]
-            if "OUTLINE_COMPLETE_PROMPT" in messages[-1]["content"]:
-                is_complete = MockLLMEditor.GetOutlineRating(
-                    self, MockLoggerOutline(), "dummy outline"
-                )
-                return [
-                    *messages,
-                    {
-                        "role": "assistant",
-                        "content": json.dumps({"IsComplete": is_complete}),
-                    },
-                ]
-            return [
-                *messages,
-                {"role": "assistant", "content": "Default mock response."},
-            ]
+            return [*m, {"role": "assistant", "content": "Mocked response."}]
 
-        def GetLastMessageText(self, messages: list):
-            return messages[-1]["content"] if messages else ""
+        def safe_generate_json(
+            self, l, m, mo, required_attribs
+        ):  # For GetOutlineRating
+            self.call_count += 1
+            print(
+                f"Mock LLM JSON Call ({self.call_count}) to {mo}. Prompt: {m[-1]['content'][:50]}..."
+            )
+            if "OUTLINE_COMPLETE_PROMPT" in m[-1]["content"]:
+                if self.call_count < 6:  # Simulate a few revisions needed
+                    return (
+                        [
+                            *m,
+                            {
+                                "role": "assistant",
+                                "content": json.dumps({"IsComplete": False}),
+                            },
+                        ],
+                        {"IsComplete": False},
+                    )
+                else:
+                    return (
+                        [
+                            *m,
+                            {
+                                "role": "assistant",
+                                "content": json.dumps({"IsComplete": True}),
+                            },
+                        ],
+                        {"IsComplete": True},
+                    )
+            return ([*m, {"role": "assistant", "content": "{}"}], {})
 
-    mock_logger_outline = MockLoggerOutline()
-    mock_interface_outline = MockInterfaceOutline(models=[], logger_instance=mock_logger_outline)  # type: ignore
+    # Setup necessary Config values for the test
+    Config.EVAL_MODEL = "mock_eval_model"
+    Config.INITIAL_OUTLINE_WRITER_MODEL = "mock_outline_model"
+    Config.MODEL_STORY_ELEMENTS_GENERATOR = "mock_elements_model"
+    Config.OUTLINE_MIN_REVISIONS = 0  # For quicker test
+    Config.OUTLINE_MAX_REVISIONS = 2  # For quicker test
+    Prompts.DEFAULT_SYSTEM_PROMPT = "System prompt for testing."
 
-    test_user_prompt = "A space opera about a lost kitten."
+    mock_logger = MockLogger()
+    mock_interface = MockInterface()
 
-    print("\n--- Testing GenerateOutline ---")
-    full_outline, elements, chapter_outline, base_ctx = GenerateOutline(mock_interface_outline, mock_logger_outline, test_user_prompt)  # type: ignore
+    test_user_prompt = "A grand adventure to save the kingdom from an ancient evil."
+    print(f"--- Testing generate_outline with prompt: '{test_user_prompt}' ---\n")
+
+    full_out, elements, chap_out, base_ctx = generate_outline(
+        mock_interface, mock_logger, test_user_prompt
+    )
 
     print("\n--- Results ---")
-    print(f"Base Context:\n{base_ctx}")
-    print(f"\nStory Elements:\n{elements}")
-    print(f"\nFinal Chapter-Level Outline:\n{chapter_outline}")
-    # print(f"\nPrintable Full Outline:\n{full_outline}") # This can be very long
+    print(f"Base Context:\n{base_ctx}\n")
+    print(f"Story Elements:\n{elements}\n")
+    print(f"Chapter-Level Outline:\n{chap_out}\n")
+    # print(f"Full Printable Outline:\n{full_out}") # Can be very long
+
+    print(f"\n--- Test with empty user prompt ---")
+    empty_results = generate_outline(mock_interface, mock_logger, "")
+    print(empty_results)

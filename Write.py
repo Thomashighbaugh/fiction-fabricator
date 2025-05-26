@@ -1,474 +1,914 @@
-#!/bin/python3
+# File: AIStoryWriter/Write.py
+# Purpose: Main orchestrator for the AI Story Writer application.
+
+"""
+AI Story Writer - Main Orchestration Script.
+
+This script drives the entire story generation process, from taking a user's
+initial prompt to producing a complete, multi-chapter narrative.
+
+Key responsibilities include:
+- Parsing command-line arguments to configure the generation process.
+- Initializing core components: Logger, LLM Interface.
+- Orchestrating the generation workflow:
+    1. Outline Generation: Creating story elements and a chapter-level plot outline.
+    2. Chapter Detection: Determining the number of chapters from the outline.
+    3. Chapter-by-Scene Generation: For each chapter:
+        a. Breaking the chapter's plot into detailed scene outlines.
+        b. Generating narrative text for each scene.
+        c. Assembling scenes into a full chapter.
+        d. Optionally refining and revising the assembled chapter.
+    4. Optional Global Editing: Performing a final pass over the entire novel.
+    5. Optional Post-Processing: Scrubbing and/or translating the novel.
+    6. Metadata Extraction: Generating title, summary, and tags.
+    7. Output: Saving the final story, outline, metadata, and logs.
+
+The script is designed to be modular, relying on specialized modules within
+the `Writer` package for specific tasks (e.g., outline generation, scene writing,
+LLM interaction). Configuration is managed via `Writer.Config` and can be
+overridden by command-line arguments.
+"""
 
 import argparse
 import time
 import datetime
 import os
 import json
+import sys
+import re
+from typing import List, Dict, Any, Optional
 
-import Writer.Config
+# Ensure the Writer package is discoverable.
+# If Write.py is in the project root and Writer is a subdirectory, this should work.
+# If running from a different location, PYTHONPATH might need adjustment.
+try:
+    import Writer.Config as Config
+    import Writer.Interface.Wrapper as Wrapper
+    import Writer.PrintUtils as PrintUtils
+    import Writer.Chapter.ChapterDetector as ChapterDetector
+    import Writer.Scrubber as Scrubber
+    import Writer.Statistics as Statistics
+    import Writer.OutlineGenerator as OutlineGenerator
+    import Writer.Chapter.ChapterGenerator as ChapterGenerator
+    import Writer.StoryInfo as StoryInfo
+    import Writer.NovelEditor as NovelEditor
+    import Writer.Translator as Translator
+    import Writer.Prompts as Prompts  # For direct access if needed, though mostly through other modules
+except ImportError as e:
+    # Attempt to add project root to sys.path if modules are not found
+    # This helps if script is run from a subdirectory like 'Tools'
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(
+        current_dir
+    )  # Assumes Write.py is in a direct subdir of project root
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
 
-import Writer.Interface.Wrapper
-import Writer.PrintUtils
-import Writer.Chapter.ChapterDetector
-import Writer.Scrubber
-import Writer.Statistics
-import Writer.OutlineGenerator
-import Writer.Chapter.ChapterGenerator
-import Writer.StoryInfo
-import Writer.NovelEditor
-import Writer.Translator
+    # Retry imports
+    try:
+        import Writer.Config as Config
+        import Writer.Interface.Wrapper as Wrapper
+        import Writer.PrintUtils as PrintUtils
+        import Writer.Chapter.ChapterDetector as ChapterDetector
 
-
-# Setup Argparser
-Parser = argparse.ArgumentParser()
-Parser.add_argument("-Prompt", help="Path to file containing the prompt")
-Parser.add_argument(
-    "-Output",
-    default="",
-    type=str,
-    help="Optional file output path, if none is speciifed, we will autogenerate a file name based on the story title",
-)
-Parser.add_argument(
-    "-InitialOutlineModel",
-    default=Writer.Config.INITIAL_OUTLINE_WRITER_MODEL,
-    type=str,
-    help="Model to use for writing the base outline content",
-)
-Parser.add_argument(
-    "-ChapterOutlineModel",
-    default=Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL,
-    type=str,
-    help="Model to use for writing the per-chapter outline content",
-)
-Parser.add_argument(
-    "-ChapterS1Model",
-    default=Writer.Config.CHAPTER_STAGE1_WRITER_MODEL,
-    type=str,
-    help="Model to use for writing the chapter (stage 1: plot)",
-)
-Parser.add_argument(
-    "-ChapterS2Model",
-    default=Writer.Config.CHAPTER_STAGE2_WRITER_MODEL,
-    type=str,
-    help="Model to use for writing the chapter (stage 2: character development)",
-)
-Parser.add_argument(
-    "-ChapterS3Model",
-    default=Writer.Config.CHAPTER_STAGE3_WRITER_MODEL,
-    type=str,
-    help="Model to use for writing the chapter (stage 3: dialogue)",
-)
-Parser.add_argument(
-    "-ChapterS4Model",
-    default=Writer.Config.CHAPTER_STAGE4_WRITER_MODEL,
-    type=str,
-    help="Model to use for writing the chapter (stage 4: final correction pass)",
-)
-Parser.add_argument(
-    "-ChapterRevisionModel",
-    default=Writer.Config.CHAPTER_REVISION_WRITER_MODEL,
-    type=str,
-    help="Model to use for revising the chapter until it meets criteria",
-)
-Parser.add_argument(
-    "-RevisionModel",
-    default=Writer.Config.REVISION_MODEL,
-    type=str,
-    help="Model to use for generating constructive criticism",
-)
-Parser.add_argument(
-    "-EvalModel",
-    default=Writer.Config.EVAL_MODEL,
-    type=str,
-    help="Model to use for evaluating the rating out of 100",
-)
-Parser.add_argument(
-    "-InfoModel",
-    default=Writer.Config.INFO_MODEL,
-    type=str,
-    help="Model to use when generating summary/info at the end",
-)
-Parser.add_argument(
-    "-ScrubModel",
-    default=Writer.Config.SCRUB_MODEL,
-    type=str,
-    help="Model to use when scrubbing the story at the end",
-)
-Parser.add_argument(
-    "-CheckerModel",
-    default=Writer.Config.CHECKER_MODEL,
-    type=str,
-    help="Model to use when checking if the LLM cheated or not",
-)
-Parser.add_argument(
-    "-TranslatorModel",
-    default=Writer.Config.TRANSLATOR_MODEL,
-    type=str,
-    help="Model to use if translation of the story is enabled",
-)
-Parser.add_argument(
-    "-Translate",
-    default="",
-    type=str,
-    help="Specify a language to translate the story to - will not translate by default. Ex: 'French'",
-)
-Parser.add_argument(
-    "-TranslatePrompt",
-    default="",
-    type=str,
-    help="Specify a language to translate your input prompt to. Ex: 'French'",
-)
-Parser.add_argument("-Seed", default=12, type=int, help="Used to seed models.")
-Parser.add_argument(
-    "-OutlineMinRevisions",
-    default=0,
-    type=int,
-    help="Number of minimum revisions that the outline must be given prior to proceeding",
-)
-Parser.add_argument(
-    "-OutlineMaxRevisions",
-    default=3,
-    type=int,
-    help="Max number of revisions that the outline may have",
-)
-Parser.add_argument(
-    "-ChapterMinRevisions",
-    default=0,
-    type=int,
-    help="Number of minimum revisions that the chapter must be given prior to proceeding",
-)
-Parser.add_argument(
-    "-ChapterMaxRevisions",
-    default=3,
-    type=int,
-    help="Max number of revisions that the chapter may have",
-)
-Parser.add_argument(
-    "-NoChapterRevision", action="store_true", help="Disables Chapter Revisions"
-)
-Parser.add_argument(
-    "-NoScrubChapters",
-    action="store_true",
-    help="Disables a final pass over the story to remove prompt leftovers/outline tidbits",
-)
-Parser.add_argument(
-    "-ExpandOutline",
-    action="store_true",
-    default=True,
-    help="Disables the system from expanding the outline for the story chapter by chapter prior to writing the story's chapter content",
-)
-Parser.add_argument(
-    "-EnableFinalEditPass",
-    action="store_true",
-    help="Enable a final edit pass of the whole story prior to scrubbing",
-)
-Parser.add_argument(
-    "-Debug",
-    action="store_true",
-    help="Print system prompts to stdout during generation",
-)
-Parser.add_argument(
-    "-SceneGenerationPipeline",
-    action="store_true",
-    default=True,
-    help="Use the new scene-by-scene generation pipeline as an initial starting point for chapter writing",
-)
-Args = Parser.parse_args()
-
-
-# Measure Generation Time
-StartTime = time.time()
-
-
-# Setup Config
-Writer.Config.SEED = Args.Seed
-
-Writer.Config.INITIAL_OUTLINE_WRITER_MODEL = Args.InitialOutlineModel
-Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL = Args.ChapterOutlineModel
-Writer.Config.CHAPTER_STAGE1_WRITER_MODEL = Args.ChapterS1Model
-Writer.Config.CHAPTER_STAGE2_WRITER_MODEL = Args.ChapterS2Model
-Writer.Config.CHAPTER_STAGE3_WRITER_MODEL = Args.ChapterS3Model
-Writer.Config.CHAPTER_STAGE4_WRITER_MODEL = Args.ChapterS4Model
-Writer.Config.CHAPTER_REVISION_WRITER_MODEL = Args.ChapterRevisionModel
-Writer.Config.EVAL_MODEL = Args.EvalModel
-Writer.Config.REVISION_MODEL = Args.RevisionModel
-Writer.Config.INFO_MODEL = Args.InfoModel
-Writer.Config.SCRUB_MODEL = Args.ScrubModel
-Writer.Config.CHECKER_MODEL = Args.CheckerModel
-Writer.Config.TRANSLATOR_MODEL = Args.TranslatorModel
-
-Writer.Config.TRANSLATE_LANGUAGE = Args.Translate
-Writer.Config.TRANSLATE_PROMPT_LANGUAGE = Args.TranslatePrompt
-
-Writer.Config.OUTLINE_MIN_REVISIONS = Args.OutlineMinRevisions
-Writer.Config.OUTLINE_MAX_REVISIONS = Args.OutlineMaxRevisions
-
-Writer.Config.CHAPTER_MIN_REVISIONS = Args.ChapterMinRevisions
-Writer.Config.CHAPTER_MAX_REVISIONS = Args.ChapterMaxRevisions
-Writer.Config.CHAPTER_NO_REVISIONS = Args.NoChapterRevision
-
-Writer.Config.SCRUB_NO_SCRUB = Args.NoScrubChapters
-Writer.Config.EXPAND_OUTLINE = Args.ExpandOutline
-Writer.Config.ENABLE_FINAL_EDIT_PASS = Args.EnableFinalEditPass
-
-Writer.Config.OPTIONAL_OUTPUT_NAME = Args.Output
-Writer.Config.SCENE_GENERATION_PIPELINE = Args.SceneGenerationPipeline
-Writer.Config.DEBUG = Args.Debug
-
-# Get a list of all used providers
-Models = [
-    Writer.Config.INITIAL_OUTLINE_WRITER_MODEL,
-    Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL,
-    Writer.Config.CHAPTER_STAGE1_WRITER_MODEL,
-    Writer.Config.CHAPTER_STAGE2_WRITER_MODEL,
-    Writer.Config.CHAPTER_STAGE3_WRITER_MODEL,
-    Writer.Config.CHAPTER_STAGE4_WRITER_MODEL,
-    Writer.Config.CHAPTER_REVISION_WRITER_MODEL,
-    Writer.Config.EVAL_MODEL,
-    Writer.Config.REVISION_MODEL,
-    Writer.Config.INFO_MODEL,
-    Writer.Config.SCRUB_MODEL,
-    Writer.Config.CHECKER_MODEL,
-    Writer.Config.TRANSLATOR_MODEL,
-]
-Models = list(set(Models))
-
-# Setup Logger
-SysLogger = Writer.PrintUtils.Logger()
-
-# Initialize Interface
-SysLogger.Log("Created OLLAMA Interface", 5)
-Interface = Writer.Interface.Wrapper.Interface(Models)
-
-# Load User Prompt
-Prompt: str = ""
-if Args.Prompt is None:
-    raise Exception("No Prompt Provided")
-with open(Args.Prompt, "r") as f:
-    Prompt = f.read()
-
-
-# If user wants their prompt translated, do so
-if Writer.Config.TRANSLATE_PROMPT_LANGUAGE != "":
-    Prompt = Writer.Translator.TranslatePrompt(
-        Interface, SysLogger, Prompt, Writer.Config.TRANSLATE_PROMPT_LANGUAGE
-    )
-
-
-# Generate the Outline
-Outline, Elements, RoughChapterOutline, BaseContext = (
-    Writer.OutlineGenerator.GenerateOutline(
-        Interface, SysLogger, Prompt, Writer.Config.OUTLINE_QUALITY
-    )
-)
-BasePrompt = Prompt
-
-
-# Detect the number of chapters
-SysLogger.Log("Detecting Chapters", 5)
-Messages = [Interface.BuildUserQuery(Outline)]
-NumChapters: int = Writer.Chapter.ChapterDetector.LLMCountChapters(
-    Interface, SysLogger, Interface.GetLastMessageText(Messages)
-)
-SysLogger.Log(f"Found {NumChapters} Chapter(s)", 5)
-
-
-## Write Per-Chapter Outline
-Prompt = f"""
-Please help me expand upon the following outline, chapter by chapter.
-
-```
-{Outline}
-```
-    
-"""
-Messages = [Interface.BuildUserQuery(Prompt)]
-ChapterOutlines: list = []
-if Writer.Config.EXPAND_OUTLINE:
-    for Chapter in range(1, NumChapters + 1):
-        ChapterOutline, Messages = Writer.OutlineGenerator.GeneratePerChapterOutline(
-            Interface, SysLogger, Chapter, Outline, Messages
+        # ... re-import all other necessary modules ...
+        import Writer.Scrubber as Scrubber
+        import Writer.Statistics as Statistics
+        import Writer.OutlineGenerator as OutlineGenerator
+        import Writer.Chapter.ChapterGenerator as ChapterGenerator
+        import Writer.StoryInfo as StoryInfo
+        import Writer.NovelEditor as NovelEditor
+        import Writer.Translator as Translator
+        import Writer.Prompts as Prompts
+    except ImportError:
+        print(
+            f"CRITICAL ERROR: Failed to import necessary Writer modules. Original error: {e}"
         )
-        ChapterOutlines.append(ChapterOutline)
+        print(
+            f"Ensure AIStoryWriter modules are in PYTHONPATH or script is run from project root."
+        )
+        print(f"Current sys.path: {sys.path}")
+        sys.exit(1)
 
 
-# Create MegaOutline
-DetailedOutline: str = ""
-for Chapter in ChapterOutlines:
-    DetailedOutline += Chapter
-MegaOutline: str = f"""
-
-# Base Outline
-{Elements}
-
-# Detailed Outline
-{DetailedOutline}
-
-"""
-
-# Setup Base Prompt For Per-Chapter Generation
-UsedOutline: str = Outline
-if Writer.Config.EXPAND_OUTLINE:
-    UsedOutline = MegaOutline
-
-
-# Write the chapters
-SysLogger.Log("Starting Chapter Writing", 5)
-Chapters = []
-for i in range(1, NumChapters + 1):
-
-    Chapter = Writer.Chapter.ChapterGenerator.GenerateChapter(
-        Interface,
-        SysLogger,
-        i,
-        NumChapters,
-        Outline,
-        Chapters,
-        Writer.Config.OUTLINE_QUALITY,
-        BaseContext,
+def parse_arguments() -> argparse.Namespace:
+    """Parses command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="AI Story Writer: Generates a multi-chapter narrative."
     )
 
-    Chapter = f"### Chapter {i}\n\n{Chapter}"
-    Chapters.append(Chapter)
-    ChapterWordCount = Writer.Statistics.GetWordCount(Chapter)
-    SysLogger.Log(f"Chapter Word Count: {ChapterWordCount}", 2)
-
-
-# Now edit the whole thing together
-StoryBodyText: str = ""
-StoryInfoJSON: dict = {"Outline": Outline}
-StoryInfoJSON.update({"StoryElements": Elements})
-StoryInfoJSON.update({"RoughChapterOutline": RoughChapterOutline})
-StoryInfoJSON.update({"BaseContext": BaseContext})
-
-if Writer.Config.ENABLE_FINAL_EDIT_PASS:
-    NewChapters = Writer.NovelEditor.EditNovel(
-        Interface, SysLogger, Chapters, Outline, NumChapters
+    # Core Inputs/Outputs
+    parser.add_argument(
+        "-Prompt",
+        required=True,
+        help="Path to a text file containing the user's story prompt.",
     )
-NewChapters = Chapters
-StoryInfoJSON.update({"UnscrubbedChapters": NewChapters})
-
-# Now scrub it (if enabled)
-if not Writer.Config.SCRUB_NO_SCRUB:
-    NewChapters = Writer.Scrubber.ScrubNovel(
-        Interface, SysLogger, NewChapters, NumChapters
+    parser.add_argument(
+        "-Output",
+        default="",
+        type=str,
+        help="Optional base filename for output (e.g., 'MyStory'). If empty, autogenerated from title.",
     )
-else:
-    SysLogger.Log(f"Skipping Scrubbing Due To Config", 4)
-StoryInfoJSON.update({"ScrubbedChapter": NewChapters})
 
-
-# If enabled, translate the novel
-if Writer.Config.TRANSLATE_LANGUAGE != "":
-    NewChapters = Writer.Translator.TranslateNovel(
-        Interface, SysLogger, NewChapters, NumChapters, Writer.Config.TRANSLATE_LANGUAGE
+    # Model Configuration (New, more specific model roles)
+    # These correspond to the new architecture. Old -ChapterS[1-4]Model args are deprecated.
+    parser.add_argument(
+        "-InitialOutlineModel",
+        default=Config.INITIAL_OUTLINE_WRITER_MODEL,
+        type=str,
+        help="Model for the main story outline.",
     )
-else:
-    SysLogger.Log(f"No Novel Translation Requested, Skipping Translation Step", 4)
-StoryInfoJSON.update({"TranslatedChapters": NewChapters})
+    parser.add_argument(
+        "-ModelStoryElementsGenerator",
+        default=Config.MODEL_STORY_ELEMENTS_GENERATOR,
+        type=str,
+        help="Model for story elements (genre, theme, etc.).",
+    )
+    parser.add_argument(
+        "-ModelSceneOutliner",
+        default=Config.MODEL_SCENE_OUTLINER,
+        type=str,
+        help="Model for breaking chapters into scene outlines.",
+    )
+    parser.add_argument(
+        "-ModelSceneNarrativeGenerator",
+        default=Config.MODEL_SCENE_NARRATIVE_GENERATOR,
+        type=str,
+        help="Model for writing individual scene narratives.",
+    )
+    parser.add_argument(
+        "-ModelChapterContextSummarizer",
+        default=Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER,
+        type=str,
+        help="Model for summarizing chapter/scene context.",
+    )
+    parser.add_argument(
+        "-ModelChapterAssemblyRefiner",
+        default=Config.MODEL_CHAPTER_ASSEMBLY_REFINER,
+        type=str,
+        help="Model for refining assembled scenes into a cohesive chapter.",
+    )
+
+    # Supporting Models (largely same as before)
+    parser.add_argument(
+        "-ChapterRevisionModel",
+        default=Config.CHAPTER_REVISION_WRITER_MODEL,
+        type=str,
+        help="Model for revising chapters based on LLM feedback.",
+    )
+    parser.add_argument(
+        "-RevisionModel",
+        default=Config.REVISION_MODEL,
+        type=str,
+        help="Model for generating critique/feedback.",
+    )
+    parser.add_argument(
+        "-EvalModel",
+        default=Config.EVAL_MODEL,
+        type=str,
+        help="Model for evaluation tasks (e.g., ratings, JSON checks).",
+    )
+    parser.add_argument(
+        "-InfoModel",
+        default=Config.INFO_MODEL,
+        type=str,
+        help="Model for extracting story metadata (title, summary, tags).",
+    )
+    parser.add_argument(
+        "-ScrubModel",
+        default=Config.SCRUB_MODEL,
+        type=str,
+        help="Model for cleaning final text.",
+    )
+    parser.add_argument(
+        "-CheckerModel",
+        default=Config.CHECKER_MODEL,
+        type=str,
+        help="Model for simple validation/parsing aid (e.g., chapter count).",
+    )
+    parser.add_argument(
+        "-TranslatorModel",
+        default=Config.TRANSLATOR_MODEL,
+        type=str,
+        help="Model for translation tasks.",
+    )
+
+    # Generation Parameters
+    parser.add_argument(
+        "-Seed",
+        default=Config.SEED,
+        type=int,
+        help="Seed for LLM generation (for reproducibility).",
+    )
+    parser.add_argument(
+        "-Translate",
+        default=Config.TRANSLATE_LANGUAGE,
+        type=str,
+        help="Target language for story translation (e.g., 'French'). Leave empty for no translation.",
+    )
+    parser.add_argument(
+        "-TranslatePrompt",
+        default=Config.TRANSLATE_PROMPT_LANGUAGE,
+        type=str,
+        help="Target language for user prompt translation (e.g., 'English' if prompt is non-English).",
+    )
+
+    # Revision Control
+    parser.add_argument(
+        "-OutlineMinRevisions",
+        default=Config.OUTLINE_MIN_REVISIONS,
+        type=int,
+        help="Minimum revision cycles for the main outline.",
+    )
+    parser.add_argument(
+        "-OutlineMaxRevisions",
+        default=Config.OUTLINE_MAX_REVISIONS,
+        type=int,
+        help="Maximum revision cycles for the main outline.",
+    )
+    parser.add_argument(
+        "-ChapterMinRevisions",
+        default=Config.CHAPTER_MIN_REVISIONS,
+        type=int,
+        help="Minimum revision cycles for an assembled chapter.",
+    )
+    parser.add_argument(
+        "-ChapterMaxRevisions",
+        default=Config.CHAPTER_MAX_REVISIONS,
+        type=int,
+        help="Maximum revision cycles for an assembled chapter.",
+    )
+    parser.add_argument(
+        "-NoChapterRevision",
+        action="store_true",
+        default=Config.CHAPTER_NO_REVISIONS,
+        help="Disables feedback/revision loops for assembled chapters.",
+    )
+
+    # Feature Flags
+    parser.add_argument(
+        "-NoScrubChapters",
+        action="store_true",
+        default=Config.SCRUB_NO_SCRUB,
+        help="Disables the final scrubbing pass on chapters.",
+    )
+    parser.add_argument(
+        "-EnableFinalEditPass",
+        action="store_true",
+        default=Config.ENABLE_FINAL_EDIT_PASS,
+        help="Enables a global novel editing pass after all chapters are assembled.",
+    )
+    # -ExpandOutline is deprecated as scene-by-scene is primary. The main outline is chapter-level.
+    # -SceneGenerationPipeline is now assumed True and core to the refactor.
+
+    # Debugging
+    parser.add_argument(
+        "-Debug",
+        action="store_true",
+        default=Config.DEBUG,
+        help="Enables verbose debugging output.",
+    )
+    parser.add_argument(
+        "-DebugLevel",
+        default=Config.DEBUG_LEVEL,
+        type=int,
+        help="Sets debug verbosity (0=off, 1=basic, 2=detailed).",
+    )
+
+    # Deprecated model args (for awareness, not active use in new flow)
+    # parser.add_argument("-ChapterS1Model", type=str, help=argparse.SUPPRESS) # Suppress from help
+    # ... and S2, S3, S4
+
+    return parser.parse_args()
 
 
-# Compile The Story
-for Chapter in NewChapters:
-    StoryBodyText += Chapter + "\n\n\n"
+def apply_config_from_args(args: argparse.Namespace, logger: PrintUtils.Logger):
+    """Applies parsed command-line arguments to the Config module."""
+    logger.Log("Applying command-line arguments to configuration...", 0)
+
+    # Core Inputs/Outputs
+    Config.OPTIONAL_OUTPUT_NAME = args.Output
+
+    # Model Configuration
+    Config.INITIAL_OUTLINE_WRITER_MODEL = args.InitialOutlineModel
+    Config.MODEL_STORY_ELEMENTS_GENERATOR = args.ModelStoryElementsGenerator
+    Config.MODEL_SCENE_OUTLINER = args.ModelSceneOutliner
+    Config.MODEL_SCENE_NARRATIVE_GENERATOR = args.ModelSceneNarrativeGenerator
+    Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER = args.ModelChapterContextSummarizer
+    Config.MODEL_CHAPTER_ASSEMBLY_REFINER = args.ModelChapterAssemblyRefiner
+    Config.CHAPTER_REVISION_WRITER_MODEL = args.ChapterRevisionModel
+    Config.REVISION_MODEL = args.RevisionModel
+    Config.EVAL_MODEL = args.EvalModel
+    Config.INFO_MODEL = args.InfoModel
+    Config.SCRUB_MODEL = args.ScrubModel
+    Config.CHECKER_MODEL = args.CheckerModel
+    Config.TRANSLATOR_MODEL = args.TranslatorModel
+
+    # Generation Parameters
+    Config.SEED = args.Seed
+    Config.TRANSLATE_LANGUAGE = args.Translate
+    Config.TRANSLATE_PROMPT_LANGUAGE = args.TranslatePrompt
+
+    # Revision Control
+    Config.OUTLINE_MIN_REVISIONS = args.OutlineMinRevisions
+    Config.OUTLINE_MAX_REVISIONS = args.OutlineMaxRevisions
+    Config.CHAPTER_MIN_REVISIONS = args.ChapterMinRevisions
+    Config.CHAPTER_MAX_REVISIONS = args.ChapterMaxRevisions
+    Config.CHAPTER_NO_REVISIONS = args.NoChapterRevision
+
+    # Feature Flags
+    Config.SCRUB_NO_SCRUB = args.NoScrubChapters
+    Config.ENABLE_FINAL_EDIT_PASS = args.EnableFinalEditPass
+    Config.SCENE_GENERATION_PIPELINE = (
+        True  # This is central to the refactor, always True.
+    )
+
+    # Debugging
+    Config.DEBUG = args.Debug
+    Config.DEBUG_LEVEL = args.DebugLevel
+
+    logger.Log("Configuration updated from command-line arguments.", 0)
 
 
-# Now Generate Info
-Messages = []
-Messages.append(Interface.BuildUserQuery(Outline))
-Info = Writer.StoryInfo.GetStoryInfo(Interface, SysLogger, Messages)
-Title = Info["Title"]
-StoryInfoJSON.update({"Title": Info["Title"]})
-Summary = Info["Summary"]
-StoryInfoJSON.update({"Summary": Info["Summary"]})
-Tags = Info["Tags"]
-StoryInfoJSON.update({"Tags": Info["Tags"]})
-
-print("---------------------------------------------")
-print(f"Story Title: {Title}")
-print(f"Summary: {Summary}")
-print(f"Tags: {Tags}")
-print("---------------------------------------------")
-
-ElapsedTime = time.time() - StartTime
-
-
-# Calculate Total Words
-TotalWords: int = Writer.Statistics.GetWordCount(StoryBodyText)
-SysLogger.Log(f"Story Total Word Count: {TotalWords}", 4)
-
-StatsString: str = "Work Statistics:  \n"
-StatsString += " - Total Words: " + str(TotalWords) + "  \n"
-StatsString += f" - Title: {Title}  \n"
-StatsString += f" - Summary: {Summary}  \n"
-StatsString += f" - Tags: {Tags}  \n"
-StatsString += f" - Generation Start Date: {datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')}  \n"
-StatsString += f" - Generation Total Time: {ElapsedTime}s  \n"
-StatsString += f" - Generation Average WPM: {60 * (TotalWords/ElapsedTime)}  \n"
-
-StatsString += "\n\nUser Settings:  \n"
-StatsString += f" - Base Prompt: {BasePrompt}  \n"
-
-StatsString += "\n\nGeneration Settings:  \n"
-StatsString += f" - Generator: AIStoryGenerator_2024-06-27  \n"
-StatsString += (
-    f" - Base Outline Writer Model: {Writer.Config.INITIAL_OUTLINE_WRITER_MODEL}  \n"
-)
-StatsString += (
-    f" - Chapter Outline Writer Model: {Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL}  \n"
-)
-StatsString += f" - Chapter Writer (Stage 1: Plot) Model: {Writer.Config.CHAPTER_STAGE1_WRITER_MODEL}  \n"
-StatsString += f" - Chapter Writer (Stage 2: Char Development) Model: {Writer.Config.CHAPTER_STAGE2_WRITER_MODEL}  \n"
-StatsString += f" - Chapter Writer (Stage 3: Dialogue) Model: {Writer.Config.CHAPTER_STAGE3_WRITER_MODEL}  \n"
-StatsString += f" - Chapter Writer (Stage 4: Final Pass) Model: {Writer.Config.CHAPTER_STAGE4_WRITER_MODEL}  \n"
-StatsString += f" - Chapter Writer (Revision) Model: {Writer.Config.CHAPTER_REVISION_WRITER_MODEL}  \n"
-StatsString += f" - Revision Model: {Writer.Config.REVISION_MODEL}  \n"
-StatsString += f" - Eval Model: {Writer.Config.EVAL_MODEL}  \n"
-StatsString += f" - Info Model: {Writer.Config.INFO_MODEL}  \n"
-StatsString += f" - Scrub Model: {Writer.Config.SCRUB_MODEL}  \n"
-StatsString += f" - Seed: {Writer.Config.SEED}  \n"
-# StatsString += f" - Outline Quality: {Writer.Config.OUTLINE_QUALITY}  \n"
-StatsString += f" - Outline Min Revisions: {Writer.Config.OUTLINE_MIN_REVISIONS}  \n"
-StatsString += f" - Outline Max Revisions: {Writer.Config.OUTLINE_MAX_REVISIONS}  \n"
-# StatsString += f" - Chapter Quality: {Writer.Config.CHAPTER_QUALITY}  \n"
-StatsString += f" - Chapter Min Revisions: {Writer.Config.CHAPTER_MIN_REVISIONS}  \n"
-StatsString += f" - Chapter Max Revisions: {Writer.Config.CHAPTER_MAX_REVISIONS}  \n"
-StatsString += f" - Chapter Disable Revisions: {Writer.Config.CHAPTER_NO_REVISIONS}  \n"
-StatsString += f" - Disable Scrubbing: {Writer.Config.SCRUB_NO_SCRUB}  \n"
+def load_user_prompt_file(
+    prompt_filepath: str, logger: PrintUtils.Logger
+) -> Optional[str]:
+    """Loads content from the user's prompt file."""
+    logger.Log(f"Loading user prompt from: {prompt_filepath}", 1)
+    if not os.path.exists(prompt_filepath):
+        logger.Log(f"Error: Prompt file not found at '{prompt_filepath}'.", 7)
+        return None
+    try:
+        with open(prompt_filepath, "r", encoding="utf-8") as f:
+            prompt_text = f.read()
+        if not prompt_text.strip():
+            logger.Log(f"Warning: Prompt file '{prompt_filepath}' is empty.", 6)
+            return (
+                ""  # Return empty string rather than None if file exists but is empty
+            )
+        logger.Log("User prompt loaded successfully.", 1)
+        return prompt_text
+    except Exception as e:
+        logger.Log(f"Error reading prompt file '{prompt_filepath}': {e}", 7)
+        return None
 
 
-# Save The Story To Disk
-SysLogger.Log("Saving Story To Disk", 3)
-os.makedirs("Stories", exist_ok=True)
-FName = f"Stories/Story_{Title.replace(' ', '_')}"
-if Writer.Config.OPTIONAL_OUTPUT_NAME != "":
-    FName = Writer.Config.OPTIONAL_OUTPUT_NAME
-with open(f"{FName}.md", "w", encoding="utf-8") as F:
-    Out = f"""
-{StatsString}
+def split_overall_outline_into_chapter_plots(
+    overall_chapter_level_outline: str,
+    num_chapters: int,
+    interface: Wrapper.Interface,
+    logger: PrintUtils.Logger,
+) -> List[str]:
+    """
+    Splits or parses the main chapter-level outline into individual plot summaries
+    for each chapter. This is crucial for feeding into scene-by-scene generation.
 
----
+    If the outline is already well-segmented (e.g., clear "Chapter X:" headings),
+    it might use regex. If not, it can use an LLM to perform the segmentation.
+    """
+    logger.Log(
+        f"Segmenting overall outline into {num_chapters} chapter-specific plot outlines...",
+        3,
+    )
 
-Note: An outline of the story is available at the bottom of this document.
-Please scroll to the bottom if you wish to read that.
+    # Strategy 1: Regex for "Chapter X:" or "## Chapter X" type headings
+    # This is faster but less robust to variations in outline formatting.
+    # Pattern to find "Chapter <number>:" or "## Chapter <number>" possibly followed by a title
+    chapter_segments = re.split(
+        r"\n(?:Chapter\s*\d+\s*:?|\#{1,3}\s*Chapter\s*\d+\s*:?)[^\n]*\n",
+        overall_chapter_level_outline,
+        flags=re.IGNORECASE,
+    )
 
----
-# {Title}
+    # The first element of split is often content before the first "Chapter" heading, or empty.
+    # Filter out empty strings that might result from multiple newlines or splits at start/end.
+    parsed_plots = [seg.strip() for seg in chapter_segments if seg.strip()]
 
-{StoryBodyText}
+    if len(parsed_plots) == num_chapters:
+        logger.Log(
+            f"Successfully segmented outline into {num_chapters} chapter plots using regex.",
+            4,
+        )
+        return parsed_plots
+    elif len(parsed_plots) > num_chapters and parsed_plots[0].lower().startswith(
+        "introduction"
+    ):  # Common for LLM to add intro
+        logger.Log(
+            f"Regex split yielded {len(parsed_plots)} segments (expected {num_chapters}), possibly due to an intro. Taking segments after first.",
+            5,
+        )
+        if len(parsed_plots[1:]) == num_chapters:
+            return parsed_plots[1:]
+
+    logger.Log(
+        f"Regex-based segmentation yielded {len(parsed_plots)} plots, expected {num_chapters}. Attempting LLM-based segmentation.",
+        5,
+    )
+
+    # Strategy 2: LLM-based segmentation (more robust, but slower)
+    # This is a fallback if regex fails or yields an unexpected number of segments.
+    prompt_text = f"""
+    The following is a story outline that describes {num_chapters} chapters.
+    Please divide this outline into {num_chapters} distinct sections, where each section
+    corresponds to the plot summary or key events for one chapter.
+    Present your output as a JSON list of strings, where each string is the plot content for one chapter.
+    Ensure there are exactly {num_chapters} strings in the list.
+
+    Original Outline:
+    ---
+    {overall_chapter_level_outline}
+    ---
+
+    JSON List of Chapter Plot Strings:
+    """
+
+    messages = [
+        interface.build_system_query(
+            "You are an AI assistant that accurately segments text into specified chapter summaries and formats them as a JSON list."
+        ),
+        interface.build_user_query(prompt_text),
+    ]
+
+    try:
+        _response_msgs, parsed_json = interface.safe_generate_json(
+            logger,
+            messages,
+            Config.CHECKER_MODEL,
+            required_attribs=[],  # No specific keys, just expect a list
+        )
+        if isinstance(parsed_json, list) and all(
+            isinstance(item, str) for item in parsed_json
+        ):
+            if len(parsed_json) == num_chapters:
+                logger.Log(
+                    f"LLM successfully segmented outline into {len(parsed_json)} chapter plots.",
+                    4,
+                )
+                return parsed_json
+            else:
+                logger.Log(
+                    f"LLM segmentation returned {len(parsed_json)} plots, but {num_chapters} were expected. Using regex results or crude split.",
+                    6,
+                )
+        else:
+            logger.Log(
+                f"LLM segmentation did not return a JSON list of strings. Type: {type(parsed_json)}. Using regex results or crude split.",
+                6,
+            )
+    except Exception as e:
+        logger.Log(
+            f"Error during LLM-based outline segmentation: {e}. Using regex results or crude split.",
+            6,
+        )
+
+    # Fallback if LLM also fails or regex was insufficient:
+    # If regex produced *some* usable segments but not the right number, try to make do.
+    if parsed_plots:  # If regex found something
+        if len(parsed_plots) > num_chapters:
+            return parsed_plots[:num_chapters]  # Truncate
+        else:  # Pad if too few
+            return parsed_plots + [
+                "Outline segment missing or could not be parsed."
+            ] * (num_chapters - len(parsed_plots))
+
+    # Absolute fallback: crude split (very unlikely to be good)
+    logger.Log(
+        "All segmentation methods had issues. Performing a crude split of the outline. Chapter plot quality may be low.",
+        7,
+    )
+    avg_len = (
+        len(overall_chapter_level_outline) // num_chapters
+        if num_chapters > 0
+        else len(overall_chapter_level_outline)
+    )
+    return [
+        overall_chapter_level_outline[i * avg_len : (i + 1) * avg_len]
+        for i in range(num_chapters)
+    ]
 
 
----
-# Outline
+def main():
+    """Main function to orchestrate the story generation process."""
+    args = parse_arguments()
+
+    # --- Initialization ---
+    logger = PrintUtils.Logger(log_dir_base="Logs")  # Initialize Logger first
+
+    # Add SaveArtifact method to Logger if not callable
+    import types
+    def SaveArtifact(self, content, filename, subdirectory=None):
+        # Determine file path based on subdirectory if provided
+        import os
+        if subdirectory:
+            target_dir = os.path.join(self.log_dir_base, subdirectory)
+            os.makedirs(target_dir, exist_ok=True)
+            filepath = os.path.join(target_dir, filename)
+        else:
+            filepath = os.path.join(self.log_dir_base, filename)
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            self.Log(f"Artifact saved to: {filepath}", 1)
+        except Exception as e:
+            self.Log(f"Error saving artifact to {filepath}: {e}", 7)
+    if not callable(getattr(logger, 'SaveArtifact', None)):
+        logger.SaveArtifact = types.MethodType(SaveArtifact, logger)
+    logger.Log("AIStoryWriter Refactored - Initialization Started.", 0)
+    apply_config_from_args(args, logger)  # Apply CLI args to global Config
+
+    start_time_total = time.time()
+
+    # Collect all unique model URIs to load them once
+    models_to_load = list(
+        set(
+            [
+                Config.INITIAL_OUTLINE_WRITER_MODEL,
+                Config.MODEL_STORY_ELEMENTS_GENERATOR,
+                Config.MODEL_SCENE_OUTLINER,
+                Config.MODEL_SCENE_NARRATIVE_GENERATOR,
+                Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER,
+                Config.MODEL_CHAPTER_ASSEMBLY_REFINER,
+                Config.CHAPTER_REVISION_WRITER_MODEL,
+                Config.REVISION_MODEL,
+                Config.EVAL_MODEL,
+                Config.INFO_MODEL,
+                Config.SCRUB_MODEL,
+                Config.CHECKER_MODEL,
+                Config.TRANSLATOR_MODEL,
+            ]
+        )
+    )
+
+    try:
+        interface = Wrapper.Interface(models_to_load=models_to_load)
+        logger.Log("LLM Interface initialized with specified models.", 1)
+    except Exception as e:
+        logger.Log(f"CRITICAL: Failed to initialize LLM Interface: {e}. Aborting.", 7)
+        logger.close()
+        return
+
+    # --- Load User Prompt ---
+    user_prompt_text = load_user_prompt_file(args.Prompt, logger)
+    if user_prompt_text is None:  # File not found or unreadable
+        logger.Log(f"Exiting due to prompt loading error.", 7)
+        logger.close()
+        return
+
+    original_user_prompt_for_log = user_prompt_text  # Keep a copy for logging
+
+    if Config.TRANSLATE_PROMPT_LANGUAGE:
+        logger.Log(
+            f"Translating user prompt to '{Config.TRANSLATE_PROMPT_LANGUAGE}' for LLM processing...",
+            1,
+        )
+        user_prompt_text = Translator.translate_user_prompt(
+            interface, logger, user_prompt_text, Config.TRANSLATE_PROMPT_LANGUAGE
+        )
+        if "Error:" in user_prompt_text:  # Check for translation error
+            logger.Log(
+                f"Prompt translation failed: {user_prompt_text}. Using original prompt.",
+                6,
+            )
+            user_prompt_text = original_user_prompt_for_log  # Fallback
+
+    # --- Outline Generation ---
+    logger.Log("Phase 1: Generating Story Outline...", 1)
+    (
+        full_printable_outline,
+        story_elements_md,
+        chapter_level_plot_outline,
+        base_story_context_instructions,
+    ) = OutlineGenerator.generate_outline(interface, logger, user_prompt_text)
+
+    if (
+        "Error:" in chapter_level_plot_outline
+    ):  # Check for critical error from outline generation
+        logger.Log(
+            f"Outline generation failed: {chapter_level_plot_outline}. Aborting.", 7
+        )
+        logger.SaveArtifact(full_printable_outline, "Errored_Outline.md")
+        logger.close()
+        return
+    logger.SaveArtifact(story_elements_md, "1_StoryElements.md")
+    logger.SaveArtifact(chapter_level_plot_outline, "2_ChapterLevelOutline_Raw.md")
+
+    # --- Determine Number of Chapters ---
+    logger.Log("Phase 2: Determining Number of Chapters...", 1)
+    num_chapters = ChapterDetector.llm_count_chapters(
+        interface, logger, chapter_level_plot_outline
+    )
+    if num_chapters <= 0:
+        logger.Log(
+            f"Could not determine a valid number of chapters (detected: {num_chapters}). Aborting.",
+            7,
+        )
+        logger.SaveArtifact(
+            full_printable_outline, "3_FullPrintableOutline_PreChapterDetectionError.md"
+        )
+        logger.close()
+        return
+    logger.Log(f"Detected {num_chapters} chapters for the story.", 2)
+
+    # --- Segment Overall Outline into Per-Chapter Plot Outlines ---
+    # This step is crucial for the scene-by-scene generator.
+    per_chapter_plot_outlines = split_overall_outline_into_chapter_plots(
+        chapter_level_plot_outline, num_chapters, interface, logger
+    )
+    # Log these individual plot outlines for debugging
+    for i, plot in enumerate(per_chapter_plot_outlines):
+        logger.SaveArtifact(plot, f"2a_Chapter_{i+1}_PlotSegment.txt")
+
+    # --- Chapter Generation Loop (Scene-by-Scene) ---
+    logger.Log(f"Phase 3: Generating {num_chapters} Chapter(s) Scene-by-Scene...", 1)
+    generated_chapters_list: List[str] = []
+    previous_chapter_context_summary: Optional[str] = None
+
+    for i in range(num_chapters):
+        current_chapter_num = i + 1
+        logger.Log(
+            f"--- Generating Chapter {current_chapter_num}/{num_chapters} ---", 2
+        )
+
+        current_chapter_specific_plot = per_chapter_plot_outlines[i]
+        if not current_chapter_specific_plot.strip():
+            logger.Log(
+                f"Plot outline for Chapter {current_chapter_num} is empty. Attempting generation with broader context only.",
+                6,
+            )
+            current_chapter_specific_plot = f"This is Chapter {current_chapter_num}. Refer to the overall story outline for guidance."
+
+        generated_chapter_text = ChapterGenerator.generate_chapter_by_scenes(
+            interface,
+            logger,
+            current_chapter_num,
+            num_chapters,
+            chapter_level_plot_outline,  # Pass the main chapter-level outline for broader context
+            current_chapter_specific_plot,  # Pass the specific plot points for *this* chapter
+            previous_chapter_context_summary,
+            base_story_context_instructions,
+        )
+
+        # Add formal chapter heading (can be scrubbed later if needed)
+        final_formatted_chapter_text = (
+            f"## Chapter {current_chapter_num}\n\n{generated_chapter_text}"
+        )
+        generated_chapters_list.append(final_formatted_chapter_text)
+        logger.SaveArtifact(
+            final_formatted_chapter_text,
+            f"3_Chapter_{current_chapter_num}_Generated.md",
+        )
+
+        if "Error:" in generated_chapter_text:
+            logger.Log(
+                f"Chapter {current_chapter_num} generation resulted in an error placeholder.",
+                6,
+            )
+            # Context for next chapter might be compromised; generate a generic one or use overall outline.
+            previous_chapter_context_summary = f"Context after Chapter {current_chapter_num} (which had errors): The story should proceed according to the overall outline."
+        elif (
+            current_chapter_num < num_chapters
+        ):  # Don't need summary after the last chapter for *next* gen
+            logger.Log(
+                f"Generating context summary for end of Chapter {current_chapter_num}...",
+                3,
+            )
+            previous_chapter_context_summary = (
+                ChapterContext.generate_previous_chapter_summary(
+                    interface,
+                    logger,
+                    generated_chapter_text,
+                    chapter_level_plot_outline,
+                    current_chapter_num,
+                )
+            )
+            if "Error:" in previous_chapter_context_summary:
+                logger.Log(
+                    f"Failed to generate context summary for Chapter {current_chapter_num}. Next chapter's context may be weak.",
+                    6,
+                )
+                # Fallback context for next iteration
+                previous_chapter_context_summary = f"The story should proceed to Chapter {current_chapter_num + 1} as per the main outline. Chapter {current_chapter_num} involved: {current_chapter_specific_plot[:100]}..."
+
+    # --- Optional Global Novel Editing ---
+    globally_edited_chapters = list(generated_chapters_list)  # Start with copies
+    if Config.ENABLE_FINAL_EDIT_PASS and num_chapters > 0:
+        logger.Log("Phase 4: Performing Optional Global Novel Editing Pass...", 1)
+        globally_edited_chapters = NovelEditor.edit_novel_globally(
+            interface, logger, generated_chapters_list, chapter_level_plot_outline
+        )
+        for i, chap_text in enumerate(globally_edited_chapters):
+            logger.SaveArtifact(chap_text, f"4_Chapter_{i+1}_GloballyEdited.md")
+    else:
+        logger.Log("Skipping optional global novel editing pass.", 1)
+
+    # --- Optional Scrubbing ---
+    scrubbed_chapters = list(globally_edited_chapters)
+    if not Config.SCRUB_NO_SCRUB and num_chapters > 0:
+        logger.Log("Phase 5: Scrubbing Final Novel Text...", 1)
+        scrubbed_chapters = Scrubber.scrub_novel_chapters(
+            interface, logger, globally_edited_chapters
+        )
+        for i, chap_text in enumerate(scrubbed_chapters):
+            logger.SaveArtifact(chap_text, f"5_Chapter_{i+1}_Scrubbed.md")
+    else:
+        logger.Log("Skipping novel scrubbing pass.", 1)
+
+    # --- Optional Translation ---
+    final_chapters_for_output = list(scrubbed_chapters)
+    if Config.TRANSLATE_LANGUAGE and num_chapters > 0:
+        logger.Log(f"Phase 6: Translating Novel to '{Config.TRANSLATE_LANGUAGE}'...", 1)
+        # Assuming chapters are currently in English (or the primary generation language)
+        # TODO: Make source language for translation configurable if needed
+        final_chapters_for_output = Translator.translate_novel_chapters(
+            interface,
+            logger,
+            scrubbed_chapters,
+            Config.TRANSLATE_LANGUAGE,
+            source_language_of_chapters="English",
+        )
+        for i, chap_text in enumerate(final_chapters_for_output):
+            logger.SaveArtifact(
+                chap_text, f"6_Chapter_{i+1}_Translated_{Config.TRANSLATE_LANGUAGE}.md"
+            )
+    else:
+        logger.Log("Skipping novel translation.", 1)
+
+    # --- Compile Final Story Text & Extract Metadata ---
+    final_story_body_text = "\n\n\n".join(final_chapters_for_output)
+    logger.SaveArtifact(final_story_body_text, "7_CompleteStory_Body.md")
+
+    logger.Log("Phase 7: Generating Final Story Metadata (Title, Summary, Tags)...", 1)
+    # Provide a comprehensive context for metadata generation; the full outline is good.
+    # Create messages list for story info. Last user message should be the outline.
+    story_info_context_messages = [interface.build_user_query(full_printable_outline)]
+    story_metadata = StoryInfo.get_story_info(
+        interface, logger, story_info_context_messages
+    )
+
+    story_title = story_metadata.get(
+        "Title", f"Untitled_Story_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+    )
+    story_summary = story_metadata.get("Summary", "Summary not available.")
+    story_tags = story_metadata.get("Tags", "No tags available.")
+    # overall_rating = story_metadata.get("OverallRating", "N/A") # Optional
+
+    # --- Output and Logging ---
+    total_words_final = Statistics.get_word_count(final_story_body_text)
+    end_time_total = time.time()
+    total_generation_time_s = round(end_time_total - start_time_total)
+    words_per_minute = (
+        round(60 * (total_words_final / total_generation_time_s))
+        if total_generation_time_s > 0
+        else 0
+    )
+
+    logger.Log(f"--- STORY GENERATION COMPLETE ---", 0)
+    logger.Log(f"Title: {story_title}", 0)
+    logger.Log(f"Summary: {story_summary[:200]}...", 0)
+    logger.Log(f"Tags: {story_tags}", 0)
+    logger.Log(f"Total Chapters: {num_chapters}", 0)
+    logger.Log(f"Final Word Count: {total_words_final}", 0)
+    logger.Log(
+        f"Total Generation Time: {total_generation_time_s}s (~{total_generation_time_s/60:.1f} min)",
+        0,
+    )
+    logger.Log(f"Approximate WPM: {words_per_minute}", 0)
+
+    # Construct detailed statistics string for the output file
+    stats_string = f"""
+# Work Statistics:
+- **Title**: {story_title}
+- **Summary**: {story_summary}
+- **Tags**: {story_tags}
+- **Total Chapters**: {num_chapters}
+- **Final Word Count**: {total_words_final}
+- **Generation Start Time**: {datetime.datetime.fromtimestamp(start_time_total).strftime('%Y-%m-%d %H:%M:%S')}
+- **Total Generation Time**: {total_generation_time_s} seconds (~{total_generation_time_s/60:.1f} minutes)
+- **Approximate Words Per Minute (Generation)**: {words_per_minute}
+
+# User Prompt:
 ```
-{Outline}
+{original_user_prompt_for_log}
 ```
-"""
-    SysLogger.SaveStory(Out)
-    F.write(Out)
 
-# Save JSON
-with open(f"{FName}.json", "w", encoding="utf-8") as F:
-    F.write(json.dumps(StoryInfoJSON, indent=4))
+# Key Configuration:
+- **Seed**: {Config.SEED}
+- **Primary Creative Models**:
+    - Outline: {Config.INITIAL_OUTLINE_WRITER_MODEL}
+    - Scene Outliner: {Config.MODEL_SCENE_OUTLINER}
+    - Scene Writer: {Config.MODEL_SCENE_NARRATIVE_GENERATOR}
+- **Debug Mode**: {Config.DEBUG} (Level: {Config.DEBUG_LEVEL})
+- **Final Edit Pass**: {Config.ENABLE_FINAL_EDIT_PASS}
+- **Scrubbing**: {"Disabled" if Config.SCRUB_NO_SCRUB else "Enabled"}
+- **Translation to**: {Config.TRANSLATE_LANGUAGE if Config.TRANSLATE_LANGUAGE else "N/A"}
+(See Main.log in the log directory for full configuration details)
+    """.strip()
 
+    final_output_markdown = f"""
+{stats_string}
+
+---
+**Note:** The full story elements and chapter-level plot outline are included at the end of this document.
+---
+
+# {story_title}
+
+{final_story_body_text}
+
+---
+# Appendix: Story Foundation
+
+## Base Story Context/Instructions from User Prompt:
+```text
+{base_story_context_instructions if base_story_context_instructions.strip() else "None extracted."}
+```
+
+## Generated Story Elements:
+```markdown
+{story_elements_md}
+```
+
+## Final Chapter-by-Chapter Plot Outline:
+```markdown
+{chapter_level_plot_outline}
+```
+    """.strip()
+
+    # Save the final story and metadata
+    output_dir = "Stories"
+    os.makedirs(output_dir, exist_ok=True)
+
+    clean_title_for_filename = "".join(
+        c if c.isalnum() or c in [" ", "_"] else "" for c in story_title
+    ).replace(" ", "_")
+    if not clean_title_for_filename:
+        clean_title_for_filename = (
+            f"Story_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
+
+    base_filename = (
+        Config.OPTIONAL_OUTPUT_NAME
+        if Config.OPTIONAL_OUTPUT_NAME
+        else os.path.join(output_dir, clean_title_for_filename)
+    )
+
+    md_filepath = f"{base_filename}.md"
+    json_filepath = f"{base_filename}_data.json"
+
+    logger.SaveArtifact(
+        final_output_markdown,
+        os.path.basename(md_filepath),
+        subdirectory=(
+            os.path.dirname(base_filename) if Config.OPTIONAL_OUTPUT_NAME else None
+        ),
+    )  # Use SaveArtifact for consistency
+
+    story_data_for_json = {
+        "title": story_title,
+        "summary": story_summary,
+        "tags": story_tags,
+        "generation_timestamp_utc": datetime.datetime.utcnow().isoformat(),
+        "original_user_prompt": original_user_prompt_for_log,
+        "translated_user_prompt": (
+            user_prompt_text if Config.TRANSLATE_PROMPT_LANGUAGE else None
+        ),
+        "base_story_context_instructions": base_story_context_instructions,
+        "story_elements_markdown": story_elements_md,
+        "chapter_level_plot_outline": chapter_level_plot_outline,
+        "per_chapter_plot_segments_used": per_chapter_plot_outlines,  # For debug
+        "num_chapters_generated": num_chapters,
+        "config_settings_used": {
+            key: getattr(Config, key)
+            for key in dir(Config)
+            if not key.startswith("__")
+            and not callable(getattr(Config, key))
+            and isinstance(getattr(Config, key), (str, int, float, bool, list, dict))
+        },  # Basic serializable config
+        "statistics": {
+            "final_word_count": total_words_final,
+            "total_generation_time_s": total_generation_time_s,
+            "words_per_minute": words_per_minute,
+        },
+        # Storing chapter versions for analysis/debug
+        "chapters_initial_assembly": generated_chapters_list,
+        "chapters_globally_edited": (
+            globally_edited_chapters if Config.ENABLE_FINAL_EDIT_PASS else None
+        ),
+        "chapters_scrubbed": scrubbed_chapters if not Config.SCRUB_NO_SCRUB else None,
+        "chapters_final_output": final_chapters_for_output,  # This is the version in the .md body
+    }
+    try:
+        with open(json_filepath, "w", encoding="utf-8") as f_json:
+            json.dump(story_data_for_json, f_json, indent=2, ensure_ascii=False)
+        logger.Log(f"Detailed story data JSON saved to: {json_filepath}", 1)
+    except Exception as e:
+        logger.Log(f"Error saving story data JSON to {json_filepath}: {e}", 7)
+
+    logger.Log(f"Story generation process complete. Output: {md_filepath}", 0)
+    logger.close()
+
+
+if __name__ == "__main__":
+    # This structure ensures that if Write.py is imported, main() is not run,
+    # but if it's executed as a script, main() is called.
+    main()
