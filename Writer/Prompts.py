@@ -148,6 +148,11 @@ This will serve as a blueprint for writing the chapter.
 {_PreviousChapterContextSummary}
 </PreviousChapterContextSummary>
 
+**Base Story Context (if any user instructions apply globally):**
+<BaseStoryContext>
+{_BaseStoryContext}
+</BaseStoryContext>
+
 **Instructions:**
 Generate a JSON list where each element is an object representing a single scene. Each scene object must include the following keys:
 -   `"scene_number_in_chapter"`: (Integer) e.g., 1, 2, 3.
@@ -156,7 +161,7 @@ Generate a JSON list where each element is an object representing a single scene
 -   `"characters_present"`: (List of Strings) Names of characters actively participating in this scene.
 -   `"character_goals_moods"`: (String) Brief description of what each key character present wants to achieve or their emotional state at the start of the scene.
 -   `"key_events_actions"`: (List of Strings) Bullet points describing the critical plot developments, actions, or discoveries that *must* occur in this scene. Be specific.
--   `"dialogue_points"`: (List of Strings) Key topics of conversation or specific impactful lines of dialogue that should be included.
+-   `"dialogue_points"`: (List of Strings) Key topics of conversation or specific impactful lines of dialogue that should be included. **Each string in this list must be a complete, simple JSON string. Do not use Python-style string concatenation (e.g., 'text' + 'more text') within the JSON values.** For example, instead of `["'Hello ' + name + '!'"]`, use `["Hello [name]!"]` or handle dynamic parts before JSON generation if possible, or simply provide the full intended dialogue line as one string.
 -   `"pacing_note"`: (String) Suggested pacing for the scene (e.g., "Fast-paced action sequence," "Slow, tense dialogue exchange," "Quick, transitional scene," "Introspective and reflective").
 -   `"tone"`: (String) The dominant emotional tone the scene should convey (e.g., "Suspenseful," "Romantic," "Tragic," "Hopeful," "Humorous").
 -   `"purpose_in_chapter"`: (String) How this scene specifically contributes to the chapter's overall objectives (e.g., "Introduces a new obstacle," "Reveals a character's hidden motive," "Escalates the central conflict of the chapter").
@@ -180,6 +185,11 @@ Adhere closely to the provided blueprint, ensuring the scene is engaging, well-p
 <PreviousSceneContextSummary>
 {_PreviousSceneContextSummary}
 </PreviousSceneContextSummary>
+
+**Base Story Context (if any user instructions apply globally):**
+<BaseStoryContext>
+{_BaseStoryContext}
+</BaseStoryContext>
 
 **Current Chapter:** {_ChapterNumber}
 **Scene Number in Chapter:** {_SceneNumberInChapter}
@@ -629,4 +639,26 @@ Ensure the translation is fluent and natural-sounding in {_Language}.
 </CHAPTER_TEXT>
 
 Translated Chapter Text in {_Language}:
+"""
+
+FALLBACK_CHAPTER_PLOT_GENERATION_PROMPT: str = """
+You are an AI story assistant. The main story outline is provided below.
+A specific chapter, Chapter {ChapterNum} out of {TotalChapters}, currently has a missing or unusable plot description.
+Your task is to generate a concise, plausible plot summary (2-4 sentences) for this specific Chapter {ChapterNum} that fits logically within the overall narrative flow, considering the base story context.
+
+**Overall Story Outline:**
+<OverallStoryOutline>
+{OverallStoryOutline}
+</OverallStoryOutline>
+
+**Base Story Context/Instructions (if any):**
+<BaseStoryContext>
+{BaseStoryContext}
+</BaseStoryContext>
+
+Provide ONLY the plot summary for Chapter {ChapterNum}. Do not add any preamble or extra text.
+Focus on:
+- What key event(s) should happen in this chapter?
+- How does it advance the main plot or character development?
+- How does it connect to adjacent chapters (implied by the overall outline)?
 """

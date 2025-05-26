@@ -34,10 +34,10 @@ EVAL_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-In
 INFO_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For extracting story metadata (title, summary, tags)
 SCRUB_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For cleaning final output
 CHECKER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For JSON parsing checks or simple validations
-TRANSLATOR_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For translation tasks
+TRANSLATOR_MODEL: str = "huggingface.co/DavidAU/DeepSeek-MOE-4X8B-R1-Distill-Llama-3.1-Deep-Thinker-Uncensored-24B-GGUF:latest " # For translation tasks
 
 # --- API and System Settings ---
-OLLAMA_CTX: int = 8192  # Default context window size for Ollama models
+OLLAMA_CTX: int = 16384  # Default context window size for Ollama models
 OLLAMA_HOST: str = "http://localhost:11434" # Default Ollama host URL
 
 # API keys should ideally be loaded from environment variables (.env file)
@@ -54,16 +54,16 @@ TRANSLATE_PROMPT_LANGUAGE: str = ""  # Target language for initial user prompt t
 
 # Outline revision settings
 OUTLINE_MIN_REVISIONS: int = 1  # Minimum number of revision cycles for the main outline
-OUTLINE_MAX_REVISIONS: int = 3  # Maximum number of revision cycles for the main outline
+OUTLINE_MAX_REVISIONS: int = 5  # Maximum number of revision cycles for the main outline
 
 # Chapter/Scene revision settings
 CHAPTER_NO_REVISIONS: bool = False  # If True, skips feedback/revision loops for assembled chapters
 CHAPTER_MIN_REVISIONS: int = 1  # Minimum revision cycles for an assembled chapter
-CHAPTER_MAX_REVISIONS: int = 3  # Maximum revision cycles for an assembled chapter
+CHAPTER_MAX_REVISIONS: int = 5  # Maximum revision cycles for an assembled chapter
 
 # Scene-specific generation parameters
-SCENE_NARRATIVE_MIN_WORDS: int = 150  # Minimum expected word count for a single generated scene narrative
-SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER: int = 3 # Minimum scenes expected from the scene outliner per chapter
+SCENE_NARRATIVE_MIN_WORDS: int = 350  # Minimum expected word count for a single generated scene narrative
+SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER: int = 5 # Minimum scenes expected from the scene outliner per chapter
 
 # --- Feature Flags ---
 SCRUB_NO_SCRUB: bool = False  # If True, skips the final scrubbing pass

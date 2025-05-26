@@ -12,11 +12,11 @@ features without manually typing long command-line arguments.
 The script constructs and executes a command string that calls `../Write.py`.
 """
 
+from typing import Any, Dict
+from Writer.Config import Config
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from typing import Any, Dict
-from Writer.Config import Config
 
 # Predefined model configurations (can be expanded)
 # Each key is a menu option, value is a dictionary of model arguments for Write.py

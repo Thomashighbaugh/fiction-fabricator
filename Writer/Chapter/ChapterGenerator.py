@@ -26,10 +26,10 @@ import Writer.LLMEditor as LLMEditor
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
 from Writer.Statistics import get_word_count
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple  # Added Tuple
 
 
-def generate_chapter_by_scenes(  # Ensure this exact function name exists
+def generate_chapter_by_scenes(
     interface: Interface,
     logger: Logger,
     chapter_num: int,
@@ -38,7 +38,7 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
     current_chapter_plot_outline: str,
     previous_chapter_context_summary: Optional[str],
     base_story_context: Optional[str],
-) -> str:
+) -> Tuple[str, List[Dict[str, Any]]]:  # Modified return type
     """
     Generates a complete chapter by first outlining scenes and then writing each scene.
 
@@ -55,8 +55,10 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
         base_story_context (Optional[str]): Overarching story context or user instructions.
 
     Returns:
-        str: The full text of the generated chapter. Returns an error message string
-             or placeholder if critical failures occur.
+        Tuple[str, List[Dict[str, Any]]]:
+            - The full text of the generated chapter. Returns an error message string
+              or placeholder if critical failures occur.
+            - The list of scene outlines used to generate the chapter.
     """
     logger.Log(
         f"--- Starting Generation for Chapter {chapter_num}/{total_chapters} (Scene-by-Scene Pipeline) ---",
@@ -68,7 +70,7 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
             f"Chapter {chapter_num} plot outline is empty. Cannot generate chapter."
         )
         logger.Log(error_msg, 7)
-        return f"// {error_msg} //"
+        return f"// {error_msg} //", []  # Return empty list for scenes on error
 
     # 1. Get detailed scene outlines for this chapter
     logger.Log(
@@ -87,7 +89,7 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
     if not list_of_scene_outlines:
         error_msg = f"No scene outlines were generated for Chapter {chapter_num}. Chapter generation aborted."
         logger.Log(error_msg, 7)
-        return f"// Chapter {chapter_num} - Generation Error: {error_msg} //"
+        return f"// Chapter {chapter_num} - Generation Error: {error_msg} //", []
 
     logger.Log(
         f"Successfully generated {len(list_of_scene_outlines)} scene outlines for Chapter {chapter_num}.",
@@ -144,7 +146,9 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
                 4,
             )
 
-            if scene_idx < len(list_of_scene_outlines) - 1:
+            if (
+                scene_idx < len(list_of_scene_outlines) - 1
+            ):  # Don't summarize after the last scene of the chapter
                 current_scene_context_summary = (
                     ChapterContext.generate_previous_scene_summary(
                         interface, logger, scene_narrative, scene_outline_blueprint
@@ -169,7 +173,9 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
     )
 
     refined_chapter_text = full_chapter_text_from_scenes
-    if not Config.CHAPTER_NO_REVISIONS and len(compiled_scene_texts) > 1:
+    if (
+        not Config.CHAPTER_NO_REVISIONS and len(compiled_scene_texts) > 1
+    ):  # Only refine if there's more than one scene
         logger.Log(
             f"Step 3: Performing refinement pass on assembled Chapter {chapter_num}...",
             3,
@@ -224,7 +230,9 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
 
         current_revision_history: List[Dict[str, Any]] = [
             interface.build_system_query(Prompts.DEFAULT_SYSTEM_PROMPT),
-            interface.build_assistant_query(final_chapter_text),
+            interface.build_assistant_query(
+                final_chapter_text
+            ),  # Start history with the current version
         ]
 
         revision_iterations = 0
@@ -237,25 +245,29 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
 
             try:
                 feedback_on_chapter = LLMEditor.GetFeedbackOnChapter(
-                    interface, logger, final_chapter_text, overall_story_outline
+                    interface,
+                    logger,
+                    final_chapter_text,
+                    overall_story_outline,  # Use current final_chapter_text
                 )
                 is_chapter_complete = LLMEditor.GetChapterRating(
-                    interface, logger, final_chapter_text
+                    interface,
+                    logger,
+                    final_chapter_text,  # Use current final_chapter_text
                 )
 
                 if (
                     is_chapter_complete
-                    and revision_iterations >= Config.CHAPTER_MIN_REVISIONS
-                ):  # Ensure min revisions are met
+                    and revision_iterations
+                    >= Config.CHAPTER_MIN_REVISIONS  # Ensure min revisions met even if complete early
+                ):
                     logger.Log(
                         f"Chapter {chapter_num} meets quality standards post-assembly. Exiting revision.",
                         4,
                     )
                     break
 
-                if (
-                    revision_iterations >= Config.CHAPTER_MAX_REVISIONS
-                ):  # Use >= for clarity
+                if revision_iterations >= Config.CHAPTER_MAX_REVISIONS:
                     logger.Log(
                         f"Max revisions ({Config.CHAPTER_MAX_REVISIONS}) reached for Chapter {chapter_num}. Proceeding with current version (IsComplete: {is_chapter_complete}).",
                         6 if not is_chapter_complete else 4,
@@ -270,7 +282,9 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
                     _Chapter=final_chapter_text, _Feedback=feedback_on_chapter
                 )
 
-                messages_for_this_revision = current_revision_history[:]
+                messages_for_this_revision = current_revision_history[
+                    :
+                ]  # Use the evolving history
                 messages_for_this_revision.append(
                     interface.build_user_query(chapter_revision_prompt_text)
                 )
@@ -282,10 +296,12 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
                     min_word_count=int(get_word_count(final_chapter_text) * 0.7),
                 )
 
-                final_chapter_text = interface.get_last_message_text(
-                    response_revised_chapter_messages
+                final_chapter_text = (
+                    interface.get_last_message_text(  # Update final_chapter_text
+                        response_revised_chapter_messages
+                    )
                 )
-                current_revision_history = response_revised_chapter_messages
+                current_revision_history = response_revised_chapter_messages  # Update history with the new LLM response
                 logger.Log(
                     f"Chapter {chapter_num} revised. New word count: {get_word_count(final_chapter_text)}.",
                     4,
@@ -296,21 +312,21 @@ def generate_chapter_by_scenes(  # Ensure this exact function name exists
                     f"Error during Chapter {chapter_num} revision loop (iteration {revision_iterations}): {e}. Using last good version.",
                     7,
                 )
-                break
+                break  # Exit loop on error
 
     logger.Log(
         f"--- Finished Generation for Chapter {chapter_num}/{total_chapters}. Final word count: {get_word_count(final_chapter_text)} ---",
         2,
     )
-    return final_chapter_text
+    return final_chapter_text, list_of_scene_outlines  # Return generated scene outlines
 
 
 # Example usage (typically called from Write.py)
 if __name__ == "__main__":
     # This is for testing purposes only.
-    # A full integration test would require mocking all sub-modules (SceneOutliner, SceneGenerator, ChapterContext, LLMEditor)
-    # and the Interface. This is a simplified placeholder.
     class MockLogger:
+        """Mock logger for testing ChapterGenerator."""
+
         def Log(self, item: str, level: int, stream: bool = False):
             print(f"LOG L{level}: {item}")
 
@@ -318,21 +334,26 @@ if __name__ == "__main__":
             print(f"LANGCHAIN_SAVE: {label}")
 
     class MockInterface:
-        def build_system_query(self, q: str):
+        """Mock interface for testing ChapterGenerator."""
+
+        def build_system_query(self, q: str) -> Dict[str, str]:
             return {"role": "system", "content": q}
 
-        def build_user_query(self, q: str):
+        def build_user_query(self, q: str) -> Dict[str, str]:
             return {"role": "user", "content": q}
 
-        def build_assistant_query(self, q: str):
+        def build_assistant_query(self, q: str) -> Dict[str, str]:
             return {"role": "assistant", "content": q}
 
-        def get_last_message_text(self, msgs):
+        def get_last_message_text(self, msgs: List[Dict[str, Any]]) -> str:
             return msgs[-1]["content"] if msgs else ""
 
-        def safe_generate_text(self, l, m, mo, min_word_count):
-            print(
-                f"Mock LLM Call to {mo} with min_words {min_word_count} for ChapterGenerator sub-task."
+        def safe_generate_text(
+            self, l: MockLogger, m: List[Dict[str, Any]], mo: str, min_word_count: int
+        ) -> List[Dict[str, Any]]:
+            l.Log(
+                f"Mock LLM Call to {mo} with min_words {min_word_count} for ChapterGenerator sub-task.",
+                0,
             )
             if mo == Config.MODEL_CHAPTER_ASSEMBLY_REFINER:
                 return [
@@ -360,47 +381,68 @@ if __name__ == "__main__":
 
     # Mock sub-module functions
     def mock_generate_detailed_scene_outlines(
-        iface, log, chap_plot, overall, chap_num, prev_sum, base_ctx
-    ):
+        iface: MockInterface,
+        log: MockLogger,
+        chap_plot: str,
+        overall: str,
+        chap_num: int,
+        prev_sum: Optional[str],
+        base_ctx: Optional[str],
+    ) -> List[Dict[str, Any]]:
         log.Log(f"MOCK SceneOutliner called for Ch.{chap_num}", 0)
         return [
             {
+                "scene_number_in_chapter": 1,  # Added for consistency
                 "scene_title": f"Mock Scene {chap_num}.1",
                 "key_events_actions": ["Event 1.1"],
             },
             {
+                "scene_number_in_chapter": 2,
                 "scene_title": f"Mock Scene {chap_num}.2",
                 "key_events_actions": ["Event 1.2"],
             },
         ]
 
     def mock_write_scene_narrative(
-        iface, log, scene_outline, overall, prev_ctx, chap_num, scene_num, base_ctx
-    ):
+        iface: MockInterface,
+        log: MockLogger,
+        scene_outline: Dict[str, Any],
+        overall: str,
+        prev_ctx: str,
+        chap_num: int,
+        scene_num: int,
+        base_ctx: Optional[str],
+    ) -> str:
         log.Log(f"MOCK SceneGenerator called for {scene_outline['scene_title']}", 0)
         return f"Narrative for {scene_outline['scene_title']}. It included: {scene_outline['key_events_actions'][0]}."
 
-    def mock_generate_previous_scene_summary(iface, log, scene_text, scene_outline):
+    def mock_generate_previous_scene_summary(
+        iface: MockInterface,
+        log: MockLogger,
+        scene_text: str,
+        scene_outline: Dict[str, Any],
+    ) -> str:
         log.Log(
             f"MOCK ChapterContext (scene summary) called for {scene_outline['scene_title']}",
             0,
         )
         return f"Summary after {scene_outline['scene_title']}: Key things happened."
 
-    def mock_get_feedback_on_chapter(iface, log, chapter_text, overall_outline):
-        log.Log(f"MOCK LLMEditor (GetFeedbackOnChapter) called.", 0)
+    _mock_get_chapter_rating_call_count = 0
+
+    def mock_get_feedback_on_chapter(
+        iface: MockInterface, log: MockLogger, chapter_text: str, overall_outline: str
+    ) -> str:
+        log.Log("MOCK LLMEditor (GetFeedbackOnChapter) called.", 0)
         return "This chapter is okay, but could be more exciting."
 
-    def mock_get_chapter_rating(iface, log, chapter_text):
-        log.Log(f"MOCK LLMEditor (GetChapterRating) called.", 0)
-        # Simulate it becoming complete after one revision for testing loop
-        # Ensure this attribute is handled if function is called multiple times in a test run
-        if not hasattr(mock_get_chapter_rating, "call_count"):
-            mock_get_chapter_rating.call_count = 0
-        mock_get_chapter_rating.call_count += 1
-        return True if mock_get_chapter_rating.call_count > 1 else False
-
-    # mock_get_chapter_rating.call_count = 0 # Reset outside if needed for multiple test runs in one script
+    def mock_get_chapter_rating(
+        iface: MockInterface, log: MockLogger, chapter_text: str
+    ) -> bool:
+        log.Log("MOCK LLMEditor (GetChapterRating) called.", 0)
+        global _mock_get_chapter_rating_call_count
+        _mock_get_chapter_rating_call_count += 1
+        return True if _mock_get_chapter_rating_call_count > 1 else False
 
     # Monkey-patch the imported modules with mocks
     SceneOutliner.generate_detailed_scene_outlines = (
@@ -413,26 +455,24 @@ if __name__ == "__main__":
     LLMEditor.GetFeedbackOnChapter = mock_get_feedback_on_chapter
     LLMEditor.GetChapterRating = mock_get_chapter_rating
 
-    mock_logger = MockLogger()
-    mock_interface = MockInterface()
+    mock_logger_instance = MockLogger()
+    mock_interface_instance = MockInterface()
 
     # Setup Config for the test
     Config.MODEL_CHAPTER_ASSEMBLY_REFINER = "mock_refiner_model"
     Config.CHAPTER_REVISION_WRITER_MODEL = "mock_chapter_revision_model"
     Config.CHAPTER_NO_REVISIONS = False
-    Config.CHAPTER_MIN_REVISIONS = 0
-    Config.CHAPTER_MAX_REVISIONS = 1
+    Config.CHAPTER_MIN_REVISIONS = 1  # Set to 1 to ensure one revision attempt
+    Config.CHAPTER_MAX_REVISIONS = 1  # Allow only one revision for faster test
     Prompts.DEFAULT_SYSTEM_PROMPT = "System prompt for ChapterGenerator test."
     Prompts.CHAPTER_REVISION_PROMPT = "Revise: {_Chapter} with feedback: {_Feedback}"
 
     print("\n--- Testing generate_chapter_by_scenes ---")
-    # Reset call count for GetChapterRating if it's stateful across tests
-    if hasattr(mock_get_chapter_rating, "call_count"):
-        mock_get_chapter_rating.call_count = 0
+    _mock_get_chapter_rating_call_count = 0  # Reset for the test
 
-    chapter_text_result = generate_chapter_by_scenes(
-        mock_interface,
-        mock_logger,
+    chapter_text_result, scene_outlines_result = generate_chapter_by_scenes(
+        mock_interface_instance,
+        mock_logger_instance,
         chapter_num=1,
         total_chapters=3,
         overall_story_outline="A three-chapter saga.",
@@ -443,8 +483,13 @@ if __name__ == "__main__":
 
     print("\n--- Final Generated Chapter Text (Mocked) ---")
     print(chapter_text_result)
+    print("\n--- Generated Scene Outlines (Mocked) ---")
+    for idx, scene in enumerate(scene_outlines_result):
+        print(f"Scene {idx+1}: {scene.get('scene_title', 'N/A')}")
 
     assert "Narrative for Mock Scene 1.1" in chapter_text_result
     assert "Narrative for Mock Scene 1.2" in chapter_text_result
-    assert "REFINED" in chapter_text_result
-    assert "REVISED" in chapter_text_result
+    assert "REFINED" in chapter_text_result  # From assembly refiner
+    assert "REVISED" in chapter_text_result  # From revision loop
+    assert len(scene_outlines_result) == 2
+    assert scene_outlines_result[0]["scene_title"] == "Mock Scene 1.1"

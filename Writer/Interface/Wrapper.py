@@ -21,14 +21,15 @@ import inspect
 import json
 import os
 import time
-import random
+
+# import random # No longer used directly
 import importlib
 import subprocess
 import sys
 from urllib.parse import parse_qs, urlparse
 from typing import List, Dict, Any, Tuple, Optional, Literal
-import Writer.Config as Config  # Renamed for clarity
-import Writer.Prompts as Prompts  # For JSON_PARSE_ERROR prompt
+import Writer.Config as Config
+import Writer.Prompts as Prompts
 
 
 # Load environment variables from .env file (e.g., API keys)
@@ -47,9 +48,7 @@ class Interface:
         Args:
             models_to_load (List[str]): A list of model URI strings to preload.
         """
-        self.clients: Dict[str, Any] = (
-            {}
-        )  # Stores initialized LLM clients, keyed by model_uri
+        self.clients: Dict[str, Any] = {}
         self.load_models(models_to_load)
 
     def _ensure_package_is_installed(
@@ -106,7 +105,10 @@ class Interface:
             provider, provider_model_name, model_host, model_options = (
                 self._get_model_and_provider(model_uri)
             )
-            log_msg_load = f"Loading Model: '{provider_model_name}' from Provider: '{provider}' at Host: '{model_host or 'default'}' with options: {model_options or '{}'}"
+            log_msg_load = (
+                f"Loading Model: '{provider_model_name}' from Provider: '{provider}' "
+                f"at Host: '{model_host or 'default'}' with options: {model_options or '{}'}"
+            )
             if logger:
                 logger.Log(log_msg_load, 1)
             else:
@@ -121,20 +123,21 @@ class Interface:
                         model_host if model_host else Config.OLLAMA_HOST
                     )
 
-                    # Check if model is available and download if not
                     try:
                         ollama.Client(host=effective_ollama_host).show(
                             provider_model_name
                         )
                         if logger:
                             logger.Log(
-                                f"Ollama model '{provider_model_name}' found locally at {effective_ollama_host}.",
+                                f"Ollama model '{provider_model_name}' found locally at "
+                                f"{effective_ollama_host}.",
                                 0,
                             )
-                    except (
-                        ollama.ResponseError
-                    ):  # More specific exception for model not found
-                        log_msg_download = f"Ollama model '{provider_model_name}' not found at {effective_ollama_host}. Attempting download..."
+                    except ollama.ResponseError:
+                        log_msg_download = (
+                            f"Ollama model '{provider_model_name}' not found at "
+                            f"{effective_ollama_host}. Attempting download..."
+                        )
                         if logger:
                             logger.Log(log_msg_download, 1)
                         else:
@@ -147,20 +150,27 @@ class Interface:
                             status = chunk.get("status", "")
                             completed = chunk.get("completed", 0)
                             total = chunk.get("total", 0)
-                            if total > 0 and completed > 0:
-                                progress = (completed / total) * 100
+                            if total > 0 and completed >= 0:
+                                progress = (completed / total) * 100 if total > 0 else 0
+                                completed_size_mb = completed / (1024**2)
+                                total_size_mb = total / (1024**2)
                                 print(
-                                    f"Downloading {provider_model_name}: {progress:.2f}% ({completed/1024**2:.2f}MB / {total/1024**2:.2f}MB)",
+                                    f"Downloading {provider_model_name}: {progress:.2f}% "
+                                    f"({completed_size_mb:.2f}MB / {total_size_mb:.2f}MB)",
                                     end="\r",
+                                    flush=True,
                                 )
-                            else:
-                                print(f"{status} {provider_model_name}...", end="\r")
+                            elif status:
+                                print(
+                                    f"{status} {provider_model_name}...",
+                                    end="\r",
+                                    flush=True,
+                                )
                         print(
                             "\nDownload complete."
                             if total > 0
                             else f"\nFinished: {status}"
                         )
-
                     self.clients[model_uri] = ollama.Client(host=effective_ollama_host)
 
                 elif provider == "google":
@@ -170,7 +180,7 @@ class Interface:
                     google_api_key = os.environ.get("GOOGLE_API_KEY")
                     if not google_api_key:
                         raise ValueError(
-                            "GOOGLE_API_KEY not found in environment variables for Google provider."
+                            "GOOGLE_API_KEY not found for Google provider."
                         )
                     genai.configure(api_key=google_api_key)
                     self.clients[model_uri] = genai.GenerativeModel(
@@ -178,32 +188,26 @@ class Interface:
                     )
 
                 elif provider == "openrouter":
-                    self._ensure_package_is_installed(
-                        "requests", logger
-                    )  # OpenRouter client uses requests
-                    from Writer.Interface.OpenRouter import OpenRouter  # Local import
+                    self._ensure_package_is_installed("requests", logger)
+                    from Writer.Interface.OpenRouter import OpenRouter
 
                     openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
                     if not openrouter_api_key:
                         raise ValueError(
-                            "OPENROUTER_API_KEY not found in environment variables for OpenRouter provider."
+                            "OPENROUTER_API_KEY not found for OpenRouter provider."
                         )
                     self.clients[model_uri] = OpenRouter(
                         api_key=openrouter_api_key, model=provider_model_name
                     )
-
-                # Add other providers like Anthropic here if needed
-                # elif provider == "anthropic":
-                #     self._ensure_package_is_installed("anthropic", logger)
-                #     # ... anthropic client setup ...
-
                 else:
-                    error_msg = f"Unsupported model provider '{provider}' for model URI '{model_uri}'."
+                    error_msg = f"Unsupported provider '{provider}' for '{model_uri}'."
                     if logger:
                         logger.Log(error_msg, 7)
                     raise ValueError(error_msg)
 
-                log_msg_success = f"Successfully loaded model '{provider_model_name}' for URI '{model_uri}'."
+                log_msg_success = (
+                    f"Loaded model '{provider_model_name}' for '{model_uri}'."
+                )
                 if logger:
                     logger.Log(log_msg_success, 1)
                 else:
@@ -215,20 +219,11 @@ class Interface:
                     logger.Log(error_msg_load, 7)
                 else:
                     print(error_msg_load)
-                # Optionally, re-raise or handle as appropriate (e.g., skip model if non-critical)
 
     def _get_model_and_provider(
         self, model_uri: str
     ) -> Tuple[str, str, Optional[str], Optional[Dict[str, Any]]]:
-        """
-        Parses a model URI string to extract provider, model name, host, and query parameters.
-        Format: "provider://model_identifier@host?param1=value1¶m2=value2"
-        If no "://" is present, defaults to "ollama".
-        """
         if "://" not in model_uri:
-            # Default to ollama provider if no scheme is specified
-            # This assumes the model_uri is just the model name for ollama
-            # and uses the default Config.OLLAMA_HOST
             parsed_path = model_uri.split("@")
             model_name = parsed_path[0]
             host = parsed_path[1] if len(parsed_path) > 1 else Config.OLLAMA_HOST
@@ -236,63 +231,50 @@ class Interface:
 
         parsed = urlparse(model_uri)
         provider = parsed.scheme.lower()
-
-        path_parts = parsed.path.strip("/").split(
-            "@"
-        )  # Remove leading/trailing slashes from path
+        path_parts = parsed.path.strip("/").split("@")
         model_identifier_from_path = path_parts[0]
         host_from_path = path_parts[1] if len(path_parts) > 1 else None
 
-        # Combine netloc and path for model identifier if netloc is part of it
-        # (e.g., huggingface.co/DavidAU/...)
         if parsed.netloc:
             model_name = (
                 f"{parsed.netloc}{parsed.path.split('@')[0]}"
-                if parsed.path
-                else parsed.netloc
+                if parsed.path and "@" in parsed.path
+                else f"{parsed.netloc}{('/' + model_identifier_from_path) if model_identifier_from_path and not parsed.path.endswith(model_identifier_from_path) else parsed.path}"
             )
         else:
-            model_name = model_identifier_from_path  # Should not happen if "://" is present and scheme is not file
+            model_name = model_identifier_from_path
 
-        host = host_from_path  # Host from path takes precedence if specified with @
-        if (
-            not host and provider == "ollama"
-        ):  # Default host for ollama if not specified
+        host = host_from_path
+        if not host and provider == "ollama":
             host = Config.OLLAMA_HOST
 
         query_params: Optional[Dict[str, Any]] = None
         if parsed.query:
             query_params = {}
             for key, value_list in parse_qs(parsed.query).items():
-                value = value_list[0]  # Take the first value for each param
+                value = value_list[0]
                 try:
-                    # Attempt to convert to float or int if possible
                     if "." in value:
                         query_params[key] = float(value)
                     else:
                         query_params[key] = int(value)
                 except ValueError:
-                    # Keep as string if conversion fails
                     if value.lower() == "true":
                         query_params[key] = True
                     elif value.lower() == "false":
                         query_params[key] = False
                     else:
                         query_params[key] = value
-
         return provider, model_name, host, query_params
 
     def _clean_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Removes messages with empty or whitespace-only content, except possibly the last one if it's an assistant placeholder."""
         cleaned = []
         for i, msg in enumerate(messages):
             content = msg.get("content", "")
             if isinstance(content, str) and content.strip() == "":
-                if (
-                    i == len(messages) - 1 and msg.get("role") == "assistant"
-                ):  # Keep placeholder
+                if i == len(messages) - 1 and msg.get("role") == "assistant":
                     cleaned.append(msg)
-                continue  # Skip other empty messages
+                continue
             cleaned.append(msg)
         return cleaned
 
@@ -302,83 +284,51 @@ class Interface:
         messages: List[Dict[str, Any]],
         model_uri: str,
         seed_override: int = -1,
-        output_format: Optional[
-            Literal["json"]
-        ] = None,  # Changed from _Format to output_format
+        output_format: Optional[Literal["json"]] = None,
         min_word_count: int = 1,
     ) -> List[Dict[str, Any]]:
-        """
-        Ensures the LLM response is not empty/whitespace and meets a minimum word count.
-        Retries with modified prompts if initial attempts fail.
-
-        Args:
-            logger: Logger instance.
-            messages: List of message dictionaries for the LLM.
-            model_uri: The URI string of the model to use.
-            seed_override: Specific seed for this generation, or -1 for default.
-            output_format: Optional. If "json", instructs capable models to output JSON.
-            min_word_count: Minimum number of words required in the response.
-
-        Returns:
-            The list of messages including the LLM's successful response.
-        """
         current_messages = self._clean_messages(messages)
-
         max_retries_sgt = 3
         for attempt in range(max_retries_sgt):
             effective_seed = (
                 seed_override if seed_override != -1 else (Config.SEED + attempt)
-            )  # Vary seed on retries
-
+            )
             response_messages = self.chat_and_stream_response(
                 logger, current_messages, model_uri, effective_seed, output_format
             )
-
             last_response_text = self.get_last_message_text(response_messages)
             word_count = len(last_response_text.split())
 
             if last_response_text.strip() != "" and word_count >= min_word_count:
-                return response_messages  # Success
+                return response_messages
 
-            # Prepare for retry
             logger.Log(
-                f"SafeGenerateText (Attempt {attempt + 1}/{max_retries_sgt}): Response failed criteria "
+                f"SafeGenerateText (Attempt {attempt + 1}/{max_retries_sgt}): Response failed "
                 f"(Empty: {last_response_text.strip() == ''}, Words: {word_count}, Min: {min_word_count}). Retrying.",
-                (
-                    6 if attempt < max_retries_sgt - 1 else 7
-                ),  # Log as warning, then error on final fail
+                6 if attempt < max_retries_sgt - 1 else 7,
             )
-
-            # Modify current_messages for retry:
-            # Remove the last assistant's failed response.
-            # Add a user message asking to try again or be more verbose.
             if response_messages and response_messages[-1]["role"] == "assistant":
-                current_messages = response_messages[
-                    :-1
-                ]  # Remove failed assistant response
-
+                current_messages = response_messages[:-1]
             if word_count < min_word_count and last_response_text.strip() != "":
                 current_messages.append(
                     self.build_user_query(
-                        f"Your previous response was too short ({word_count} words, minimum {min_word_count}). Please elaborate and provide a more detailed answer."
+                        f"Your previous response was too short ({word_count} words, "
+                        f"minimum {min_word_count}). Please elaborate."
                     )
                 )
-            else:  # Was empty
+            else:
                 current_messages.append(
                     self.build_user_query(
-                        "Your previous response was empty. Please try generating a response again."
+                        "Your previous response was empty. Please try again."
                     )
                 )
-
-            if attempt == max_retries_sgt - 1:  # Last attempt failed
+            if attempt == max_retries_sgt - 1:
                 logger.Log(
-                    f"SafeGenerateText: Failed to get adequate response for {model_uri} after {max_retries_sgt} attempts. Last response: '{last_response_text[:100]}...'",
+                    f"SafeGenerateText: Failed for {model_uri} after {max_retries_sgt} attempts. "
+                    f"Last response: '{last_response_text[:100]}...'",
                     7,
                 )
-                # Return the last failed response, but mark it or handle upstream
-                return response_messages
-
-        return response_messages  # Should be unreachable if loop logic is correct
+        return response_messages
 
     def safe_generate_json(
         self,
@@ -388,32 +338,14 @@ class Interface:
         seed_override: int = -1,
         required_attribs: List[str] = [],
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Ensures the LLM response is valid JSON and contains required attributes.
-        Retries with corrective prompts if parsing fails or attributes are missing.
-
-        Args:
-            logger: Logger instance.
-            messages: List of message dictionaries for the LLM.
-            model_uri: The URI string of the model to use.
-            seed_override: Specific seed for this generation, or -1 for default.
-            required_attribs: A list of attribute keys that must be present in the JSON response.
-
-        Returns:
-            A tuple containing the full message list (including the valid JSON response)
-            and the parsed JSON dictionary.
-
-        Raises:
-            Exception if a valid JSON response cannot be obtained after max retries.
-        """
         current_messages = self._clean_messages(messages)
-
         max_json_attempts = 3
+        last_error_type = ""
+
         for attempt in range(max_json_attempts):
             effective_seed = (
                 seed_override if seed_override != -1 else (Config.SEED + attempt)
             )
-
             response_messages = self.chat_and_stream_response(
                 logger,
                 current_messages,
@@ -422,9 +354,9 @@ class Interface:
                 output_format="json",
             )
             last_response_text = self.get_last_message_text(response_messages)
+            parsed_json: Optional[Dict[str, Any]] = None
 
             try:
-                # Pre-process common JSON issues (like markdown code blocks)
                 cleaned_response_text = last_response_text.strip()
                 if cleaned_response_text.startswith("```json"):
                     cleaned_response_text = cleaned_response_text[7:]
@@ -438,49 +370,55 @@ class Interface:
                     )
 
                 parsed_json = json.loads(cleaned_response_text)
-
                 missing_attribs = [
                     attr for attr in required_attribs if attr not in parsed_json
                 ]
+
                 if not missing_attribs:
                     return response_messages, parsed_json  # Success
 
-                # Attributes missing, prepare for retry
+                last_error_type = "missing_attributes"
                 logger.Log(
-                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): JSON response missing attributes: {missing_attribs}. Retrying.",
+                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): "
+                    f"JSON missing attributes: {missing_attribs}. Retrying.",
                     6,
                 )
-                current_messages = response_messages  # Keep history
-                current_messages.append(
-                    self.build_user_query(
-                        f"Your JSON response was missing the following required attributes: {', '.join(missing_attribs)}. "
-                        f"Please ensure your response is a valid JSON object containing all attributes: {', '.join(required_attribs)}."
-                    )
+                correction_prompt = (
+                    f"Your JSON response was missing the following required attributes: {', '.join(missing_attribs)}. "
+                    f"Please ensure your response is a valid JSON object containing all required attributes: {', '.join(required_attribs)}. "
+                    f"The previous full JSON attempt was:\n```json\n{last_response_text}\n```"
                 )
 
             except json.JSONDecodeError as e:
+                last_error_type = "json_decode_error"
                 logger.Log(
-                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): JSONDecodeError: {e}. Response: '{last_response_text[:200]}...'. Retrying.",
+                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): "
+                    f"JSONDecodeError: {e}. Response: '{last_response_text[:200]}...'. Retrying.",
                     6,
                 )
-                current_messages = response_messages  # Keep history
-                current_messages.append(
-                    self.build_user_query(
-                        Prompts.JSON_PARSE_ERROR.format(_Error=str(e))
-                    )
+                # Use the generic JSON_PARSE_ERROR but also include the faulty text to help the LLM.
+                correction_prompt = (
+                    Prompts.JSON_PARSE_ERROR.format(_Error=str(e))
+                    + f"\nThe malformed JSON text was:\n```\n{last_response_text}\n```\n"
+                    + "Please provide the corrected JSON structure."
                 )
 
-            if attempt == max_json_attempts - 1:  # Last attempt failed
-                logger.Log(
-                    f"SafeGenerateJSON: Failed to generate valid JSON for {model_uri} after {max_json_attempts} attempts.",
-                    7,
-                )
-                raise Exception(
-                    f"Failed to generate valid JSON for {model_uri} after {max_json_attempts} attempts. Last response: {last_response_text}"
-                )
+            # Prepare for retry: use the response_messages that led to the error as history for correction
+            current_messages = response_messages
+            current_messages.append(self.build_user_query(correction_prompt))
 
-        # Should be unreachable
-        raise Exception(f"SafeGenerateJSON logic error for {model_uri}")
+            if attempt == max_json_attempts - 1:
+                error_message = (
+                    f"SafeGenerateJSON: Failed to generate valid JSON for {model_uri} "
+                    f"after {max_json_attempts} attempts. Last error type: {last_error_type}."
+                )
+                logger.Log(error_message, 7)
+                raise Exception(f"{error_message} Last response: {last_response_text}")
+
+        # This part should be unreachable if logic is correct
+        raise Exception(
+            f"SafeGenerateJSON logic error for {model_uri}, exited loop unexpectedly."
+        )
 
     def chat_and_stream_response(
         self,
@@ -490,44 +428,26 @@ class Interface:
         seed_override: int = -1,
         output_format: Optional[Literal["json"]] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Sends messages to the specified LLM and streams the response.
-        Handles provider-specific logic and includes error retries for the LLM call itself.
-
-        Args:
-            logger: Logger instance.
-            messages: List of message dictionaries.
-            model_uri: The URI string of the model to use.
-            seed_override: Specific seed, or -1 for default.
-            output_format: If "json", attempts to instruct the model for JSON output.
-
-        Returns:
-            The updated list of messages, including the assistant's response.
-        """
         provider, provider_model_name, model_host, model_options_from_uri = (
             self._get_model_and_provider(model_uri)
         )
         effective_seed = Config.SEED if seed_override == -1 else seed_override
-
-        # Logging context length
         total_chars = sum(len(str(msg.get("content", ""))) for msg in messages)
-        estimated_tokens = total_chars / 4.5  # Rough estimate
+        estimated_tokens = total_chars / 4.5
         logger.Log(
-            f"Initiating LLM call to '{provider_model_name}' ({provider}). Seed: {effective_seed}. Format: {output_format}. Est. Tokens: ~{estimated_tokens:.0f}",
+            f"LLM call to '{provider_model_name}' ({provider}). Seed: {effective_seed}. "
+            f"Format: {output_format}. Est. Tokens: ~{estimated_tokens:.0f}",
             4,
         )
-        if estimated_tokens > (
-            Config.OLLAMA_CTX * 0.8
-        ):  # Warning if approaching context limit
+        if estimated_tokens > (Config.OLLAMA_CTX * 0.8):
             logger.Log(
-                f"Warning: Estimated token count ({estimated_tokens:.0f}) is high for context window {Config.OLLAMA_CTX}.",
+                f"Warning: Est. tokens ({estimated_tokens:.0f}) high for context "
+                f"{Config.OLLAMA_CTX}.",
                 6,
             )
 
         if Config.DEBUG:
-            logger.Log(
-                "--------- Message History START ---------", 0, stream=True
-            )  # Use stream=True for multiline debug
+            logger.Log("--------- Message History START ---------", 0, stream=True)
             for i, msg in enumerate(messages):
                 role = msg.get("role", "unknown")
                 content_preview = (
@@ -542,14 +462,9 @@ class Interface:
 
         start_time = time.time()
         full_response_content = ""
-
-        # Combine URI options with any dynamic options, URI options take precedence
         final_model_options = {}
         if Config.DEBUG_LEVEL > 1:
-            logger.Log(
-                f"Base model options from Config for {provider}: {final_model_options}",
-                0,
-            )  # Placeholder for future provider-specific base options
+            logger.Log(f"Base model options for {provider}: {final_model_options}", 0)
         if model_options_from_uri:
             final_model_options.update(model_options_from_uri)
             if Config.DEBUG_LEVEL > 1:
@@ -557,7 +472,7 @@ class Interface:
                     f"Updated model options with URI params: {final_model_options}", 0
                 )
 
-        max_llm_retries = 2  # Retries for the LLM call itself (e.g., network errors)
+        max_llm_retries = 2
         for attempt in range(max_llm_retries):
             try:
                 if provider == "ollama":
@@ -571,7 +486,6 @@ class Interface:
                         ollama_options["format"] = "json"
                     if Config.DEBUG_LEVEL > 0:
                         logger.Log(f"Ollama options: {ollama_options}", 0)
-
                     stream = self.clients[model_uri].chat(
                         model=provider_model_name,
                         messages=messages,
@@ -583,45 +497,75 @@ class Interface:
                     )
 
                 elif provider == "google":
-                    import google.generativeai as genai  # type: ignore
-                    from google.generativeai.types import HarmCategory, HarmBlockThreshold  # type: ignore
+                    import google.generativeai as genai
+                    from google.generativeai.types import (
+                        HarmCategory,
+                        HarmBlockThreshold,
+                    )
 
-                    # Format messages for Google API
-                    google_messages = []
+                    google_messages, system_instruction_text = [], None
                     for msg in messages:
-                        role = msg["role"]
+                        role, content = msg["role"], str(msg.get("content", ""))
                         if role == "system":
-                            # Convert system messages to user prompts for Google
-                            google_messages.append(
-                                {"author": "user", "content": str(msg["content"])}
+                            system_instruction_text = content
+                            continue
+                        if (
+                            system_instruction_text
+                            and role == "user"
+                            and (
+                                not google_messages
+                                or all(m.get("role") != "user" for m in google_messages)
                             )
-                        elif role == "assistant":
-                            google_messages.append(
-                                {"author": "model", "content": str(msg["content"])}
+                        ):
+                            content = system_instruction_text + "\n\n" + content
+                            system_instruction_text = None
+                        google_messages.append(
+                            {
+                                "role": "model" if role == "assistant" else "user",
+                                "parts": [{"text": content}],
+                            }
+                        )
+                    if system_instruction_text:
+                        if not any(m["role"] == "user" for m in google_messages):
+                            google_messages.insert(
+                                0,
+                                {
+                                    "role": "user",
+                                    "parts": [{"text": system_instruction_text}],
+                                },
                             )
-                        else:
-                            # For user and other roles, use as is
-                            google_messages.append(
-                                {"author": role, "content": str(msg["content"])}
+                        elif google_messages and google_messages[0]["role"] == "model":
+                            google_messages.insert(
+                                0,
+                                {
+                                    "role": "user",
+                                    "parts": [{"text": system_instruction_text}],
+                                },
                             )
 
-                    generation_config = (
-                        genai.types.GenerationConfig(**final_model_options)
-                        if final_model_options
+                    gen_config_dict = final_model_options.copy()
+                    if (
+                        "temperature" in gen_config_dict
+                        and gen_config_dict["temperature"] is None
+                    ):
+                        del gen_config_dict["temperature"]
+                    gen_config_obj = (
+                        genai.types.GenerationConfig(**gen_config_dict)
+                        if gen_config_dict
                         else None
                     )
-                    if output_format == "json" and generation_config:
-                        generation_config.response_mime_type = "application/json"
-                    elif output_format == "json":  # Create config if None
-                        generation_config = genai.types.GenerationConfig(
-                            response_mime_type="application/json"
-                        )
+                    if output_format == "json":
+                        if gen_config_obj:
+                            gen_config_obj.response_mime_type = "application/json"
+                        else:
+                            gen_config_obj = genai.types.GenerationConfig(
+                                response_mime_type="application/json"
+                            )
                     if Config.DEBUG_LEVEL > 0:
                         logger.Log(
-                            f"Google messages: {google_messages}, GenConfig: {generation_config}",
+                            f"Google messages: {google_messages}, GenConfig: {gen_config_obj}",
                             0,
                         )
-
                     safety_settings = {
                         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -632,108 +576,92 @@ class Interface:
                         contents=google_messages,
                         stream=True,
                         safety_settings=safety_settings,
-                        generation_config=generation_config,
+                        generation_config=gen_config_obj,
                     )
                     full_response_content = self._stream_response_internal(
                         stream, provider, logger
                     )
 
                 elif provider == "openrouter":
-                    from Writer.Interface.OpenRouter import OpenRouter  # Local import
+                    from Writer.Interface.OpenRouter import OpenRouter
 
                     client: OpenRouter = self.clients[model_uri]
-                    client.set_params(**final_model_options)  # Apply dynamic options
-                    client.model = provider_model_name  # Ensure correct model is set
-
-                    if output_format == "json":  # OpenRouter specific JSON mode
+                    client.set_params(**final_model_options)
+                    client.model = provider_model_name
+                    if output_format == "json":
                         client.set_params(response_format={"type": "json_object"})
-
                     if Config.DEBUG_LEVEL > 0:
-                        logger.Log(f"OpenRouter params: {client.__dict__}", 0)
-
-                    # OpenRouter client currently doesn't stream in this implementation, directly gets content
+                        logger.Log(
+                            f"OpenRouter params: {client.params}, model: {client.model}",
+                            0,
+                        )
                     full_response_content = client.chat(
                         messages=messages, seed=effective_seed
                     )
                     logger.Log(
-                        f"OpenRouter full response received (length: {len(full_response_content)}).",
+                        f"OpenRouter full response (len: {len(full_response_content)}).",
                         4,
                         stream=False,
                     )
-
                 else:
-                    raise NotImplementedError(
-                        f"Provider '{provider}' not implemented in chat_and_stream_response."
-                    )
-
-                # If successful, break retry loop
+                    raise NotImplementedError(f"Provider '{provider}' not implemented.")
                 break
-
             except Exception as e:
                 logger.Log(
                     f"LLM Call Error (Attempt {attempt + 1}/{max_llm_retries}) for {model_uri}: {e}",
                     7,
                 )
-                if attempt == max_llm_retries - 1:  # Last attempt
-                    full_response_content = f"ERROR: LLM call failed after {max_llm_retries} attempts. Last error: {e}"
-                    # Fall through to return the error message
-                time.sleep(1.5**attempt)  # Exponential backoff
+                if attempt == max_llm_retries - 1:
+                    full_response_content = f"ERROR: LLM call failed after {max_llm_retries} attempts. Error: {e}"
+                time.sleep(1.5**attempt)
 
-        end_time = time.time()
-        duration = end_time - start_time
-        response_tokens = len(full_response_content.split())  # Very rough token count
-        tokens_per_sec = response_tokens / duration if duration > 0 else 0
+        duration = time.time() - start_time
+        response_words = len(full_response_content.split())
+        words_per_sec = response_words / duration if duration > 0 else 0
         logger.Log(
-            f"Generated response in {duration:.2f}s. Approx. {response_tokens} words, ~{tokens_per_sec:.2f} words/s.",
+            f"Generated response in {duration:.2f}s. Approx. {response_words} words, ~{words_per_sec:.2f} words/s.",
             4,
         )
-
-        # Append assistant's response to the messages list
         updated_messages = messages + [
             {"role": "assistant", "content": full_response_content}
         ]
 
-        # Save to Langchain debug log
-        # Get caller function name dynamically for better log naming
         caller_function_name = "UnknownCaller"
         try:
-            # stack returns a list of FrameInfo objects
-            # FrameInfo(frame, filename, lineno, function, code_context, index)
-            # We want the function name of the function that called ChatAndStreamResponse
-            # The first frame (index 0) is ChatAndStreamResponse itself.
-            # The second frame (index 1) is the function that called it (e.g. SafeGenerateText)
-            # The third frame (index 2) is the function that called SafeGenerateText (e.g. GenerateOutline)
-            # We'll construct a call path like "Grandparent.Parent.Child"
             call_stack = inspect.stack()
             relevant_frames = []
-            for i in range(1, min(4, len(call_stack))):  # Max 3 levels up from current
-                frame_name = call_stack[i].function
-                if frame_name == "<module>":
-                    frame_name = "Main"
-                relevant_frames.append(frame_name)
+            for i in range(1, min(4, len(call_stack))):
+                frame_info, func_name = call_stack[i], call_stack[i].function
+                if func_name == "<module>":
+                    if "self" in frame_info.frame.f_locals:
+                        func_name = frame_info.frame.f_locals["self"].__class__.__name__
+                    elif i == 1 and not relevant_frames:
+                        module_name = os.path.splitext(
+                            os.path.basename(frame_info.filename)
+                        )[0]
+                        func_name = (
+                            module_name
+                            if module_name != "__main__"
+                            else "MainExecution"
+                        )
+                relevant_frames.append(func_name)
             caller_function_name = (
                 ".".join(reversed(relevant_frames)) if relevant_frames else "DirectCall"
             )
-
         except IndexError:
-            pass  # Keep "UnknownCaller" if stack is too shallow
+            logger.Log("Could not determine full call stack for log naming.", 1)
 
-        logger.SaveLangchain(
-            f"{caller_function_name}.{provider_model_name.replace('/','_')}",
-            updated_messages,
+        simple_model_name = provider_model_name.split("/")[-1].split(":")[0]
+        logger.save_langchain_interaction(
+            f"{caller_function_name}.{simple_model_name}", updated_messages
         )
-
         return updated_messages
 
     def _stream_response_internal(
         self, stream_iterator: Any, provider: str, logger: Any
     ) -> str:
-        """Helper to consolidate streaming logic for different providers."""
-        response_text = ""
-        chunk_count = 0
+        response_text, chunk_count = "", 0
         stream_start_time = time.time()
-
-        # Console output for streaming can be very verbose, toggle with DEBUG_LEVEL
         enable_console_stream = Config.DEBUG and Config.DEBUG_LEVEL > 1
 
         for chunk in stream_iterator:
@@ -742,49 +670,42 @@ class Interface:
             if provider == "ollama":
                 current_chunk_text = chunk.get("message", {}).get("content", "")
             elif provider == "google":
-                try:  # Google's stream can have empty chunks or non-text parts
+                try:
                     current_chunk_text = chunk.text
-                except Exception:  # ValueError, AttributeError if chunk has no .text
+                except Exception:
                     if Config.DEBUG_LEVEL > 1:
-                        logger.Log(f"Google stream chunk without text: {chunk}", 0)
-                    continue  # Skip if no text
-            # Add other providers here
+                        logger.Log(f"Google stream chunk no text: {chunk}", 0)
+                    continue
             else:
-                # This should not be reached if called correctly
                 logger.Log(f"Streaming not implemented for provider: {provider}", 7)
                 break
-
             if current_chunk_text:
                 response_text += current_chunk_text
                 if enable_console_stream:
                     print(current_chunk_text, end="", flush=True)
 
-        if enable_console_stream:
-            print()  # Newline after streaming is done
-
+        if enable_console_stream and chunk_count > 0:
+            print()
         stream_duration = time.time() - stream_start_time
-        logger.Log(
-            f"Streamed {chunk_count} chunks for {provider} in {stream_duration:.2f}s.",
-            0,
-            stream=True,
-        )  # Log this at a lower level
+        if chunk_count > 0:
+            logger.Log(
+                f"Streamed {chunk_count} chunks for {provider} in {stream_duration:.2f}s.",
+                0,
+                stream=True,
+            )
         return response_text
 
     def build_user_query(self, query_text: str) -> Dict[str, str]:
-        """Constructs a user message dictionary."""
         return {"role": "user", "content": query_text}
 
     def build_system_query(self, query_text: str) -> Dict[str, str]:
-        """Constructs a system message dictionary."""
         return {"role": "system", "content": query_text}
 
     def build_assistant_query(self, query_text: str) -> Dict[str, str]:
-        """Constructs an assistant message dictionary."""
         return {"role": "assistant", "content": query_text}
 
     def get_last_message_text(self, messages: List[Dict[str, Any]]) -> str:
-        """Safely retrieves the content of the last message."""
-        if messages and isinstance(messages, list) and len(messages) > 0:
+        if messages and isinstance(messages, list) and messages:
             last_msg = messages[-1]
             if isinstance(last_msg, dict):
                 content = last_msg.get("content", "")

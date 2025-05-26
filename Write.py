@@ -18,7 +18,7 @@ import os
 import json
 import sys
 import re
-from typing import List, Optional  # Removed unused Any
+from typing import List, Optional, Dict, Any, Tuple
 
 # Ensure the Writer package is discoverable.
 try:
@@ -34,15 +34,14 @@ try:
     import Writer.StoryInfo as StoryInfo
     import Writer.NovelEditor as NovelEditor
     import Writer.Translator as Translator
+    import Writer.Prompts as Prompts
+    import Writer.Scene.SceneOutliner as SceneOutliner  # Needed for explicit scene generation for logging
 except ImportError as e:
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    # If Write.py is in project root, Writer/ is a direct subdir.
-    # If Write.py is in a subdir (e.g. scripts/), project_root is parent.
-    project_root = current_dir  # Assume Write.py is in project root
+    project_root = current_dir
     if "AIStoryWriter" in project_root.split(os.sep)[-1] and "Writer" not in os.listdir(
         project_root
     ):
-        # This implies Write.py might be one level down, e.g. in a "scripts" folder.
         project_root = os.path.dirname(project_root)
 
     if project_root not in sys.path:
@@ -60,6 +59,8 @@ except ImportError as e:
         import Writer.StoryInfo as StoryInfo
         import Writer.NovelEditor as NovelEditor
         import Writer.Translator as Translator
+        import Writer.Prompts as Prompts
+        import Writer.Scene.SceneOutliner as SceneOutliner
     except ImportError:
         print(
             f"CRITICAL ERROR: Failed to import necessary Writer modules. Original error: {e}"
@@ -254,52 +255,25 @@ def apply_config_from_args(args: argparse.Namespace, logger: PrintUtils.Logger) 
     This ensures that settings provided via CLI override the defaults in Config.py.
     """
     logger.Log("Applying command-line arguments to configuration...", 0)
-
-    # Iterate over args and update Config if the arg was actually provided by the user
-    # or if its default is different from Config (less common for most flags)
     for arg_name, arg_value in vars(args).items():
-        config_attr_name = arg_name.upper()  # Assuming Config uses UPPERCASE names
-
-        # Handle boolean flags (action="store_true") carefully
-        # If a store_true flag is present in args, its value will be True.
-        # If not present, its value will be False (argparse default for store_true if not specified)
-        # We only want to override Config if the flag was explicitly used or has a different effective default.
-
-        # Check if the argument was specified on the command line.
-        # This is a bit tricky with argparse. One way is to see if the value is different
-        # from the default defined in add_argument.
-        # For store_true, if its default in add_argument was False, and args.Flag is True, it was specified.
-        # If default was Config.FLAG, then args.Flag reflects that or the command line.
-
-        # Simpler: just assign. Argparse defaults (if set from Config) will handle it.
+        config_attr_name = arg_name.upper()
         if hasattr(Config, config_attr_name):
             current_config_val = getattr(Config, config_attr_name)
-            if current_config_val != arg_value:  # Log if there's a change
+            if current_config_val != arg_value:
                 logger.Log(
                     f"Config: '{config_attr_name}' changing from '{current_config_val}' to '{arg_value}' via CLI.",
                     0,
                 )
             setattr(Config, config_attr_name, arg_value)
-        elif arg_name in [
-            "NoChapterRevision",
-            "NoScrubChapters",
-            "EnableFinalEditPass",
-            "Debug",
-        ]:
-            # Handle boolean flags from argparse that might not directly map to UPPERCASE Config names
-            # or have different default logic.
-            # For example, if arg is NoChapterRevision (True if passed), set Config.CHAPTER_NO_REVISIONS = True
-            if arg_name == "NoChapterRevision":
-                Config.CHAPTER_NO_REVISIONS = arg_value
-            if arg_name == "NoScrubChapters":
-                Config.SCRUB_NO_SCRUB = arg_value
-            if arg_name == "EnableFinalEditPass":
-                Config.ENABLE_FINAL_EDIT_PASS = arg_value
-            if arg_name == "Debug":
-                Config.DEBUG = arg_value
-            # For other flags, they directly map to uppercase, like SEED, TRANSLATE etc.
-
-    Config.SCENE_GENERATION_PIPELINE = True  # This is central to the refactor
+        elif arg_name == "NoChapterRevision":
+            Config.CHAPTER_NO_REVISIONS = arg_value
+        elif arg_name == "NoScrubChapters":
+            Config.SCRUB_NO_SCRUB = arg_value
+        elif arg_name == "EnableFinalEditPass":
+            Config.ENABLE_FINAL_EDIT_PASS = arg_value
+        elif arg_name == "Debug":
+            Config.DEBUG = arg_value
+    Config.SCENE_GENERATION_PIPELINE = True
     logger.Log("Configuration updated from command-line arguments.", 0)
 
 
@@ -319,10 +293,10 @@ def load_user_prompt_file(
             return ""
         logger.Log("User prompt loaded successfully.", 1)
         return prompt_text
-    except IOError as e:  # More specific exception for file I/O issues
+    except IOError as e:
         logger.Log(f"Error reading prompt file '{prompt_filepath}': {e}", 7)
         return None
-    except Exception as e:  # Catch-all for other unexpected errors
+    except Exception as e:
         logger.Log(f"Unexpected error reading prompt file '{prompt_filepath}': {e}", 7)
         return None
 
@@ -341,15 +315,9 @@ def split_overall_outline_into_chapter_plots(
         f"Segmenting overall outline into {num_chapters} chapter-specific plot outlines...",
         3,
     )
-
-    # Regex to find "Chapter <number>[: title]" or "## Chapter <number>[: title]"
-    # It captures content *after* the heading.
-    # Using re.split is tricky because it removes the delimiter.
-    # Instead, let's use re.findall or re.finditer with a pattern that captures chapter content.
-    # This pattern looks for "Chapter X" and captures everything until the next "Chapter X" or end of string.
     pattern = re.compile(
         r"(?:Chapter\s*\d+\s*:?|\#{1,3}\s*Chapter\s*\d+\s*:?)[^\n]*\n(.*?)(?=\n(?:Chapter\s*\d+\s*:?|\#{1,3}\s*Chapter\s*\d+\s*:?)|\Z)",
-        re.IGNORECASE | re.DOTALL,  # DOTALL allows . to match newlines
+        re.IGNORECASE | re.DOTALL,
     )
     parsed_plots_via_find = [
         match.strip() for match in pattern.findall(overall_chapter_level_outline)
@@ -366,8 +334,6 @@ def split_overall_outline_into_chapter_plots(
         f"Regex findall yielded {len(parsed_plots_via_find)} plots, expected {num_chapters}. Using LLM or broader regex split.",
         5,
     )
-
-    # Fallback to previous regex split logic if findall didn't work as expected or for robustness
     chapter_segments = re.split(
         r"\n(?:Chapter\s*\d+\s*:?|\#{1,3}\s*Chapter\s*\d+\s*:?)[^\n]*\n",
         overall_chapter_level_outline,
@@ -375,7 +341,6 @@ def split_overall_outline_into_chapter_plots(
     )
     parsed_plots_via_split = [seg.strip() for seg in chapter_segments if seg.strip()]
 
-    # Remove potential leading empty segment or "Introduction" if it's not counted as a chapter
     if parsed_plots_via_split and (
         not parsed_plots_via_split[0]
         or parsed_plots_via_split[0].lower().startswith(("introduction", "prologue"))
@@ -395,7 +360,6 @@ def split_overall_outline_into_chapter_plots(
         f"Regex split yielded {len(parsed_plots_via_split)} plots. Attempting LLM-based segmentation.",
         5,
     )
-
     prompt_text = (
         f"The following is a story outline that describes {num_chapters} chapters.\n"
         f"Please divide this outline into {num_chapters} distinct sections, where each section\n"
@@ -425,7 +389,6 @@ def split_overall_outline_into_chapter_plots(
                     4,
                 )
                 return parsed_json_list
-
             logger.Log(
                 f"LLM segmentation returned {len(parsed_json_list)} plots, but {num_chapters} were expected. Adjusting list or using fallback.",
                 6,
@@ -446,16 +409,12 @@ def split_overall_outline_into_chapter_plots(
             f"Error during LLM-based outline segmentation: {e}. Using prior regex or crude split.",
             6,
         )
-
-    # Fallback to best regex result if LLM fails
     best_regex_plots = (
         parsed_plots_via_find
         if len(parsed_plots_via_find) > len(parsed_plots_via_split)
         else parsed_plots_via_split
     )
-    if best_regex_plots and (
-        len(best_regex_plots) >= num_chapters * 0.5
-    ):  # If regex got something reasonable
+    if best_regex_plots and (len(best_regex_plots) >= num_chapters * 0.5):
         logger.Log(
             f"Falling back to best regex-parsed plots ({len(best_regex_plots)} found) due to LLM segmentation issues.",
             6,
@@ -465,7 +424,6 @@ def split_overall_outline_into_chapter_plots(
         return best_regex_plots + [
             "Plot segment missing or could not be parsed by regex."
         ] * (num_chapters - len(best_regex_plots))
-
     logger.Log(
         "All segmentation methods had issues. Performing a crude split. Chapter plot quality may be low.",
         7,
@@ -475,13 +433,116 @@ def split_overall_outline_into_chapter_plots(
         if num_chapters > 0
         else len(overall_chapter_level_outline)
     )
-    if avg_len == 0 and num_chapters > 0:  # Avoid empty strings if possible
+    if avg_len == 0 and num_chapters > 0:
         return ["Error: Crude split resulted in empty segment."] * num_chapters
     return [
         overall_chapter_level_outline[i * avg_len : (i + 1) * avg_len].strip()
         or f"Segment {i+1} empty after crude split."
         for i in range(num_chapters)
     ]
+
+
+def _generate_fallback_plot_string_for_chapter(
+    interface: Wrapper.Interface,
+    logger: PrintUtils.Logger,
+    chapter_num: int,
+    total_chapters: int,
+    overall_story_outline: str,
+    base_story_context: Optional[str],
+) -> str:
+    """Generates a fallback plot string for a chapter if its segment is problematic."""
+    logger.Log(f"Generating fallback plot string for Chapter {chapter_num}...", 5)
+    try:
+        prompt_template = Prompts.FALLBACK_CHAPTER_PLOT_GENERATION_PROMPT
+        formatted_prompt = prompt_template.format(
+            ChapterNum=chapter_num,
+            TotalChapters=total_chapters,
+            OverallStoryOutline=overall_story_outline,
+            BaseStoryContext=(
+                base_story_context if base_story_context else "Not provided."
+            ),
+        )
+    except AttributeError:  # Check if prompt is defined in Prompts module
+        logger.Log(
+            "FALLBACK_CHAPTER_PLOT_GENERATION_PROMPT not found in Prompts.py!", 7
+        )
+        return f"Error: Fallback prompt missing. Chapter {chapter_num} plot cannot be generated."
+    except KeyError as e:
+        logger.Log(
+            f"Fallback plot prompt formatting error for Chapter {chapter_num}: {e}", 7
+        )
+        return f"Error: Fallback prompt key error. Chapter {chapter_num} plot error."
+
+    messages = [
+        interface.build_system_query(
+            "You are an AI story assistant helping to create a coherent plot for a chapter whose specific details are missing."
+        ),
+        interface.build_user_query(formatted_prompt),
+    ]
+    try:
+        response_messages = interface.safe_generate_text(
+            logger, messages, Config.MODEL_SCENE_OUTLINER, min_word_count=20
+        )
+        fallback_plot = interface.get_last_message_text(response_messages)
+        if not fallback_plot.strip() or "Error:" in fallback_plot:
+            logger.Log(
+                f"LLM failed to generate fallback plot for Chapter {chapter_num}.", 6
+            )
+            return f"Error: LLM failed to generate fallback plot for Chapter {chapter_num}."
+        logger.Log(
+            f"Fallback plot generated for Chapter {chapter_num}: '{fallback_plot[:100]}...'",
+            4,
+        )
+        return fallback_plot
+    except Exception as e:
+        logger.Log(
+            f"Exception generating fallback plot for Chapter {chapter_num}: {e}", 7
+        )
+        return f"Error: Exception during fallback plot generation for Chapter {chapter_num}."
+
+
+def _log_generated_scenes_to_plot_file(
+    logger: PrintUtils.Logger,
+    scene_outlines: List[Dict[str, Any]],
+    plot_segment_filepath: str,
+) -> None:
+    """Appends formatted scene outlines to the chapter's plot segment log file."""
+    if not scene_outlines:
+        return
+    logger.Log(
+        f"Appending {len(scene_outlines)} generated scene outlines to {os.path.basename(plot_segment_filepath)}",
+        3,
+    )
+    try:
+        with open(plot_segment_filepath, "a", encoding="utf-8") as f_plot_log:
+            f_plot_log.write(
+                "\n\n--- GENERATED SCENE OUTLINES FOR THIS CHAPTER SEGMENT ---\n"
+            )
+            for idx, scene_dict in enumerate(scene_outlines):
+                scene_num_in_chapter = scene_dict.get(
+                    "scene_number_in_chapter", idx + 1
+                )
+                title = scene_dict.get("scene_title", "Untitled Scene")
+                setting = scene_dict.get("setting_description", "N/A")
+                events = scene_dict.get("key_events_actions", ["N/A"])
+                events_str = (
+                    "; ".join(events) if isinstance(events, list) else str(events)
+                )
+
+                f_plot_log.write(
+                    f"{scene_num_in_chapter}. **{title}**\n"
+                    f"   Setting: {setting}\n"
+                    f"   Events: {events_str}\n"
+                    f"   Purpose: {scene_dict.get('purpose_in_chapter', 'N/A')}\n\n"
+                )
+            f_plot_log.write("--- END GENERATED SCENE OUTLINES ---\n")
+    except IOError as e:
+        logger.Log(f"Error appending scene outlines to {plot_segment_filepath}: {e}", 7)
+    except Exception as e:  # Catch any other unexpected error during file write
+        logger.Log(
+            f"Unexpected error appending scene outlines to {plot_segment_filepath}: {e}",
+            7,
+        )
 
 
 def main() -> None:
@@ -540,7 +601,6 @@ def main() -> None:
             logger,
             user_prompt_text,
             Config.TRANSLATE_PROMPT_LANGUAGE,
-            # Assuming auto-detect or user_prompt_text's original lang is not passed here
         )
         if "Error:" in user_prompt_text:
             logger.Log(
@@ -592,6 +652,7 @@ def main() -> None:
     logger.Log(f"Phase 3: Generating {num_chapters} Chapter(s) Scene-by-Scene...", 1)
     generated_chapters_list: List[str] = []
     previous_chapter_context_summary: Optional[str] = None
+    all_generated_scene_outlines_for_json_log: List[List[Dict[str, Any]]] = []
 
     for i in range(num_chapters):
         current_chapter_num = i + 1
@@ -599,25 +660,76 @@ def main() -> None:
             f"--- Generating Chapter {current_chapter_num}/{num_chapters} ---", 2
         )
 
-        current_chapter_specific_plot = per_chapter_plot_outlines[i]
-        if not current_chapter_specific_plot.strip():
+        current_chapter_specific_plot_from_split = per_chapter_plot_outlines[i]
+        plot_segment_filename = f"2a_Chapter_{current_chapter_num}_PlotSegment.txt"
+        plot_segment_filepath = os.path.join(
+            logger.log_session_dir, plot_segment_filename
+        )
+
+        effective_plot_for_generator = current_chapter_specific_plot_from_split
+        is_plot_problematic = (
+            not current_chapter_specific_plot_from_split.strip()
+            or "Plot segment missing" in current_chapter_specific_plot_from_split
+            or "Error: Crude split" in current_chapter_specific_plot_from_split
+            or "not clearly delineated by LLM"
+            in current_chapter_specific_plot_from_split
+        )
+
+        if is_plot_problematic:
             logger.Log(
-                f"Plot outline for Chapter {current_chapter_num} is empty. Attempting generation with broader context only.",
+                f"Plot for Chapter {current_chapter_num} is problematic: '{current_chapter_specific_plot_from_split}'. "
+                "Generating a fallback plot string.",
                 6,
             )
-            current_chapter_specific_plot = f"This is Chapter {current_chapter_num}. Refer to the overall story outline for guidance."
-
-        generated_chapter_text = (
-            ChapterGenerator.generate(  # Corrected function name to match module's member
+            fallback_plot_str = _generate_fallback_plot_string_for_chapter(
                 interface,
                 logger,
                 current_chapter_num,
                 num_chapters,
                 chapter_level_plot_outline,
-                current_chapter_specific_plot,
+                base_story_context_instructions,
+            )
+            if fallback_plot_str and "Error:" not in fallback_plot_str:
+                effective_plot_for_generator = fallback_plot_str
+                try:
+                    with open(
+                        plot_segment_filepath, "a", encoding="utf-8"
+                    ) as f_plot_log:
+                        f_plot_log.write(
+                            "\n\n--- FALLBACK CHAPTER PLOT GENERATED ---\n"
+                        )
+                        f_plot_log.write(effective_plot_for_generator)
+                        f_plot_log.write("\n--- END FALLBACK CHAPTER PLOT ---\n\n")
+                except IOError as e:
+                    logger.Log(
+                        f"Error appending fallback plot to {plot_segment_filepath}: {e}",
+                        7,
+                    )
+            else:
+                logger.Log(
+                    f"Failed to generate fallback plot for Chapter {current_chapter_num}. Using original problematic plot.",
+                    7,
+                )
+
+        # This assumes ChapterGenerator.generate_chapter_by_scenes has been modified
+        # to return Tuple[str, List[Dict[str, Any]]]
+        generated_chapter_text, scene_outlines_used_for_chapter = (
+            ChapterGenerator.generate_chapter_by_scenes(
+                interface,
+                logger,
+                current_chapter_num,
+                num_chapters,
+                chapter_level_plot_outline,
+                effective_plot_for_generator,
                 previous_chapter_context_summary,
                 base_story_context_instructions,
             )
+        )
+        all_generated_scene_outlines_for_json_log.append(
+            scene_outlines_used_for_chapter
+        )
+        _log_generated_scenes_to_plot_file(
+            logger, scene_outlines_used_for_chapter, plot_segment_filepath
         )
 
         final_formatted_chapter_text = (
@@ -659,7 +771,7 @@ def main() -> None:
                 )
                 previous_chapter_context_summary = (
                     f"The story should proceed to Chapter {current_chapter_num + 1} as per the main outline. "
-                    f"Chapter {current_chapter_num} involved: {current_chapter_specific_plot[:100]}..."
+                    f"Chapter {current_chapter_num} involved: {effective_plot_for_generator[:100]}..."
                 )
 
     globally_edited_chapters = list(generated_chapters_list)
@@ -725,9 +837,7 @@ def main() -> None:
         else 0
     )
 
-    logger.Log(
-        "--- STORY GENERATION COMPLETE ---", 0
-    )  # Changed f-string to regular string
+    logger.Log("--- STORY GENERATION COMPLETE ---", 0)
     logger.Log(f"Title: {story_title}", 0)
     logger.Log(f"Summary: {story_summary[:200]}...", 0)
     logger.Log(f"Tags: {story_tags}", 0)
@@ -836,6 +946,7 @@ def main() -> None:
         "story_elements_markdown": story_elements_md,
         "chapter_level_plot_outline": chapter_level_plot_outline,
         "per_chapter_plot_segments_used": per_chapter_plot_outlines,
+        "all_generated_scene_outlines": all_generated_scene_outlines_for_json_log,  # Added
         "num_chapters_generated": num_chapters,
         "config_settings_used": {
             key: getattr(Config, key)
@@ -859,6 +970,8 @@ def main() -> None:
         "chapters_final_output": final_chapters_for_output,
     }
     try:
+        if os.path.dirname(json_filepath):
+            os.makedirs(os.path.dirname(json_filepath), exist_ok=True)
         with open(json_filepath, "w", encoding="utf-8") as f_json:
             json.dump(story_data_for_json, f_json, indent=2, ensure_ascii=False)
         logger.Log(f"Detailed story data JSON saved to: {json_filepath}", 1)
@@ -866,7 +979,7 @@ def main() -> None:
         IOError,
         TypeError,
         Exception,
-    ) as e:  # Catch more specific errors for JSON dump
+    ) as e:
         logger.Log(f"Error saving story data JSON to {json_filepath}: {e}", 7)
 
     logger.Log(f"Story generation process complete. Output: {md_filepath}", 0)
