@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Evaluate.py
+# File: Evaluate.py
 # Purpose: Script for evaluating and comparing generated stories/outlines using an LLM.
 
 """

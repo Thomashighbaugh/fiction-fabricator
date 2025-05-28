@@ -1,4 +1,4 @@
-# File: AIStoryWriter/write.py (Renamed from Write.py for convention)
+# File: write.py (Renamed from Write.py for convention)
 # Purpose: Main orchestrator for the AI Story Writer application.
 
 """

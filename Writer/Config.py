@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Config.py
+# File: Writer/Config.py
 # Purpose: Central configuration for models, API keys, and generation parameters.
 
 """

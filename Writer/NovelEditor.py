@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/NovelEditor.py
+# File: Writer/NovelEditor.py
 # Purpose: Performs an optional global editing pass on the assembled novel for consistency and flow.
 
 """

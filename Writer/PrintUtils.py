@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/PrintUtils.py
+# File: Writer/PrintUtils.py
 # Purpose: Utilities for logging and colored console output.
 
 """

@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/LLMEditor.py
+# File: Writer/LLMEditor.py
 # Purpose: Provides LLM-based feedback and ratings for outlines and chapters.
 
 """

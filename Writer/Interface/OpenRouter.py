@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Interface/OpenRouter.py
+# File: Writer/Interface/OpenRouter.py
 # Purpose: Client for interacting with the OpenRouter API.
 
 """

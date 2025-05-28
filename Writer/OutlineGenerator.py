@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/OutlineGenerator.py
+# File: Writer/OutlineGenerator.py
 # Purpose: Generates the main story outline, chapter by chapter, using story elements and LLM feedback.
 
 """

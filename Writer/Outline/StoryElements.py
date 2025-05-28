@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Outline/StoryElements.py
+# File: Writer/Outline/StoryElements.py
 # Purpose: Generates foundational story elements (genre, theme, plot, characters, etc.) using an LLM.
 
 """

@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Chapter/ChapterDetector.py
+# File: Writer/Chapter/ChapterDetector.py
 # Purpose: Detects the number of chapters from a given story outline using an LLM.
 
 """

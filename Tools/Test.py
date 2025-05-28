@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Tools/Test.py
+# File: Tools/Test.py
 # Purpose: Developer utility script for quickly running AIStoryWriter with predefined configurations.
 
 """
@@ -256,7 +256,7 @@ def main():
     # Construct the command
     # Go up one directory to execute Write.py from the project root if Test.py is in Tools/
     # Adjust the path to Write.py if your structure is different.
-    # Assuming Test.py is in AIStoryWriter/Tools/ and Write.py is in AIStoryWriter/
+    # Assuming Test.py is in Tools/ and Write.py is in 
     script_path = os.path.join("..", "Write.py")
     if not os.path.exists(script_path):
         # Fallback if Test.py is run from project root

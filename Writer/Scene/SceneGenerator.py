@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Scene/SceneGenerator.py
+# File: Writer/Scene/SceneGenerator.py
 # Purpose: Generates full narrative text for an individual scene based on its detailed outline.
 
 """

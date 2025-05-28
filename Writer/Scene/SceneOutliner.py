@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Scene/SceneOutliner.py
+# File: Writer/Scene/SceneOutliner.py
 # Purpose: Generates a detailed, structured list of scene outlines for a given chapter.
 
 """

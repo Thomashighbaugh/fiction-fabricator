@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/StoryInfo.py
+# File: Writer/StoryInfo.py
 # Purpose: Extracts final story metadata (title, summary, tags) using an LLM.
 
 """

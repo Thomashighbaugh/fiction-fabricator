@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Translator.py
+# File: Writer/Translator.py
 # Purpose: Handles translation of story prompts and generated novel content.
 
 """

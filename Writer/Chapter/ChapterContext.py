@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Chapter/ChapterContext.py
+# File: Writer/Chapter/ChapterContext.py
 # Purpose: Generates contextual summaries of completed chapters or scenes to aid narrative flow.
 
 """

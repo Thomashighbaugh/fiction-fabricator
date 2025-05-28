@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Interface/Wrapper.py
+# File: Writer/Interface/Wrapper.py
 # Purpose: Wraps LLM API interactions, providing a consistent interface and handling retries, logging, and streaming.
 
 """

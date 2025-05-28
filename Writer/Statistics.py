@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Statistics.py
+# File: Writer/Statistics.py
 # Purpose: Utility functions for text statistics, e.g., word count.
 
 """

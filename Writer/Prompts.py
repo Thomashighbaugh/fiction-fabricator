@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Prompts.py
+# File: Writer/Prompts.py
 # Purpose: Central repository for all optimized LLM prompt templates.
 
 """

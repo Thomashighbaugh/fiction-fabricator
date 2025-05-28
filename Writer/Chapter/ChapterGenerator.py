@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Chapter/ChapterGenerator.py
+# File: Writer/Chapter/ChapterGenerator.py
 # Purpose: Orchestrates the generation of a complete chapter by creating and assembling scenes.
 
 """

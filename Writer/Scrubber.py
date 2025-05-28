@@ -1,4 +1,4 @@
-# File: AIStoryWriter/Writer/Scrubber.py
+# File: Writer/Scrubber.py
 # Purpose: Cleans up final generated novel text by removing author notes, outline remnants, etc.
 
 """
