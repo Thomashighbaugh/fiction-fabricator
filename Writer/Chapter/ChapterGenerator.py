@@ -7,7 +7,8 @@ Chapter Generation Orchestrator.
 This module manages the process of generating a full chapter. It uses a
 scene-by-scene approach:
 1.  It calls `SceneOutliner` to break down the chapter's plot outline into
-    a list of detailed scene outlines (blueprints).
+    a list of detailed scene outlines (blueprints). This step includes retries
+    if initial attempts fail.
 2.  It then iterates through these scene blueprints, calling `SceneGenerator`
     to write the narrative text for each scene.
 3.  Context (summaries of previous scenes/chapters) is passed along to ensure
@@ -26,7 +27,7 @@ import Writer.LLMEditor as LLMEditor
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
 from Writer.Statistics import get_word_count
-from typing import List, Dict, Any, Optional, Tuple  # Added Tuple
+from typing import List, Dict, Any, Optional, Tuple
 
 
 def generate_chapter_by_scenes(
@@ -38,9 +39,10 @@ def generate_chapter_by_scenes(
     current_chapter_plot_outline: str,
     previous_chapter_context_summary: Optional[str],
     base_story_context: Optional[str],
-) -> Tuple[str, List[Dict[str, Any]]]:  # Modified return type
+) -> Tuple[str, List[Dict[str, Any]]]:
     """
     Generates a complete chapter by first outlining scenes and then writing each scene.
+    Includes retries for scene outline generation.
 
     Args:
         interface (Interface): The LLM interaction wrapper.
@@ -70,29 +72,52 @@ def generate_chapter_by_scenes(
             f"Chapter {chapter_num} plot outline is empty. Cannot generate chapter."
         )
         logger.Log(error_msg, 7)
-        return f"// {error_msg} //", []  # Return empty list for scenes on error
+        return f"// {error_msg} //", []
 
-    # 1. Get detailed scene outlines for this chapter
+    # 1. Get detailed scene outlines for this chapter, with retries
     logger.Log(
         f"Step 1: Generating detailed scene outlines for Chapter {chapter_num}.", 3
     )
-    list_of_scene_outlines = SceneOutliner.generate_detailed_scene_outlines(
-        interface,
-        logger,
-        current_chapter_plot_outline,
-        overall_story_outline,
-        chapter_num,
-        previous_chapter_context_summary,
-        base_story_context,
-    )
+    list_of_scene_outlines: List[Dict[str, Any]] = []
+    scene_outline_attempts = 0
+
+    while (
+        not list_of_scene_outlines
+        and scene_outline_attempts < Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS
+    ):
+        scene_outline_attempts += 1
+        if scene_outline_attempts > 1:
+            logger.Log(
+                f"Retrying scene outline generation for Chapter {chapter_num} (Attempt {scene_outline_attempts}/{Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS})...",
+                5,
+            )
+
+        list_of_scene_outlines = SceneOutliner.generate_detailed_scene_outlines(
+            interface,
+            logger,
+            current_chapter_plot_outline,
+            overall_story_outline,
+            chapter_num,
+            previous_chapter_context_summary,
+            base_story_context,
+        )
+
+        if list_of_scene_outlines:
+            break  # Successfully generated outlines
+        elif scene_outline_attempts < Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS:
+            logger.Log(
+                f"Scene outline generation attempt {scene_outline_attempts} for Chapter {chapter_num} yielded no scenes. Will retry if attempts remain.",
+                6,
+            )
+        # If last attempt and still no scenes, the loop will terminate, and the error below will be triggered.
 
     if not list_of_scene_outlines:
-        error_msg = f"No scene outlines were generated for Chapter {chapter_num}. Chapter generation aborted."
+        error_msg = f"No scene outlines were generated for Chapter {chapter_num} after {Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS} attempt(s). Chapter generation aborted."
         logger.Log(error_msg, 7)
         return f"// Chapter {chapter_num} - Generation Error: {error_msg} //", []
 
     logger.Log(
-        f"Successfully generated {len(list_of_scene_outlines)} scene outlines for Chapter {chapter_num}.",
+        f"Successfully generated {len(list_of_scene_outlines)} scene outlines for Chapter {chapter_num} after {scene_outline_attempts} attempt(s).",
         3,
     )
 
@@ -248,18 +273,17 @@ def generate_chapter_by_scenes(
                     interface,
                     logger,
                     final_chapter_text,
-                    overall_story_outline,  # Use current final_chapter_text
+                    overall_story_outline,
                 )
                 is_chapter_complete = LLMEditor.GetChapterRating(
                     interface,
                     logger,
-                    final_chapter_text,  # Use current final_chapter_text
+                    final_chapter_text,
                 )
 
                 if (
                     is_chapter_complete
-                    and revision_iterations
-                    >= Config.CHAPTER_MIN_REVISIONS  # Ensure min revisions met even if complete early
+                    and revision_iterations >= Config.CHAPTER_MIN_REVISIONS
                 ):
                     logger.Log(
                         f"Chapter {chapter_num} meets quality standards post-assembly. Exiting revision.",
@@ -282,9 +306,7 @@ def generate_chapter_by_scenes(
                     _Chapter=final_chapter_text, _Feedback=feedback_on_chapter
                 )
 
-                messages_for_this_revision = current_revision_history[
-                    :
-                ]  # Use the evolving history
+                messages_for_this_revision = current_revision_history[:]
                 messages_for_this_revision.append(
                     interface.build_user_query(chapter_revision_prompt_text)
                 )
@@ -296,12 +318,10 @@ def generate_chapter_by_scenes(
                     min_word_count=int(get_word_count(final_chapter_text) * 0.7),
                 )
 
-                final_chapter_text = (
-                    interface.get_last_message_text(  # Update final_chapter_text
-                        response_revised_chapter_messages
-                    )
+                final_chapter_text = interface.get_last_message_text(
+                    response_revised_chapter_messages
                 )
-                current_revision_history = response_revised_chapter_messages  # Update history with the new LLM response
+                current_revision_history = response_revised_chapter_messages
                 logger.Log(
                     f"Chapter {chapter_num} revised. New word count: {get_word_count(final_chapter_text)}.",
                     4,
@@ -312,13 +332,13 @@ def generate_chapter_by_scenes(
                     f"Error during Chapter {chapter_num} revision loop (iteration {revision_iterations}): {e}. Using last good version.",
                     7,
                 )
-                break  # Exit loop on error
+                break
 
     logger.Log(
         f"--- Finished Generation for Chapter {chapter_num}/{total_chapters}. Final word count: {get_word_count(final_chapter_text)} ---",
         2,
     )
-    return final_chapter_text, list_of_scene_outlines  # Return generated scene outlines
+    return final_chapter_text, list_of_scene_outlines
 
 
 # Example usage (typically called from Write.py)
@@ -380,6 +400,8 @@ if __name__ == "__main__":
             ]
 
     # Mock sub-module functions
+    _mock_scene_outline_attempt_count = 0
+
     def mock_generate_detailed_scene_outlines(
         iface: MockInterface,
         log: MockLogger,
@@ -389,10 +411,23 @@ if __name__ == "__main__":
         prev_sum: Optional[str],
         base_ctx: Optional[str],
     ) -> List[Dict[str, Any]]:
-        log.Log(f"MOCK SceneOutliner called for Ch.{chap_num}", 0)
+        global _mock_scene_outline_attempt_count
+        _mock_scene_outline_attempt_count += 1
+        log.Log(
+            f"MOCK SceneOutliner called for Ch.{chap_num} (Attempt {_mock_scene_outline_attempt_count})",
+            0,
+        )
+        if (
+            chap_num == 1 and _mock_scene_outline_attempt_count < 2
+        ):  # Simulate failure on first attempt for chapter 1
+            log.Log(
+                f"MOCK SceneOutliner: Simulating no scenes on attempt {_mock_scene_outline_attempt_count} for Ch.{chap_num}",
+                0,
+            )
+            return []
         return [
             {
-                "scene_number_in_chapter": 1,  # Added for consistency
+                "scene_number_in_chapter": 1,
                 "scene_title": f"Mock Scene {chap_num}.1",
                 "key_events_actions": ["Event 1.1"],
             },
@@ -462,18 +497,20 @@ if __name__ == "__main__":
     Config.MODEL_CHAPTER_ASSEMBLY_REFINER = "mock_refiner_model"
     Config.CHAPTER_REVISION_WRITER_MODEL = "mock_chapter_revision_model"
     Config.CHAPTER_NO_REVISIONS = False
-    Config.CHAPTER_MIN_REVISIONS = 1  # Set to 1 to ensure one revision attempt
-    Config.CHAPTER_MAX_REVISIONS = 1  # Allow only one revision for faster test
+    Config.CHAPTER_MIN_REVISIONS = 1
+    Config.CHAPTER_MAX_REVISIONS = 1
+    Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS = 2  # For testing retry
     Prompts.DEFAULT_SYSTEM_PROMPT = "System prompt for ChapterGenerator test."
     Prompts.CHAPTER_REVISION_PROMPT = "Revise: {_Chapter} with feedback: {_Feedback}"
 
-    print("\n--- Testing generate_chapter_by_scenes ---")
-    _mock_get_chapter_rating_call_count = 0  # Reset for the test
+    print("\n--- Testing generate_chapter_by_scenes (with scene outline retry) ---")
+    _mock_get_chapter_rating_call_count = 0
+    _mock_scene_outline_attempt_count = 0
 
     chapter_text_result, scene_outlines_result = generate_chapter_by_scenes(
         mock_interface_instance,
         mock_logger_instance,
-        chapter_num=1,
+        chapter_num=1,  # This chapter will use the retry logic in mock
         total_chapters=3,
         overall_story_outline="A three-chapter saga.",
         current_chapter_plot_outline="The hero starts their journey and faces a small test.",
@@ -489,7 +526,69 @@ if __name__ == "__main__":
 
     assert "Narrative for Mock Scene 1.1" in chapter_text_result
     assert "Narrative for Mock Scene 1.2" in chapter_text_result
-    assert "REFINED" in chapter_text_result  # From assembly refiner
-    assert "REVISED" in chapter_text_result  # From revision loop
+    assert "REFINED" in chapter_text_result
+    assert "REVISED" in chapter_text_result
     assert len(scene_outlines_result) == 2
     assert scene_outlines_result[0]["scene_title"] == "Mock Scene 1.1"
+    assert _mock_scene_outline_attempt_count == 2  # Ensure retry happened for Ch1
+
+    print("\n--- Testing generate_chapter_by_scenes (no retry needed) ---")
+    _mock_get_chapter_rating_call_count = 0
+    _mock_scene_outline_attempt_count = 0  # Reset for chapter 2
+    chapter_text_result_2, scene_outlines_result_2 = generate_chapter_by_scenes(
+        mock_interface_instance,
+        mock_logger_instance,
+        chapter_num=2,  # This chapter will succeed on first try in mock
+        total_chapters=3,
+        overall_story_outline="A three-chapter saga.",
+        current_chapter_plot_outline="Chapter 2 plot.",
+        previous_chapter_context_summary="Context from ch1.",
+        base_story_context="A fantasy world.",
+    )
+    assert _mock_scene_outline_attempt_count == 1  # Ensure no retry for Ch2
+
+    print("\n--- Testing generate_chapter_by_scenes (all retries fail) ---")
+    _mock_get_chapter_rating_call_count = 0
+    _mock_scene_outline_attempt_count = 0
+    # Temporarily make mock fail all attempts for scene outlines for chapter 3
+    original_scene_outliner = SceneOutliner.generate_detailed_scene_outlines
+
+    def mock_fail_all_scene_outlines(
+        iface, log, plot, overall, chap_num, prev_sum, base_ctx
+    ):
+        global _mock_scene_outline_attempt_count
+        _mock_scene_outline_attempt_count += 1
+        log.Log(
+            f"MOCK SceneOutliner (FAIL ALL): Ch.{chap_num}, Attempt {_mock_scene_outline_attempt_count}",
+            0,
+        )
+        return []
+
+    SceneOutliner.generate_detailed_scene_outlines = mock_fail_all_scene_outlines
+
+    Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS = 2  # Set for this test
+
+    chapter_text_result_3, scene_outlines_result_3 = generate_chapter_by_scenes(
+        mock_interface_instance,
+        mock_logger_instance,
+        chapter_num=3,
+        total_chapters=3,
+        overall_story_outline="A three-chapter saga.",
+        current_chapter_plot_outline="Plot for chapter 3 that will fail outlining.",
+        previous_chapter_context_summary="Context from ch2.",
+        base_story_context="A fantasy world.",
+    )
+    print(f"\nResult for Chapter 3 (expected error): {chapter_text_result_3}")
+    print(f"Scene outlines for Chapter 3 (expected empty): {scene_outlines_result_3}")
+    assert (
+        "Generation Error: No scene outlines were generated for Chapter 3 after 2 attempt(s)"
+        in chapter_text_result_3
+    )
+    assert scene_outlines_result_3 == []
+    assert (
+        _mock_scene_outline_attempt_count
+        == Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS
+    )
+
+    # Restore original mock for subsequent tests if any
+    SceneOutliner.generate_detailed_scene_outlines = original_scene_outliner

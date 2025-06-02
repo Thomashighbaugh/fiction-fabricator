@@ -46,7 +46,7 @@ OLLAMA_HOST: str = "http://localhost:11434" # Default Ollama host URL
 # GOOGLE_API_KEY: Optional[str] = None
 # OPENROUTER_API_KEY: Optional[str] = None
 
-SEED: int = 42  # Default seed for reproducibility, can be overridden by argparse
+SEED: int = 108  # Default seed for reproducibility and appeasing my superstitions, can be overridden by argparse
 
 # --- Generation Parameters ---
 TRANSLATE_LANGUAGE: str = ""  # Target language for story translation (e.g., "French")
@@ -59,11 +59,12 @@ OUTLINE_MAX_REVISIONS: int = 5  # Maximum number of revision cycles for the main
 # Chapter/Scene revision settings
 CHAPTER_NO_REVISIONS: bool = False  # If True, skips feedback/revision loops for assembled chapters
 CHAPTER_MIN_REVISIONS: int = 1  # Minimum revision cycles for an assembled chapter
-CHAPTER_MAX_REVISIONS: int = 5  # Maximum revision cycles for an assembled chapter
+CHAPTER_MAX_REVISIONS: int = 3  # Maximum revision cycles for an assembled chapter
 
 # Scene-specific generation parameters
 SCENE_NARRATIVE_MIN_WORDS: int = 350  # Minimum expected word count for a single generated scene narrative
 SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER: int = 5 # Minimum scenes expected from the scene outliner per chapter
+SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS: int = 3 # Max attempts to generate scene outlines if initial fails
 
 # --- Feature Flags ---
 SCRUB_NO_SCRUB: bool = False  # If True, skips the final scrubbing pass

@@ -711,8 +711,11 @@ def main() -> None:
                     7,
                 )
 
-        # This assumes ChapterGenerator.generate_chapter_by_scenes has been modified
-        # to return Tuple[str, List[Dict[str, Any]]]
+        logger.Log(
+            f"Preparing to generate scenes for Chapter {current_chapter_num} using plot segment: '{effective_plot_for_generator[:200].replace('\n', ' ')}...'",
+            3,
+        )
+
         generated_chapter_text, scene_outlines_used_for_chapter = (
             ChapterGenerator.generate_chapter_by_scenes(
                 interface,

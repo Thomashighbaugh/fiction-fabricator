@@ -88,6 +88,10 @@ def generate_detailed_scene_outlines(
         # For example, if min 3 scenes and each scene description is ~50-100 words, then 150-300 words.
         estimated_min_words_for_scene_outlines = 75 * Config.SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER
         
+        logger.Log(
+            f"Requesting LLM to generate detailed scene outlines for Chapter {chapter_number} from its plot.",
+            4,
+        )
         response_messages = interface.safe_generate_text(
             logger,
             messages,

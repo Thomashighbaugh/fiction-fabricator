@@ -131,7 +131,7 @@ Make it engaging and provide enough substance for the AI to build upon.
 """
 
 CRITIQUE_EXPANDED_PROMPT_TEMPLATE = """
-You are an expert AI prompt engineer evaluating a story prompt intended for an advanced AI story generation system (like AIStoryWriter).
+You are an expert AI prompt engineer evaluating a story prompt intended for an advanced AI story generation system.
 The system will use this prompt to generate story elements, an outline, and then the full narrative.
 
 Here is the expanded story prompt you need to critique:
