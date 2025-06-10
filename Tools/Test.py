@@ -1,8 +1,8 @@
 # File: Tools/Test.py
-# Purpose: Developer utility script for quickly running AIStoryWriter with predefined configurations.
+# Purpose: Developer utility script for quickly running FictionFabricator with predefined configurations.
 
 """
-Developer Testing Utility for AIStoryWriter.
+Developer Testing Utility for FictionFabricator.
 
 This script provides a simple command-line menu to run the main `Write.py`
 script with various predefined sets of model configurations and common flags.
@@ -16,7 +16,8 @@ from typing import Any, Dict
 from Writer.Config import Config
 import os
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 # Predefined model configurations (can be expanded)
 # Each key is a menu option, value is a dictionary of model arguments for Write.py
@@ -146,34 +147,11 @@ TEST_CONFIGURATIONS = {
         "extra_flags": "-EnableFinalEditPass -Debug",  # Enable all quality steps
     },
     # Add more configurations as needed...
-    # For example, a specific config from the user's original Test.py if one was particularly effective.
-    # Option 8 from original: Miqu-70B + Llama3-70B editor. Assuming miqu is available via ollama.
-    # Replace "ollama://datacrystals/midnight-miqu70b-v1.5:latest@10.1.65.4:11434" with your actual URI
-    "6: User's Original Config 8 (Miqu-70B + Llama3-70B Editor)": {
-        "model_args": {
-            # Using Miqu for all main generation tasks
-            "-InitialOutlineModel": "ollama://<your_miqu_model_id_here>",  # Replace!
-            "-ModelStoryElementsGenerator": "ollama://<your_miqu_model_id_here>",
-            "-ModelSceneOutliner": "ollama://<your_miqu_model_id_here>",
-            "-ModelSceneNarrativeGenerator": "ollama://<your_miqu_model_id_here>",
-            "-ModelChapterAssemblyRefiner": "ollama://<your_miqu_model_id_here>",
-            "-ChapterRevisionModel": "ollama://<your_miqu_model_id_here>",
-            # Using Llama3-70B for supporting tasks as per original config's editor
-            "-RevisionModel": LLAMA3_70B_LOCAL,  # For feedback generation
-            "-EvalModel": LLAMA3_70B_LOCAL,  # For ratings, JSON checks
-            "-InfoModel": LLAMA3_70B_LOCAL,
-            "-ScrubModel": LLAMA3_70B_LOCAL,
-            "-CheckerModel": LLAMA3_70B_LOCAL,  # For chapter count, etc.
-            "-ModelChapterContextSummarizer": LLAMA3_70B_LOCAL,  # Context summaries
-            "-TranslatorModel": LLAMA3_70B_LOCAL,
-        },
-        "extra_flags": "-Debug -NoScrubChapters",  # As per original choice 8 extra flags
-    },
 }
 
 PROMPT_OPTIONS = {
-    "1": "../Prompts/Harem/prompt.txt",  # Example path from source, adjust if needed
-    "2": "../Prompts/Glitch/prompt.txt",  # Example path from source, adjust if needed
+    "1": "Prompts/Example1/prompt.txt",  # Adjust path as needed
+    "2": "Prompts/Example2/prompt.txt",  # Adjust path as needed
     "3": "Custom Prompt Path",
 }
 
@@ -182,11 +160,9 @@ def display_menu(title: str, options: Dict[str, Any]) -> str:
     """Displays a menu and gets user choice."""
     print(f"\n--- {title} ---")
     for key, value in options.items():
-        # For model configs, just show the key (menu name)
-        # For prompt configs, show the path or description
         if title == "Choose Model Configuration":
             print(f"{key}")
-        else:  # Prompts
+        else:
             print(f"{key}: {value}")
 
     print("-------------------------------------------")
@@ -194,11 +170,9 @@ def display_menu(title: str, options: Dict[str, Any]) -> str:
         choice = input(f"Enter your choice (number or full key for models): ")
         if choice in options:
             return choice
-        # Allow entering just the number part of the key for model configs
         if title == "Choose Model Configuration" and any(
             key.startswith(choice + ":") for key in options
         ):
-            # Find the full key that starts with the number choice + ":"
             full_key_choice = next(
                 (k for k in options if k.startswith(choice + ":")), None
             )
@@ -208,18 +182,14 @@ def display_menu(title: str, options: Dict[str, Any]) -> str:
 
 
 def main():
-    print("AIStoryWriter Developer Testing Utility")
+    print("FictionFabricator Developer Testing Utility")
 
-    # 1. Choose Model Configuration
     chosen_config_key = display_menu("Choose Model Configuration", TEST_CONFIGURATIONS)
     selected_config = TEST_CONFIGURATIONS[chosen_config_key]
 
     model_args_dict = selected_config["model_args"]
-    base_extra_flags = selected_config.get(
-        "extra_flags", ""
-    )  # Get base flags from config
+    base_extra_flags = selected_config.get("extra_flags", "")
 
-    # 2. Choose Prompt
     chosen_prompt_key = display_menu("Choose Prompt File", PROMPT_OPTIONS)
     prompt_file_path = PROMPT_OPTIONS[chosen_prompt_key]
     if chosen_prompt_key == "3":  # Custom Prompt Path
@@ -228,7 +198,6 @@ def main():
             print(f"Error: Prompt file not found at '{prompt_file_path}'. Exiting.")
             sys.exit(1)
 
-    # 3. Seed
     seed_input = input(f"Enter Seed value (default: {Config.SEED}): ")
     try:
         seed_value = int(seed_input) if seed_input else Config.SEED
@@ -236,73 +205,37 @@ def main():
         print(f"Invalid seed value. Using default: {Config.SEED}")
         seed_value = Config.SEED
 
-    # 4. Output filename (optional)
     output_filename_base = input(
         "Enter optional base output filename (e.g., MyStoryTest) (leave blank for default): "
     ).strip()
     output_flag = f'-Output "{output_filename_base}"' if output_filename_base else ""
 
-    # 5. Additional Custom Flags
     print("\n--- Additional Flags ---")
     print(f"Current base flags from config: '{base_extra_flags}'")
     custom_extra_flags = input(
         "Enter any *additional* custom flags (e.g., -Translate French -NoChapterRevision), or leave blank: "
     ).strip()
 
-    # Combine base flags from config with custom user flags
-    # Simple concatenation; more sophisticated merging might be needed if flags conflict.
     final_extra_flags = f"{base_extra_flags} {custom_extra_flags}".strip()
 
-    # Construct the command
-    # Go up one directory to execute Write.py from the project root if Test.py is in Tools/
-    # Adjust the path to Write.py if your structure is different.
-    # Assuming Test.py is in Tools/ and Write.py is in 
-    script_path = os.path.join("..", "Write.py")
+    # Assuming Test.py is in Tools/ and Write.py is in the parent directory
+    script_path = os.path.join(os.path.dirname(__file__), "..", "Write.py")
     if not os.path.exists(script_path):
         # Fallback if Test.py is run from project root
         script_path = "Write.py"
         if not os.path.exists(script_path):
-            print(
-                f"Error: Main script Write.py not found at expected locations. Current dir: {os.getcwd()}"
-            )
+            print(f"Error: Main script Write.py not found. Current dir: {os.getcwd()}")
             sys.exit(1)
 
     command_parts = [
-        sys.executable,  # Path to Python interpreter
+        sys.executable,
         script_path,
         f'-Prompt "{prompt_file_path}"',
         f"-Seed {seed_value}",
     ]
 
-    # Add model arguments
     for arg_name, model_uri in model_args_dict.items():
-        # Check for specific new model argument names from refactoring
-        # This ensures backward compatibility if old model args are still in some configs by mistake
-        # while prioritizing the new ones if they exist.
-        if arg_name in [
-            "-InitialOutlineModel",
-            "-ModelStoryElementsGenerator",
-            "-ModelSceneOutliner",
-            "-ModelSceneNarrativeGenerator",
-            "-ModelChapterContextSummarizer",
-            "-ModelChapterAssemblyRefiner",
-            "-ChapterRevisionModel",
-            "-RevisionModel",
-            "-EvalModel",
-            "-InfoModel",
-            "-ScrubModel",
-            "-CheckerModel",
-            "-TranslatorModel",
-        ]:
-            command_parts.append(f'{arg_name} "{model_uri}"')
-        # Deprecate old stage-specific models, but include if still present for old configs
-        elif arg_name.startswith("-ChapterS") and arg_name.endswith("Model"):
-            # Silently ignore old stage models unless specifically needed for a legacy test case.
-            # For new scene-by-scene, these are not primary.
-            # One might choose to map them to the new model args if a direct translation is desired.
-            # print(f"Warning: Legacy model argument '{arg_name}' found. Consider updating test config to new model roles.")
-            # command_parts.append(f"{arg_name} \"{model_uri}\"") # Uncomment to include if needed
-            pass
+        command_parts.append(f'{arg_name} "{model_uri}"')
 
     if output_flag:
         command_parts.append(output_flag)
@@ -316,10 +249,6 @@ def main():
     print(final_command)
     print("---------------------------\n")
 
-    # Execute the command
-    # Note: os.system is simple but has security implications if inputs are not controlled.
-    # For a developer tool with known inputs, it's often acceptable.
-    # subprocess.run is generally preferred for more control.
     exit_code = os.system(final_command)
 
     if exit_code == 0:

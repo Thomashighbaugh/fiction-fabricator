@@ -13,8 +13,8 @@ character development arcs.
 import json
 import Writer.Config as Config
 import Writer.Prompts as Prompts
-from Writer.Interface.Wrapper import Interface  # LLM interaction
-from Writer.PrintUtils import Logger  # Logging
+from Writer.Interface.Wrapper import Interface
+from Writer.PrintUtils import Logger
 from typing import Optional, Dict, Any, List
 
 
@@ -24,6 +24,7 @@ def generate_previous_chapter_summary(
     completed_chapter_text: str,
     overall_story_outline: str,
     chapter_number_of_completed_chapter: int,
+    max_tokens: Optional[int] = None,
 ) -> str:
     """
     Generates a contextual summary of a completed chapter, focusing on elements
@@ -35,6 +36,7 @@ def generate_previous_chapter_summary(
         completed_chapter_text (str): The full text of the chapter that was just finished.
         overall_story_outline (str): The main outline of the entire story for broader context.
         chapter_number_of_completed_chapter (int): The number of the chapter that was just completed.
+        max_tokens (Optional[int]): Maximum number of tokens the LLM should generate for the summary.
 
     Returns:
         str: A string containing the contextual summary. Returns an error message string
@@ -74,24 +76,24 @@ def generate_previous_chapter_summary(
     messages: List[Dict[str, Any]] = [
         interface.build_system_query(
             Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # Guide LLM to be a good summarizer/analyst
+        ),
         interface.build_user_query(formatted_prompt),
     ]
 
     try:
-        # MODEL_CHAPTER_CONTEXT_SUMMARIZER should be efficient but good at summarization.
         response_messages = interface.safe_generate_text(
             logger,
             messages,
             Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER,
-            min_word_count=50,  # A summary should be reasonably detailed but concise.
+            min_word_count=50,
+            max_tokens=max_tokens,
         )
 
         context_summary: str = interface.get_last_message_text(response_messages)
 
         if (
             not context_summary or "Error:" in context_summary
-        ):  # Check for errors from safe_generate_text or LLM
+        ):
             logger.Log(
                 f"LLM failed to generate a valid context summary for Chapter {chapter_number_of_completed_chapter}.",
                 6,
@@ -117,6 +119,7 @@ def generate_previous_scene_summary(
     logger: Logger,
     completed_scene_text: str,
     completed_scene_outline: Dict[str, Any],
+    max_tokens: Optional[int] = None,
 ) -> str:
     """
     Generates a very brief contextual summary of a completed scene, focusing on
@@ -128,6 +131,7 @@ def generate_previous_scene_summary(
         completed_scene_text (str): The full text of the scene that was just finished.
         completed_scene_outline (Dict[str, Any]): The detailed outline object/dictionary
                                                   for the scene that was just completed.
+        max_tokens (Optional[int]): Maximum number of tokens the LLM should generate for the summary.
 
     Returns:
         str: A short string containing the contextual summary for the next scene.
@@ -145,24 +149,13 @@ def generate_previous_scene_summary(
         )
         return "Scene Context Error: Previous scene text was empty."
 
-    # Option 1: Non-LLM based extraction (Simpler, faster, less nuanced)
-    # This could involve taking the last N sentences or looking for keywords from the scene_outline's "Transition_Out_Hook".
-    # Example non-LLM approach:
-    # last_sentences = " ".join(completed_scene_text.split('.')[-3:]) # very naive last few sentences
-    # transition_hook_info = completed_scene_outline.get("transition_out_hook", "Scene concluded.")
-    # simple_summary = f"The scene '{scene_title}' just ended. Key concluding elements: {transition_hook_info}. Last few words: \"...{last_sentences[-100:]}\"."
-    # logger.Log(f"Non-LLM previous scene summary for '{scene_title}' generated.", 2)
-    # return simple_summary
-
-    # Option 2: LLM-based (More nuanced but slower and costs tokens)
     try:
         prompt_template = Prompts.OPTIMIZED_PREVIOUS_SCENE_SUMMARY_FOR_CONTEXT
-        # Convert dict to string for the prompt if necessary, or format it nicely
         formatted_prompt = prompt_template.format(
             _CompletedSceneText=completed_scene_text,
             _CurrentSceneOutline=json.dumps(
                 completed_scene_outline, indent=2
-            ),  # Pass outline as JSON string
+            ),
         )
     except KeyError as e:
         logger.Log(
@@ -182,17 +175,17 @@ def generate_previous_scene_summary(
     messages: List[Dict[str, Any]] = [
         interface.build_system_query(
             Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # Could be a more specialized "summarizer" persona
+        ),
         interface.build_user_query(formatted_prompt),
     ]
 
     try:
-        # Use a fast and efficient model for this very short summary. EVAL_MODEL might be suitable.
         response_messages = interface.safe_generate_text(
             logger,
             messages,
-            Config.EVAL_MODEL,  # Or a specific MODEL_SCENE_CONTEXT_SUMMARIZER
-            min_word_count=10,  # Expect a very short summary
+            Config.EVAL_MODEL,
+            min_word_count=10,
+            max_tokens=max_tokens,
         )
 
         scene_context_summary: str = interface.get_last_message_text(response_messages)
@@ -220,87 +213,3 @@ def generate_previous_scene_summary(
         return (
             f"Scene Context Error: Unexpected critical error for '{scene_title}' - {e}."
         )
-
-
-# Example usage (typically called from ChapterGenerator.py)
-if __name__ == "__main__":
-    # This is for testing purposes only.
-    class MockLogger:
-        def Log(self, item: str, level: int, stream: bool = False):
-            print(f"LOG L{level}: {item}")
-
-        def save_langchain_interaction(self, label: str, messages: list):
-            print(f"LANGCHAIN_SAVE: {label}")
-
-    class MockInterface:
-        def build_system_query(self, q: str):
-            return {"role": "system", "content": q}
-
-        def build_user_query(self, q: str):
-            return {"role": "user", "content": q}
-
-        def get_last_message_text(self, msgs):
-            return msgs[-1]["content"] if msgs else ""
-
-        def safe_generate_text(self, l, m, mo, min_word_count):
-            print(
-                f"Mock LLM Call to {mo} with min_words {min_word_count} for context summary."
-            )
-            if "OPTIMIZED_PREVIOUS_CHAPTER_SUMMARY_FOR_CONTEXT" in m[-1]["content"]:
-                return [
-                    *m,
-                    {
-                        "role": "assistant",
-                        "content": "Chapter Summary: The hero found the map and decided to go north.",
-                    },
-                ]
-            if "OPTIMIZED_PREVIOUS_SCENE_SUMMARY_FOR_CONTEXT" in m[-1]["content"]:
-                return [
-                    *m,
-                    {
-                        "role": "assistant",
-                        "content": "Scene Summary: Alice picked up the red key.",
-                    },
-                ]
-            return [*m, {"role": "assistant", "content": "Mocked summary."}]
-
-    mock_logger = MockLogger()
-    mock_interface = MockInterface()
-
-    Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER = "mock_chapter_summarizer_model"
-    Config.EVAL_MODEL = "mock_scene_summarizer_model"  # Used for scene summary
-    Prompts.DEFAULT_SYSTEM_PROMPT = "You are a summarizer bot for testing."
-
-    print("--- Testing generate_previous_chapter_summary ---")
-    chapter_text = "The long day ended. Sir Reginald, weary from his travels, finally reached the Dragon's Tooth pass. He knew the journey ahead would be perilous. He unsheathed his sword, its polished surface reflecting the dim twilight. 'For the kingdom,' he muttered, and stepped into the shadows."
-    overall_outline_sample = (
-        "Chapter 1: Intro. Chapter 2: The Pass. Chapter 3: The Lair."
-    )
-    chapter_summary = generate_previous_chapter_summary(
-        mock_interface, mock_logger, chapter_text, overall_outline_sample, 1
-    )
-    print(f"Chapter Summary Result:\n{chapter_summary}\n")
-
-    print("--- Testing generate_previous_scene_summary ---")
-    scene_text = "Alice entered the dusty room. A single red key glinted on the table. She picked it up, a sense of foreboding washing over her. The door creaked behind her."
-    scene_outline_sample = {
-        "scene_title": "The Red Key",
-        "key_events_actions": ["Alice finds red key"],
-        "transition_out_hook": "Alice feels uneasy as she holds the key.",
-    }
-    scene_summary = generate_previous_scene_summary(
-        mock_interface, mock_logger, scene_text, scene_outline_sample
-    )
-    print(f"Scene Summary Result:\n{scene_summary}\n")
-
-    print("--- Test with empty chapter text ---")
-    empty_chapter_summary = generate_previous_chapter_summary(
-        mock_interface, mock_logger, "", overall_outline_sample, 2
-    )
-    print(f"Empty Chapter Summary Result:\n{empty_chapter_summary}\n")
-
-    print("--- Test with empty scene text ---")
-    empty_scene_summary = generate_previous_scene_summary(
-        mock_interface, mock_logger, "", scene_outline_sample
-    )
-    print(f"Empty Scene Summary Result:\n{empty_scene_summary}\n")

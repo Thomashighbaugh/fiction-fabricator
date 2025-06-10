@@ -2,7 +2,7 @@
 # Purpose: Central configuration for models, API keys, and generation parameters.
 
 """
-Central configuration module for the AIStoryWriter.
+Central configuration module for the FictionFabricator.
 
 This module defines default values for various settings, including:
 - LLM model identifiers for different generation tasks.
@@ -20,24 +20,24 @@ These default values can be overridden by command-line arguments at runtime.
 # or "provider://model_identifier" (host/params optional or provider-specific)
 
 # Core Creative Models
-INITIAL_OUTLINE_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF"
-MODEL_STORY_ELEMENTS_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For generating detailed story elements
-MODEL_SCENE_OUTLINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For breaking chapters into scene outlines
-MODEL_SCENE_NARRATIVE_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For writing individual scene narratives
-MODEL_CHAPTER_ASSEMBLY_REFINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For refining assembled scenes into a cohesive chapter
+INITIAL_OUTLINE_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest"
+MODEL_STORY_ELEMENTS_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For generating detailed story elements
+MODEL_SCENE_OUTLINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For breaking chapters into scene outlines
+MODEL_SCENE_NARRATIVE_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For writing individual scene narratives
+MODEL_CHAPTER_ASSEMBLY_REFINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For refining assembled scenes into a cohesive chapter
 
 # Supporting and Utility Models
-MODEL_CHAPTER_CONTEXT_SUMMARIZER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For summarizing previous chapter/scene for context
-REVISION_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For providing critique/feedback
-CHAPTER_REVISION_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For revising chapters based on feedback
-EVAL_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For evaluation tasks (e.g., IsComplete checks, JSON ratings)
-INFO_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For extracting story metadata (title, summary, tags)
-SCRUB_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For cleaning final output
-CHECKER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" # For JSON parsing checks or simple validations
-TRANSLATOR_MODEL: str = "huggingface.co/DavidAU/DeepSeek-MOE-4X8B-R1-Distill-Llama-3.1-Deep-Thinker-Uncensored-24B-GGUF:latest " # For translation tasks
+MODEL_CHAPTER_CONTEXT_SUMMARIZER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For summarizing previous chapter/scene for context
+REVISION_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For providing critique/feedback
+CHAPTER_REVISION_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For revising chapters based on feedback
+EVAL_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For evaluation tasks (e.g., IsComplete checks, JSON ratings)
+INFO_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For extracting story metadata (title, summary, tags)
+SCRUB_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For cleaning final output
+CHECKER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For JSON parsing checks or simple validations
+TRANSLATOR_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For translation tasks
 
 # --- API and System Settings ---
-OLLAMA_CTX: int = 16384  # Default context window size for Ollama models
+OLLAMA_CTX: int = 32768  # Default context window size for Ollama models Default model lists 131072 but went with 32k for now, adjust based on context_length running `ollama show [model name]`
 OLLAMA_HOST: str = "http://localhost:11434" # Default Ollama host URL
 
 # API keys should ideally be loaded from environment variables (.env file)
@@ -54,7 +54,7 @@ TRANSLATE_PROMPT_LANGUAGE: str = ""  # Target language for initial user prompt t
 
 # Outline revision settings
 OUTLINE_MIN_REVISIONS: int = 1  # Minimum number of revision cycles for the main outline
-OUTLINE_MAX_REVISIONS: int = 5  # Maximum number of revision cycles for the main outline
+OUTLINE_MAX_REVISIONS: int = 3  # Maximum number of revision cycles for the main outline
 
 # Chapter/Scene revision settings
 CHAPTER_NO_REVISIONS: bool = False  # If True, skips feedback/revision loops for assembled chapters
@@ -63,8 +63,8 @@ CHAPTER_MAX_REVISIONS: int = 3  # Maximum revision cycles for an assembled chapt
 
 # Scene-specific generation parameters
 SCENE_NARRATIVE_MIN_WORDS: int = 350  # Minimum expected word count for a single generated scene narrative
-SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER: int = 5 # Minimum scenes expected from the scene outliner per chapter
-SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS: int = 3 # Max attempts to generate scene outlines if initial fails
+SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER: int = 4 # Minimum scenes expected from the scene outliner per chapter
+SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS: int = 5 # Max attempts to generate scene outlines if initial fails
 
 # --- Feature Flags ---
 SCRUB_NO_SCRUB: bool = False  # If True, skips the final scrubbing pass
@@ -86,3 +86,4 @@ DEBUG_LEVEL: int = 0 # 0: Normal, 1: Basic Debug, 2: Detailed Debug (e.g. stream
 # These are placeholders to indicate that Write.py will manage overriding the above defaults.
 # For example, ARGS_INITIAL_OUTLINE_WRITER_MODEL: Optional[str] = None
 # Actual update logic is in Write.py
+# --- API and System Settings ---

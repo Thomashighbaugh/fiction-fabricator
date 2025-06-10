@@ -16,9 +16,13 @@ via the `Interface` class. JSON parsing is handled for structured responses.
 
 import json
 import Writer.Config as Config
-import Writer.PrintUtils  # For Logger type hint
+import Writer.PrintUtils
 import Writer.Prompts
 from Writer.Interface.Wrapper import Interface
+import Writer.Models as Models
+
+# Heuristic: 1 word is approx 1.5 tokens in English, but can vary.
+WORD_TO_TOKEN_RATIO = 1.5
 
 
 class LLMEditorError(Exception):
@@ -43,20 +47,24 @@ def GetFeedbackOnOutline(
     """
     logger.Log("Prompting LLM To Critique Outline", 5)
 
-    # Use the optimized prompt for the user query
     user_prompt_text: str = Writer.Prompts.OPTIMIZED_CRITIC_OUTLINE_PROMPT.format(
         _Outline=outline_text
     )
 
     messages = [
-        interface.build_system_query(
-            Writer.Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # General expert persona
+        interface.build_system_query(Writer.Prompts.DEFAULT_SYSTEM_PROMPT),
         interface.build_user_query(user_prompt_text),
     ]
 
+    # A critique should be concise, 500 words is a generous limit.
+    max_tokens_for_feedback = int(500 * WORD_TO_TOKEN_RATIO)
+
     response_messages = interface.safe_generate_text(
-        logger, messages, Config.REVISION_MODEL, min_word_count=70
+        logger,
+        messages,
+        Config.REVISION_MODEL,
+        min_word_count=70,
+        max_tokens=max_tokens_for_feedback,
     )
     logger.Log("Finished Getting Outline Feedback", 5)
     return interface.get_last_message_text(response_messages)
@@ -79,22 +87,14 @@ def GetOutlineRating(
     """
     logger.Log("Prompting LLM To Get Outline Review JSON", 5)
 
-    # The OUTLINE_COMPLETE_PROMPT is the user query content
     user_prompt_text: str = Writer.Prompts.OUTLINE_COMPLETE_PROMPT.format(
         _Outline=outline_text
     )
 
-    # System prompt to guide JSON output and role
     system_prompt_text: str = (
         "You are an AI assistant that evaluates story outlines and responds strictly in JSON format "
         "as per the user's instructions."
     )
-    if (
-        hasattr(Writer.Prompts, "OUTLINE_COMPLETE_INTRO")
-        and Writer.Prompts.OUTLINE_COMPLETE_INTRO
-    ):
-        # If an INTRO prompt exists, it's likely meant as the system prompt
-        system_prompt_text = Writer.Prompts.OUTLINE_COMPLETE_INTRO
 
     messages = [
         interface.build_system_query(system_prompt_text),
@@ -102,10 +102,27 @@ def GetOutlineRating(
     ]
 
     try:
-        _response_messages, parsed_json = interface.safe_generate_json(
-            logger, messages, Config.EVAL_MODEL, required_attribs=["IsComplete"]
+        # Expected output is a tiny JSON object.
+        max_tokens_for_rating = 50
+
+        _response_messages, parsed_json_data = interface.safe_generate_json(
+            logger,
+            messages,
+            Config.EVAL_MODEL,
+            required_attribs=["IsComplete"],
+            max_tokens=max_tokens_for_rating,
+            expected_response_model=Models.IsComplete,
         )
-        is_complete = parsed_json.get("IsComplete", False)
+
+        if isinstance(parsed_json_data, dict):
+            is_complete = parsed_json_data.get("IsComplete", False)
+        else:
+            logger.Log(
+                f"LLM returned an unexpected type for outline rating: {type(parsed_json_data)}. Expected dict. Defaulting to False.",
+                6,
+            )
+            is_complete = False
+
         if not isinstance(is_complete, bool):
             logger.Log(
                 f"LLM returned non-boolean for IsComplete: {is_complete}. Defaulting to False.",
@@ -141,21 +158,25 @@ def GetFeedbackOnChapter(
     """
     logger.Log("Prompting LLM To Critique Chapter", 5)
 
-    # OPTIMIZED_CRITIC_CHAPTER_PROMPT is the user query content
     user_prompt_text: str = Writer.Prompts.OPTIMIZED_CRITIC_CHAPTER_PROMPT.format(
-        _ChapterText=chapter_text,  # Corrected placeholder from _Chapter to _ChapterText
+        _ChapterText=chapter_text,
         _OverallStoryOutline=overall_story_outline,
     )
 
     messages_for_llm = [
-        interface.build_system_query(
-            Writer.Prompts.DEFAULT_SYSTEM_PROMPT
-        ),  # General expert persona
+        interface.build_system_query(Writer.Prompts.DEFAULT_SYSTEM_PROMPT),
         interface.build_user_query(user_prompt_text),
     ]
 
+    # A critique should be concise, 500 words is a generous limit.
+    max_tokens_for_feedback = int(500 * WORD_TO_TOKEN_RATIO)
+
     response_messages = interface.safe_generate_text(
-        logger, messages_for_llm, Config.REVISION_MODEL, min_word_count=100
+        logger,
+        messages_for_llm,
+        Config.REVISION_MODEL,
+        min_word_count=100,
+        max_tokens=max_tokens_for_feedback,
     )
     logger.Log("Finished Getting Chapter Feedback", 5)
     return interface.get_last_message_text(response_messages)
@@ -186,11 +207,6 @@ def GetChapterRating(
         "You are an AI assistant that evaluates story chapters and responds strictly in JSON format "
         "as per the user's instructions."
     )
-    if (
-        hasattr(Writer.Prompts, "CHAPTER_COMPLETE_INTRO")
-        and Writer.Prompts.CHAPTER_COMPLETE_INTRO
-    ):
-        system_prompt_text = Writer.Prompts.CHAPTER_COMPLETE_INTRO
 
     messages = [
         interface.build_system_query(system_prompt_text),
@@ -198,10 +214,27 @@ def GetChapterRating(
     ]
 
     try:
-        _response_messages, parsed_json = interface.safe_generate_json(
-            logger, messages, Config.EVAL_MODEL, required_attribs=["IsComplete"]
+        # Expected output is a tiny JSON object.
+        max_tokens_for_rating = 50
+
+        _response_messages, parsed_json_data = interface.safe_generate_json(
+            logger,
+            messages,
+            Config.EVAL_MODEL,
+            required_attribs=["IsComplete"],
+            max_tokens=max_tokens_for_rating,
+            expected_response_model=Models.IsComplete,
         )
-        is_complete = parsed_json.get("IsComplete", False)
+
+        if isinstance(parsed_json_data, dict):
+            is_complete = parsed_json_data.get("IsComplete", False)
+        else:
+            logger.Log(
+                f"LLM returned an unexpected type for chapter rating: {type(parsed_json_data)}. Expected dict. Defaulting to False.",
+                6,
+            )
+            is_complete = False
+
         if not isinstance(is_complete, bool):
             logger.Log(
                 f"LLM returned non-boolean for IsComplete: {is_complete}. Defaulting to False.",

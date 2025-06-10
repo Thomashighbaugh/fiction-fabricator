@@ -1,4 +1,4 @@
-# File: write.py (Renamed from Write.py for convention)
+# File: Write.py
 # Purpose: Main orchestrator for the AI Story Writer application.
 
 """
@@ -18,7 +18,7 @@ import os
 import json
 import sys
 import re
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, Union
 
 # Ensure the Writer package is discoverable.
 try:
@@ -35,7 +35,7 @@ try:
     import Writer.NovelEditor as NovelEditor
     import Writer.Translator as Translator
     import Writer.Prompts as Prompts
-    import Writer.Scene.SceneOutliner as SceneOutliner  # Needed for explicit scene generation for logging
+    import Writer.Scene.SceneOutliner as SceneOutliner
 except ImportError as e:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = current_dir
@@ -250,22 +250,12 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def apply_config_from_args(args: argparse.Namespace, logger: PrintUtils.Logger) -> None:
-    """
-    Applies parsed command-line arguments to the global Config module.
-    This ensures that settings provided via CLI override the defaults in Config.py.
-    """
+    """Applies parsed command-line arguments to the global Config module."""
     logger.Log("Applying command-line arguments to configuration...", 0)
     for arg_name, arg_value in vars(args).items():
         config_attr_name = arg_name.upper()
-        if hasattr(Config, config_attr_name):
-            current_config_val = getattr(Config, config_attr_name)
-            if current_config_val != arg_value:
-                logger.Log(
-                    f"Config: '{config_attr_name}' changing from '{current_config_val}' to '{arg_value}' via CLI.",
-                    0,
-                )
-            setattr(Config, config_attr_name, arg_value)
-        elif arg_name == "NoChapterRevision":
+        # Handle special flag cases
+        if arg_name == "NoChapterRevision":
             Config.CHAPTER_NO_REVISIONS = arg_value
         elif arg_name == "NoScrubChapters":
             Config.SCRUB_NO_SCRUB = arg_value
@@ -273,7 +263,14 @@ def apply_config_from_args(args: argparse.Namespace, logger: PrintUtils.Logger) 
             Config.ENABLE_FINAL_EDIT_PASS = arg_value
         elif arg_name == "Debug":
             Config.DEBUG = arg_value
-    Config.SCENE_GENERATION_PIPELINE = True
+        # For all other args, map directly to Config attributes
+        elif hasattr(Config, config_attr_name):
+            current_config_val = getattr(Config, config_attr_name)
+            if current_config_val != arg_value:
+                logger.Log(f"Config: '{config_attr_name}' changing from '{current_config_val}' to '{arg_value}'.", 0)
+            setattr(Config, config_attr_name, arg_value)
+    
+    Config.SCENE_GENERATION_PIPELINE = True # This is the primary mode of operation now
     logger.Log("Configuration updated from command-line arguments.", 0)
 
 
@@ -526,7 +523,7 @@ def _log_generated_scenes_to_plot_file(
                 setting = scene_dict.get("setting_description", "N/A")
                 events = scene_dict.get("key_events_actions", ["N/A"])
                 events_str = (
-                    "; ".join(events) if isinstance(events, list) else str(events)
+                    "; ".join(map(str, events)) if isinstance(events, list) else str(events)
                 )
 
                 f_plot_log.write(
@@ -538,7 +535,7 @@ def _log_generated_scenes_to_plot_file(
             f_plot_log.write("--- END GENERATED SCENE OUTLINES ---\n")
     except IOError as e:
         logger.Log(f"Error appending scene outlines to {plot_segment_filepath}: {e}", 7)
-    except Exception as e:  # Catch any other unexpected error during file write
+    except Exception as e:
         logger.Log(
             f"Unexpected error appending scene outlines to {plot_segment_filepath}: {e}",
             7,
@@ -548,35 +545,21 @@ def _log_generated_scenes_to_plot_file(
 def main() -> None:
     """Main function to orchestrate the story generation process."""
     args = parse_arguments()
-
     logger = PrintUtils.Logger(log_dir_base="Logs")
     logger.Log("AIStoryWriter Refactored - Initialization Started.", 0)
     apply_config_from_args(args, logger)
-
     start_time_total = time.time()
 
-    models_to_load = list(
-        set(
-            [
-                Config.INITIAL_OUTLINE_WRITER_MODEL,
-                Config.MODEL_STORY_ELEMENTS_GENERATOR,
-                Config.MODEL_SCENE_OUTLINER,
-                Config.MODEL_SCENE_NARRATIVE_GENERATOR,
-                Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER,
-                Config.MODEL_CHAPTER_ASSEMBLY_REFINER,
-                Config.CHAPTER_REVISION_WRITER_MODEL,
-                Config.REVISION_MODEL,
-                Config.EVAL_MODEL,
-                Config.INFO_MODEL,
-                Config.SCRUB_MODEL,
-                Config.CHECKER_MODEL,
-                Config.TRANSLATOR_MODEL,
-            ]
-        )
-    )
+    models_to_load = list(set([
+        Config.INITIAL_OUTLINE_WRITER_MODEL, Config.MODEL_STORY_ELEMENTS_GENERATOR,
+        Config.MODEL_SCENE_OUTLINER, Config.MODEL_SCENE_NARRATIVE_GENERATOR,
+        Config.MODEL_CHAPTER_CONTEXT_SUMMARIZER, Config.MODEL_CHAPTER_ASSEMBLY_REFINER,
+        Config.CHAPTER_REVISION_WRITER_MODEL, Config.REVISION_MODEL, Config.EVAL_MODEL,
+        Config.INFO_MODEL, Config.SCRUB_MODEL, Config.CHECKER_MODEL, Config.TRANSLATOR_MODEL,
+    ]))
 
     try:
-        interface = Wrapper.Interface(models_to_load=models_to_load)
+        interface = Wrapper.Interface(logger=logger, models_to_load=models_to_load)
         logger.Log("LLM Interface initialized with specified models.", 1)
     except Exception as e:
         logger.Log(f"CRITICAL: Failed to initialize LLM Interface: {e}. Aborting.", 7)
@@ -588,7 +571,7 @@ def main() -> None:
         logger.Log("Exiting due to prompt loading error.", 7)
         logger.close()
         return
-
+    
     original_user_prompt_for_log = user_prompt_text
 
     if Config.TRANSLATE_PROMPT_LANGUAGE:
@@ -611,16 +594,12 @@ def main() -> None:
 
     logger.Log("Phase 1: Generating Story Outline...", 1)
     (
-        full_printable_outline,
-        story_elements_md,
-        chapter_level_plot_outline,
-        base_story_context_instructions,
+        full_printable_outline, story_elements_md,
+        chapter_level_plot_outline, base_story_context_instructions
     ) = OutlineGenerator.generate_outline(interface, logger, user_prompt_text)
 
     if "Error:" in chapter_level_plot_outline:
-        logger.Log(
-            f"Outline generation failed: {chapter_level_plot_outline}. Aborting.", 7
-        )
+        logger.Log(f"Outline generation failed: {chapter_level_plot_outline}. Aborting.", 7)
         logger.save_artifact(full_printable_outline, "Errored_Outline.md")
         logger.close()
         return
@@ -628,14 +607,9 @@ def main() -> None:
     logger.save_artifact(chapter_level_plot_outline, "2_ChapterLevelOutline_Raw.md")
 
     logger.Log("Phase 2: Determining Number of Chapters...", 1)
-    num_chapters = ChapterDetector.llm_count_chapters(
-        interface, logger, chapter_level_plot_outline
-    )
+    num_chapters = ChapterDetector.llm_count_chapters(interface, logger, chapter_level_plot_outline)
     if num_chapters <= 0:
-        logger.Log(
-            f"Could not determine a valid number of chapters (detected: {num_chapters}). Aborting.",
-            7,
-        )
+        logger.Log(f"Could not determine a valid number of chapters (detected: {num_chapters}). Aborting.", 7)
         logger.save_artifact(
             full_printable_outline, "3_FullPrintableOutline_PreChapterDetectionError.md"
         )
@@ -656,189 +630,79 @@ def main() -> None:
 
     for i in range(num_chapters):
         current_chapter_num = i + 1
-        logger.Log(
-            f"--- Generating Chapter {current_chapter_num}/{num_chapters} ---", 2
-        )
-
-        current_chapter_specific_plot_from_split = per_chapter_plot_outlines[i]
-        plot_segment_filename = f"2a_Chapter_{current_chapter_num}_PlotSegment.txt"
-        plot_segment_filepath = os.path.join(
-            logger.log_session_dir, plot_segment_filename
-        )
-
-        effective_plot_for_generator = current_chapter_specific_plot_from_split
-        is_plot_problematic = (
-            not current_chapter_specific_plot_from_split.strip()
-            or "Plot segment missing" in current_chapter_specific_plot_from_split
-            or "Error: Crude split" in current_chapter_specific_plot_from_split
-            or "not clearly delineated by LLM"
-            in current_chapter_specific_plot_from_split
-        )
-
-        if is_plot_problematic:
-            logger.Log(
-                f"Plot for Chapter {current_chapter_num} is problematic: '{current_chapter_specific_plot_from_split}'. "
-                "Generating a fallback plot string.",
-                6,
+        logger.Log(f"--- Generating Chapter {current_chapter_num}/{num_chapters} ---", 2)
+        
+        plot_segment_filepath = os.path.join(logger.log_session_dir, f"2a_Chapter_{current_chapter_num}_PlotSegment.txt")
+        effective_plot_for_generator = per_chapter_plot_outlines[i]
+        if not effective_plot_for_generator.strip() or "Plot segment missing" in effective_plot_for_generator:
+            logger.Log(f"Plot for Chapter {current_chapter_num} is problematic. Generating fallback.", 6)
+            effective_plot_for_generator = _generate_fallback_plot_string_for_chapter(
+                interface, logger, current_chapter_num, num_chapters, chapter_level_plot_outline, base_story_context_instructions
             )
-            fallback_plot_str = _generate_fallback_plot_string_for_chapter(
-                interface,
-                logger,
-                current_chapter_num,
-                num_chapters,
-                chapter_level_plot_outline,
-                base_story_context_instructions,
-            )
-            if fallback_plot_str and "Error:" not in fallback_plot_str:
-                effective_plot_for_generator = fallback_plot_str
-                try:
-                    with open(
-                        plot_segment_filepath, "a", encoding="utf-8"
-                    ) as f_plot_log:
-                        f_plot_log.write(
-                            "\n\n--- FALLBACK CHAPTER PLOT GENERATED ---\n"
-                        )
-                        f_plot_log.write(effective_plot_for_generator)
-                        f_plot_log.write("\n--- END FALLBACK CHAPTER PLOT ---\n\n")
-                except IOError as e:
-                    logger.Log(
-                        f"Error appending fallback plot to {plot_segment_filepath}: {e}",
-                        7,
-                    )
-            else:
-                logger.Log(
-                    f"Failed to generate fallback plot for Chapter {current_chapter_num}. Using original problematic plot.",
-                    7,
-                )
 
-        logger.Log(
-            f"Preparing to generate scenes for Chapter {current_chapter_num} using plot segment: '{effective_plot_for_generator[:200].replace('\n', ' ')}...'",
-            3,
+        generated_chapter_text, scene_outlines_used = ChapterGenerator.generate_chapter_by_scenes(
+            interface, logger, current_chapter_num, num_chapters, chapter_level_plot_outline,
+            effective_plot_for_generator, previous_chapter_context_summary, base_story_context_instructions
         )
+        all_generated_scene_outlines_for_json_log.append(scene_outlines_used)
+        _log_generated_scenes_to_plot_file(logger, scene_outlines_used, plot_segment_filepath)
 
-        generated_chapter_text, scene_outlines_used_for_chapter = (
-            ChapterGenerator.generate_chapter_by_scenes(
-                interface,
-                logger,
-                current_chapter_num,
-                num_chapters,
-                chapter_level_plot_outline,
-                effective_plot_for_generator,
-                previous_chapter_context_summary,
-                base_story_context_instructions,
-            )
-        )
-        all_generated_scene_outlines_for_json_log.append(
-            scene_outlines_used_for_chapter
-        )
-        _log_generated_scenes_to_plot_file(
-            logger, scene_outlines_used_for_chapter, plot_segment_filepath
-        )
-
-        final_formatted_chapter_text = (
-            f"## Chapter {current_chapter_num}\n\n{generated_chapter_text}"
-        )
+        final_formatted_chapter_text = f"## Chapter {current_chapter_num}\n\n{generated_chapter_text}"
         generated_chapters_list.append(final_formatted_chapter_text)
-        logger.save_artifact(
-            final_formatted_chapter_text,
-            f"3_Chapter_{current_chapter_num}_Generated.md",
-        )
+        logger.save_artifact(final_formatted_chapter_text, f"3_Chapter_{current_chapter_num}_Generated.md")
 
-        if "Error:" in generated_chapter_text:
-            logger.Log(
-                f"Chapter {current_chapter_num} generation resulted in an error placeholder.",
-                6,
+        if "Error:" not in generated_chapter_text and current_chapter_num < num_chapters:
+            previous_chapter_context_summary = ChapterContext.generate_previous_chapter_summary(
+                interface, logger, generated_chapter_text, chapter_level_plot_outline, current_chapter_num
             )
-            previous_chapter_context_summary = (
-                f"Context after Chapter {current_chapter_num} (which had errors): "
-                "The story should proceed according to the overall outline."
-            )
-        elif current_chapter_num < num_chapters:
-            logger.Log(
-                f"Generating context summary for end of Chapter {current_chapter_num}...",
-                3,
-            )
-            previous_chapter_context_summary = (
-                ChapterContext.generate_previous_chapter_summary(
-                    interface,
-                    logger,
-                    generated_chapter_text,
-                    chapter_level_plot_outline,
-                    current_chapter_num,
-                )
-            )
-            if "Error:" in previous_chapter_context_summary:
-                logger.Log(
-                    f"Failed to generate context summary for Chapter {current_chapter_num}. Next chapter's context may be weak.",
-                    6,
-                )
-                previous_chapter_context_summary = (
-                    f"The story should proceed to Chapter {current_chapter_num + 1} as per the main outline. "
-                    f"Chapter {current_chapter_num} involved: {effective_plot_for_generator[:100]}..."
-                )
 
-    globally_edited_chapters = list(generated_chapters_list)
-    if Config.ENABLE_FINAL_EDIT_PASS and num_chapters > 0:
+    # --- Post-generation processing chain ---
+    chapters_after_assembly = list(generated_chapters_list)
+
+    # Phase 4: Global Edit (Optional)
+    if Config.ENABLE_FINAL_EDIT_PASS:
         logger.Log("Phase 4: Performing Optional Global Novel Editing Pass...", 1)
-        globally_edited_chapters = NovelEditor.edit_novel_globally(
-            interface, logger, generated_chapters_list, chapter_level_plot_outline
-        )
+        globally_edited_chapters = NovelEditor.edit_novel_globally(interface, logger, chapters_after_assembly, chapter_level_plot_outline)
         for i, chap_text in enumerate(globally_edited_chapters):
             logger.save_artifact(chap_text, f"4_Chapter_{i+1}_GloballyEdited.md")
     else:
         logger.Log("Skipping optional global novel editing pass.", 1)
+        globally_edited_chapters = list(chapters_after_assembly)
 
-    scrubbed_chapters = list(globally_edited_chapters)
-    if not Config.SCRUB_NO_SCRUB and num_chapters > 0:
+    # Phase 5: Scrubbing (Optional)
+    if not Config.SCRUB_NO_SCRUB:
         logger.Log("Phase 5: Scrubbing Final Novel Text...", 1)
-        scrubbed_chapters = Scrubber.scrub_novel_chapters(
-            interface, logger, globally_edited_chapters
-        )
+        scrubbed_chapters = Scrubber.scrub_novel_chapters(interface, logger, globally_edited_chapters)
         for i, chap_text in enumerate(scrubbed_chapters):
             logger.save_artifact(chap_text, f"5_Chapter_{i+1}_Scrubbed.md")
     else:
         logger.Log("Skipping novel scrubbing pass.", 1)
+        scrubbed_chapters = list(globally_edited_chapters)
 
-    final_chapters_for_output = list(scrubbed_chapters)
-    if Config.TRANSLATE_LANGUAGE and num_chapters > 0:
+    # Phase 6: Translation (Optional)
+    if Config.TRANSLATE_LANGUAGE:
         logger.Log(f"Phase 6: Translating Novel to '{Config.TRANSLATE_LANGUAGE}'...", 1)
-        final_chapters_for_output = Translator.translate_novel_chapters(
-            interface,
-            logger,
-            scrubbed_chapters,
-            Config.TRANSLATE_LANGUAGE,
-            source_language_of_chapters="English",
-        )
+        final_chapters_for_output = Translator.translate_novel_chapters(interface, logger, scrubbed_chapters, Config.TRANSLATE_LANGUAGE)
         for i, chap_text in enumerate(final_chapters_for_output):
-            logger.save_artifact(
-                chap_text, f"6_Chapter_{i+1}_Translated_{Config.TRANSLATE_LANGUAGE}.md"
-            )
+            logger.save_artifact(chap_text, f"6_Chapter_{i+1}_Translated_{Config.TRANSLATE_LANGUAGE}.md")
     else:
         logger.Log("Skipping novel translation.", 1)
+        final_chapters_for_output = list(scrubbed_chapters)
 
     final_story_body_text = "\n\n\n".join(final_chapters_for_output)
     logger.save_artifact(final_story_body_text, "7_CompleteStory_Body.md")
 
-    logger.Log("Phase 7: Generating Final Story Metadata (Title, Summary, Tags)...", 1)
-    story_info_context_messages = [interface.build_user_query(full_printable_outline)]
-    story_metadata = StoryInfo.get_story_info(
-        interface, logger, story_info_context_messages
-    )
+    logger.Log("Phase 7: Generating Final Story Metadata...", 1)
+    story_metadata = StoryInfo.get_story_info(interface, logger, [interface.build_user_query(full_printable_outline)])
 
-    story_title = story_metadata.get(
-        "Title", f"Untitled_Story_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-    )
+    story_title = story_metadata.get("Title", f"Untitled_Story_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
     story_summary = story_metadata.get("Summary", "Summary not available.")
     story_tags = story_metadata.get("Tags", "No tags available.")
 
     total_words_final = Statistics.get_word_count(final_story_body_text)
     end_time_total = time.time()
     total_generation_time_s = round(end_time_total - start_time_total)
-    words_per_minute = (
-        round(60 * (total_words_final / total_generation_time_s))
-        if total_generation_time_s > 0
-        else 0
-    )
+    words_per_minute = (round(60 * (total_words_final / total_generation_time_s)) if total_generation_time_s > 0 else 0)
 
     logger.Log("--- STORY GENERATION COMPLETE ---", 0)
     logger.Log(f"Title: {story_title}", 0)
@@ -846,10 +710,7 @@ def main() -> None:
     logger.Log(f"Tags: {story_tags}", 0)
     logger.Log(f"Total Chapters: {num_chapters}", 0)
     logger.Log(f"Final Word Count: {total_words_final}", 0)
-    logger.Log(
-        f"Total Generation Time: {total_generation_time_s}s (~{total_generation_time_s/60:.1f} min)",
-        0,
-    )
+    logger.Log(f"Total Generation Time: {total_generation_time_s}s (~{total_generation_time_s/60:.1f} min)", 0)
     logger.Log(f"Approximate WPM: {words_per_minute}", 0)
 
     stats_string = (
@@ -911,30 +772,14 @@ def main() -> None:
         c if c.isalnum() or c in [" ", "_", "-"] else "" for c in story_title
     ).replace(" ", "_")
     if not clean_title_for_filename:
-        clean_title_for_filename = (
-            f"Story_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-        )
+        clean_title_for_filename = f"Story_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    base_filename = (
-        Config.OPTIONAL_OUTPUT_NAME
-        if Config.OPTIONAL_OUTPUT_NAME
-        else os.path.join(output_dir, clean_title_for_filename)
-    )
+    base_filename = Config.OPTIONAL_OUTPUT_NAME if Config.OPTIONAL_OUTPUT_NAME else os.path.join(output_dir, clean_title_for_filename)
 
     md_filepath = f"{base_filename}.md"
     json_filepath = f"{base_filename}_data.json"
 
-    md_subdirectory = None
-    if os.path.isabs(base_filename) or os.path.dirname(base_filename):
-        md_subdirectory = os.path.dirname(base_filename)
-        if not md_subdirectory:
-            md_subdirectory = None
-
-    logger.save_artifact(
-        final_output_markdown,
-        os.path.basename(md_filepath),
-        subdirectory=md_subdirectory,
-    )
+    logger.save_artifact(final_output_markdown, os.path.basename(md_filepath))
 
     story_data_for_json = {
         "title": story_title,
@@ -942,23 +787,17 @@ def main() -> None:
         "tags": story_tags,
         "generation_timestamp_utc": datetime.datetime.utcnow().isoformat(),
         "original_user_prompt": original_user_prompt_for_log,
-        "translated_user_prompt": (
-            user_prompt_text if Config.TRANSLATE_PROMPT_LANGUAGE else None
-        ),
+        "translated_user_prompt": user_prompt_text if Config.TRANSLATE_PROMPT_LANGUAGE else None,
         "base_story_context_instructions": base_story_context_instructions,
         "story_elements_markdown": story_elements_md,
         "chapter_level_plot_outline": chapter_level_plot_outline,
         "per_chapter_plot_segments_used": per_chapter_plot_outlines,
-        "all_generated_scene_outlines": all_generated_scene_outlines_for_json_log,  # Added
+        "all_generated_scene_outlines": all_generated_scene_outlines_for_json_log,
         "num_chapters_generated": num_chapters,
         "config_settings_used": {
-            key: getattr(Config, key)
-            for key in dir(Config)
-            if not key.startswith("__")
-            and not callable(getattr(Config, key))
-            and isinstance(
-                getattr(Config, key), (str, int, float, bool, list, dict, type(None))
-            )
+            key: getattr(Config, key) for key in dir(Config)
+            if not key.startswith("__") and not callable(getattr(Config, key))
+            and isinstance(getattr(Config, key), (str, int, float, bool, list, dict, type(None)))
         },
         "statistics": {
             "final_word_count": total_words_final,
@@ -966,11 +805,9 @@ def main() -> None:
             "words_per_minute": words_per_minute,
         },
         "chapters_initial_assembly": generated_chapters_list,
-        "chapters_globally_edited": (
-            globally_edited_chapters if Config.ENABLE_FINAL_EDIT_PASS else None
-        ),
+        "chapters_globally_edited": globally_edited_chapters if Config.ENABLE_FINAL_EDIT_PASS else None,
         "chapters_scrubbed": scrubbed_chapters if not Config.SCRUB_NO_SCRUB else None,
-        "chapters_final_output": final_chapters_for_output,
+        "chapters_final_output": final_chapters_for_output
     }
     try:
         if os.path.dirname(json_filepath):
@@ -978,11 +815,7 @@ def main() -> None:
         with open(json_filepath, "w", encoding="utf-8") as f_json:
             json.dump(story_data_for_json, f_json, indent=2, ensure_ascii=False)
         logger.Log(f"Detailed story data JSON saved to: {json_filepath}", 1)
-    except (
-        IOError,
-        TypeError,
-        Exception,
-    ) as e:
+    except Exception as e:
         logger.Log(f"Error saving story data JSON to {json_filepath}: {e}", 7)
 
     logger.Log(f"Story generation process complete. Output: {md_filepath}", 0)

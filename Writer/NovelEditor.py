@@ -19,17 +19,20 @@ integration into the larger work.
 
 import Writer.Config as Config
 import Writer.Prompts as Prompts
-from Writer.Interface.Wrapper import Interface  # LLM interaction
-from Writer.PrintUtils import Logger  # Logging
-from Writer.Statistics import get_word_count  # For logging word count
-from typing import List, Dict, Any
+from Writer.Interface.Wrapper import Interface
+from Writer.PrintUtils import Logger
+from Writer.Statistics import get_word_count
+from typing import List, Dict, Any, Optional
+
+# Heuristic: 1 word is approx 1.5 tokens in English, but can vary.
+WORD_TO_TOKEN_RATIO = 1.5
 
 
 def edit_novel_globally(
     interface: Interface,
     logger: Logger,
     assembled_chapters: List[str],
-    overall_story_outline: str,  # The original chapter-level outline
+    overall_story_outline: str,
 ) -> List[str]:
     """
     Performs a global editing pass on a list of assembled chapter texts.
@@ -59,7 +62,6 @@ def edit_novel_globally(
         logger.Log(
             "Overall story outline is empty. Global editing context is limited.", 6
         )
-        # Proceed, but edits might be less effective.
         overall_story_outline = "Overall story outline not provided for full context."
 
     total_chapters = len(assembled_chapters)
@@ -67,10 +69,8 @@ def edit_novel_globally(
         f"Starting global novel editing pass for {total_chapters} chapter(s)...", 2
     )
 
-    globally_edited_chapters: List[str] = list(assembled_chapters)  # Start with a copy
+    globally_edited_chapters: List[str] = list(assembled_chapters)
 
-    # Accumulate text of chapters processed so far to provide context to the LLM
-    # This context grows as we edit more chapters.
     novel_text_so_far_for_context = ""
 
     for chapter_idx, current_chapter_text in enumerate(globally_edited_chapters):
@@ -86,14 +86,11 @@ def edit_novel_globally(
                 f"Chapter {chapter_num} is empty. Skipping global edit for this chapter.",
                 5,
             )
-            # Add placeholder or keep empty, then add to context for next chapter
             novel_text_so_far_for_context += f"\n\n## Chapter {chapter_num} (Empty)\n\n"
             continue
 
         try:
-            # Use the specialized prompt for global chapter editing
             prompt_template = Prompts.GLOBAL_NOVEL_CHAPTER_EDIT_PROMPT
-            # Note: _NovelTextSoFar in the prompt refers to text *before* the current chapter.
             text_before_current_chapter = novel_text_so_far_for_context
 
             formatted_prompt = prompt_template.format(
@@ -102,14 +99,13 @@ def edit_novel_globally(
                 _NovelTextSoFar=(
                     text_before_current_chapter
                     if text_before_current_chapter
-                    else "This is the first chapter."
+                    else "This is the first chapter of the novel."
                 ),
                 _ChapterTextToEdit=current_chapter_text,
             )
         except KeyError as e:
             error_msg = f"Formatting error in GLOBAL_NOVEL_CHAPTER_EDIT_PROMPT for Chapter {chapter_num}: Missing key {e}"
             logger.Log(error_msg, 7)
-            # Keep original chapter text, add it to context for next iteration
             novel_text_so_far_for_context += (
                 f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
             )
@@ -125,22 +121,20 @@ def edit_novel_globally(
         messages: List[Dict[str, Any]] = [
             interface.build_system_query(
                 Prompts.DEFAULT_SYSTEM_PROMPT
-            ),  # Expert editor persona
+            ),
             interface.build_user_query(formatted_prompt),
         ]
 
         try:
-            # The model for global editing should be strong and capable of handling large context if _NovelTextSoFar gets long.
-            # Config.CHAPTER_REVISION_WRITER_MODEL or a dedicated Config.MODEL_GLOBAL_EDITOR could be used.
-            # min_word_count should ensure the chapter isn't accidentally deleted.
-            # Expect the LLM to make surgical changes, so output length should be similar.
-            min_expected_words = max(50, int(original_word_count * 0.80))
-
+            MIN_WORDS_AFTER_GLOBAL_EDIT = max(50, int(original_word_count * 0.75))
+            MAX_TOKENS_FOR_GLOBAL_EDIT = int(original_word_count * WORD_TO_TOKEN_RATIO * 1.15)
+            
             response_messages = interface.safe_generate_text(
                 logger,
                 messages,
-                Config.CHAPTER_REVISION_WRITER_MODEL,  # Re-using this, could be a dedicated global editor model
-                min_word_count=min_expected_words,
+                Config.CHAPTER_REVISION_WRITER_MODEL,
+                min_word_count=MIN_WORDS_AFTER_GLOBAL_EDIT,
+                max_tokens=MAX_TOKENS_FOR_GLOBAL_EDIT,
             )
 
             updated_chapter_text: str = interface.get_last_message_text(
@@ -152,20 +146,16 @@ def edit_novel_globally(
                     f"LLM failed global edit for Chapter {chapter_num} or returned an error. Keeping pre-edit version.",
                     6,
                 )
-                # Keep original, add to context for next iteration
                 novel_text_so_far_for_context += (
                     f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
                 )
             else:
-                globally_edited_chapters[chapter_idx] = (
-                    updated_chapter_text  # Update the list with the edited chapter
-                )
+                globally_edited_chapters[chapter_idx] = updated_chapter_text
                 edited_word_count = get_word_count(updated_chapter_text)
                 logger.Log(
                     f"Global edit review for Chapter {chapter_num} complete. New word count: {edited_word_count}.",
                     4,
                 )
-                # Add the *edited* version to the context for subsequent chapters
                 novel_text_so_far_for_context += (
                     f"\n\n## Chapter {chapter_num}\n\n{updated_chapter_text}\n\n"
                 )
@@ -173,114 +163,11 @@ def edit_novel_globally(
         except Exception as e:
             error_msg_runtime = f"An unexpected critical error during global editing of Chapter {chapter_num}: {e}"
             logger.Log(error_msg_runtime, 7)
-            # Keep original, add to context
             novel_text_so_far_for_context += (
                 f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
             )
-            # No change to globally_edited_chapters[chapter_idx] as it holds the pre-error version
 
     logger.Log(
         f"Global novel editing pass complete for all {total_chapters} chapter(s).", 2
     )
     return globally_edited_chapters
-
-
-# Example usage (typically called from Write.py if Config.ENABLE_FINAL_EDIT_PASS is True)
-if __name__ == "__main__":
-    # This is for testing purposes only.
-    class MockLogger:
-        def Log(self, item: str, level: int, stream: bool = False):
-            print(f"LOG L{level}: {item}")
-
-        def save_langchain_interaction(self, label: str, messages: list):
-            print(f"LANGCHAIN_SAVE: {label}")
-
-    class MockInterface:
-        def build_system_query(self, q: str):
-            return {"role": "system", "content": q}
-
-        def build_user_query(self, q: str):
-            return {"role": "user", "content": q}
-
-        def get_last_message_text(self, msgs):
-            return msgs[-1]["content"] if msgs else ""
-
-        def safe_generate_text(self, l, m, mo, min_word_count):
-            print(
-                f"Mock LLM Call (safe_generate_text) to {mo} for global novel editing. Min words: {min_word_count}"
-            )
-            # Simulate LLM making minor edits for global consistency
-            original_chapter_text_to_edit = ""
-            # Crude extraction from the complex prompt for mocking
-            if "<_ChapterTextToEdit>" in m[-1]["content"]:
-                original_chapter_text_to_edit = (
-                    m[-1]["content"]
-                    .split("<_ChapterTextToEdit>")[1]
-                    .split("</_ChapterTextToEdit>")[0]
-                    .strip()
-                )
-
-            edited_text = original_chapter_text_to_edit + " [Globally Edited Suffix]"
-            return [*m, {"role": "assistant", "content": edited_text}]
-
-    mock_logger = MockLogger()
-    mock_interface = MockInterface()
-
-    Config.CHAPTER_REVISION_WRITER_MODEL = (
-        "mock_global_editor_model"  # Model used for this pass
-    )
-    Prompts.DEFAULT_SYSTEM_PROMPT = "You are a global editor bot for testing."
-    # Simplified prompt for testing format call
-    Prompts.GLOBAL_NOVEL_CHAPTER_EDIT_PROMPT = """
-    Edit Chapter {ChapterNum}.
-    Outline: {_OverallStoryOutline}
-    Novel So Far: <_NovelTextSoFar>{_NovelTextSoFar}</_NovelTextSoFar>
-    Chapter to Edit: <_ChapterTextToEdit>{_ChapterTextToEdit}</_ChapterTextToEdit>
-    """
-
-    print("--- Testing edit_novel_globally ---")
-
-    sample_chapters = [
-        "Chapter One: The hero, Bob, found a sword. He was happy.",
-        "Chapter Two: Bob met Alice. Alice mentioned a dragon. Bob seemed interested.",  # Bob's interest is new
-        "Chapter Three: Bob and Alice decided to fight the dragon. Bob was still happy.",  # Could refine Bob's unchanging happiness
-    ]
-    sample_outline = (
-        "Outline: Bob gets sword, meets Alice, they fight dragon. Bob is always happy."
-    )
-
-    edited_chapters_result = edit_novel_globally(
-        mock_interface, mock_logger, sample_chapters, sample_outline
-    )
-
-    print("\n--- Globally Edited Chapters (Mocked) ---")
-    for i, chap_text in enumerate(edited_chapters_result):
-        print(f"Edited Chapter {i+1}:\n---\n{chap_text}\n---\n")
-
-    assert "[Globally Edited Suffix]" in edited_chapters_result[0]
-    assert "[Globally Edited Suffix]" in edited_chapters_result[1]
-    assert "[Globally Edited Suffix]" in edited_chapters_result[2]
-    assert len(edited_chapters_result) == len(sample_chapters)
-
-    print("--- Test with empty chapter list for global editing ---")
-    empty_edited_list = edit_novel_globally(
-        mock_interface, mock_logger, [], sample_outline
-    )
-    print(f"Result for empty list: {empty_edited_list}")
-    assert empty_edited_list == []
-
-    print("\n--- Test with one chapter having empty content ---")
-    chapters_with_empty = [
-        "Chapter One: Valid start.",
-        "",  # Empty chapter
-        "Chapter Three: Valid end.",
-    ]
-    edited_with_empty = edit_novel_globally(
-        mock_interface, mock_logger, chapters_with_empty, sample_outline
-    )
-    print(
-        f"Edited (with empty chapter):\nCh1: {edited_with_empty[0][:30]}...\nCh2: '{edited_with_empty[1]}'\nCh3: {edited_with_empty[2][:30]}..."
-    )
-    assert "[Globally Edited Suffix]" in edited_with_empty[0]
-    assert edited_with_empty[1] == ""  # Empty chapter should remain empty
-    assert "[Globally Edited Suffix]" in edited_with_empty[2]

@@ -16,11 +16,9 @@ import termcolor
 import datetime
 import os
 import json
-from typing import List, Dict, Any, Optional  # Added Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 
-# Import Config directly to check DEBUG flags if needed within Logger,
-# e.g., for conditional printing of verbose stream chunks.
-import Writer.Config as Config  # Assuming Config.py is in the same Writer package directory
+import Writer.Config as Config
 
 
 class Logger:
@@ -29,14 +27,14 @@ class Logger:
     """
 
     _LOG_LEVEL_COLORS: Dict[int, str] = {
-        0: "white",  # General Info / Startup
-        1: "light_grey",  # Minor Info / Steps # Changed from grey for better visibility on some terminals
-        2: "blue",  # Debug Info
-        3: "cyan",  # Key Process Info
-        4: "magenta",  # Important Milestones
-        5: "green",  # Success / Completion
-        6: "yellow",  # Warnings
-        7: "red",  # Errors / Critical Issues
+        0: "white",
+        1: "light_grey",
+        2: "blue",
+        3: "cyan",
+        4: "magenta",
+        5: "green",
+        6: "yellow",
+        7: "red",
     }
     _DEFAULT_COLOR = "white"
 
@@ -49,8 +47,6 @@ class Logger:
                                 Default is "Logs".
         """
         current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        # Ensure log_dir_base is an absolute path or relative to a known location
-        # For simplicity, assume it's relative to where the script using Logger is run or an absolute path.
         self.log_session_dir = os.path.join(
             os.path.abspath(log_dir_base), f"Generation_{current_timestamp}"
         )
@@ -61,13 +57,12 @@ class Logger:
         self.main_log_path = os.path.join(self.log_session_dir, "Main.log")
 
         try:
-            # Open in append mode, create if not exists, with UTF-8 encoding
             self.log_file_handle = open(self.main_log_path, "a", encoding="utf-8")
         except IOError as e:
             print(
                 f"CRITICAL: Could not open main log file at {self.main_log_path}. Error: {e}"
             )
-            self.log_file_handle = None  # Indicate failure
+            self.log_file_handle = None
 
         self.langchain_interaction_id: int = 0
         self.log_items_buffer: List[str] = []
@@ -85,7 +80,6 @@ class Logger:
 
         Args:
             interaction_label (str): A label for this interaction (e.g., function_name.model_name).
-                                     This will be part of the filename.
             messages (List[Dict[str, Any]]): The list of message dictionaries.
         """
         if not self.log_file_handle:
@@ -96,7 +90,7 @@ class Logger:
 
         safe_label = "".join(
             c if c.isalnum() or c in [".", "_", "-"] else "_" for c in interaction_label
-        )  # Allow hyphens
+        )
         base_filename = f"{self.langchain_interaction_id:03d}_{safe_label}"
         self.langchain_interaction_id += 1
 
@@ -142,9 +136,8 @@ class Logger:
 
         Args:
             content (str): The text content to save.
-            filename (str): The desired filename (e.g., "FinalStory.md", "DetailedOutline.txt").
-            subdirectory (Optional[str]): If specified, saves within this subdirectory
-                                          of the log_session_dir. If None, saves in log_session_dir.
+            filename (str): The desired filename.
+            subdirectory (Optional[str]): Saves within this subdirectory of the log_session_dir.
         """
         if not self.log_file_handle:
             print(
@@ -152,25 +145,17 @@ class Logger:
             )
             return
 
-        # Determine the correct base directory for the artifact
+        save_path_dir = self.log_session_dir
         if subdirectory:
-            # If subdirectory is absolute, use it. Otherwise, join with log_session_dir.
-            if os.path.isabs(subdirectory):
-                save_path_dir = subdirectory
-            else:
-                save_path_dir = os.path.join(self.log_session_dir, subdirectory)
-        else:
-            # If no subdirectory, save directly in the log_session_dir (which should be absolute)
-            save_path_dir = self.log_session_dir
-
-        os.makedirs(save_path_dir, exist_ok=True)  # Ensure directory exists
-
+            save_path_dir = os.path.join(self.log_session_dir, subdirectory)
+        
+        os.makedirs(save_path_dir, exist_ok=True)
         filepath = os.path.join(save_path_dir, filename)
 
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content)
-            self.Log(f"Saved artifact to: {filepath}", 1)  # Log with level 1 for info
+            self.Log(f"Saved artifact to: {filepath}", 1)
         except IOError as e:
             self.Log(
                 f"ERROR: Could not write artifact '{filename}' to '{filepath}'. Error: {e}",
@@ -200,21 +185,17 @@ class Logger:
         color = self._LOG_LEVEL_COLORS.get(safe_level, self._DEFAULT_COLOR)
 
         should_print_to_console = True
-        if stream:
-            if not Config.DEBUG or Config.DEBUG_LEVEL < 2:
-                should_print_to_console = False
+        if stream and (not Config.DEBUG or Config.DEBUG_LEVEL < 2):
+            should_print_to_console = False
 
         if should_print_to_console:
             try:
-                # Use a fixed width for the log level part for better alignment in console
                 level_str = f"[{str(safe_level).ljust(2)}]"
                 timestamp_str = f"[{timestamp}]"
                 colored_level = termcolor.colored(level_str, color)
-                # The rest of the message can use default terminal color or be colored if needed
                 print(f"{colored_level} {timestamp_str} {item}")
             except Exception as e:
                 print(f"Termcolor formatting failed: {e}. Raw log: {log_entry_raw}")
-                print(log_entry_raw)
 
     def close(self) -> None:
         if self.log_file_handle and not self.log_file_handle.closed:

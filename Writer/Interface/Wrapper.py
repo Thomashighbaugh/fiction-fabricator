@@ -21,13 +21,27 @@ import inspect
 import json
 import os
 import time
-
-# import random # No longer used directly
+import re
 import importlib
 import subprocess
 import sys
 from urllib.parse import parse_qs, urlparse
-from typing import List, Dict, Any, Tuple, Optional, Literal
+from typing import List, Dict, Any, Tuple, Optional, Literal, Union, Type
+
+# Import Pydantic models and potential errors
+from pydantic import BaseModel, ValidationError
+
+# Import provider-specific components for type hinting and error handling
+try:
+    import ollama
+    import requests
+except ImportError:
+    # These are only for type-hinting; if not installed, the script will install them dynamically.
+    # Setting them to None or a dummy class prevents static analysis errors in some environments.
+    ollama = None
+    requests = None
+
+
 import Writer.Config as Config
 import Writer.Prompts as Prompts
 
@@ -41,14 +55,16 @@ class Interface:
     Manages connections and interactions with various Large Language Models.
     """
 
-    def __init__(self, models_to_load: List[str] = []):
+    def __init__(self, logger: Optional[Any] = None, models_to_load: List[str] = []):
         """
         Initializes the Interface and loads specified models.
 
         Args:
+            logger (Optional[Any]): The Logger instance for logging messages.
             models_to_load (List[str]): A list of model URI strings to preload.
         """
         self.clients: Dict[str, Any] = {}
+        self.logger = logger
         self.load_models(models_to_load)
 
     def _ensure_package_is_installed(
@@ -59,9 +75,11 @@ class Interface:
         Uses a passed logger if available.
         """
         try:
-            importlib.import_module(package_name)
-            if logger:
-                logger.Log(f"Package '{package_name}' is already installed.", 0)
+            if importlib.util.find_spec(package_name) is not None:
+                if logger:
+                    logger.Log(f"Package '{package_name}' is already installed.", 0)
+            else:
+                raise ImportError
         except ImportError:
             log_msg = f"Package '{package_name}' not found. Attempting installation..."
             if logger:
@@ -78,6 +96,8 @@ class Interface:
                     logger.Log(log_msg_success, 0)
                 else:
                     print(log_msg_success)
+                # After installing, we need to make sure the new module is available
+                importlib.invalidate_caches()
             except subprocess.CalledProcessError as e:
                 log_msg_fail = f"Failed to install package '{package_name}': {e}"
                 if logger:
@@ -88,25 +108,25 @@ class Interface:
                     f"Could not install required package: {package_name}"
                 ) from e
 
-    def load_models(self, model_uris: List[str], logger: Optional[Any] = None) -> None:
+    def load_models(self, model_uris: List[str]) -> None:
         """
         Loads and initializes clients for the specified models.
 
         Args:
             model_uris (List[str]): A list of model URI strings.
-            logger (Optional[Any]): Logger instance for logging messages.
         """
+        logger = self.logger
         for model_uri in model_uris:
             if model_uri in self.clients:
                 if logger:
                     logger.Log(f"Model '{model_uri}' already loaded.", 0)
                 continue
 
-            provider, provider_model_name, model_host, model_options = (
+            provider, provider_model_name_original, model_host, model_options = (
                 self._get_model_and_provider(model_uri)
             )
             log_msg_load = (
-                f"Loading Model: '{provider_model_name}' from Provider: '{provider}' "
+                f"Loading Model: '{provider_model_name_original}' from Provider: '{provider}' "
                 f"at Host: '{model_host or 'default'}' with options: {model_options or '{}'}"
             )
             if logger:
@@ -117,61 +137,74 @@ class Interface:
             try:
                 if provider == "ollama":
                     self._ensure_package_is_installed("ollama", logger)
-                    import ollama  # type: ignore
+                    import ollama as ollama_lib  # type: ignore
 
                     effective_ollama_host = (
                         model_host if model_host else Config.OLLAMA_HOST
                     )
 
+                    # Create a standard ollama client
+                    ollama_client = ollama_lib.Client(host=effective_ollama_host)
+                    ollama_model_name_to_use = provider_model_name_original
+
                     try:
-                        ollama.Client(host=effective_ollama_host).show(
-                            provider_model_name
-                        )
                         if logger:
                             logger.Log(
-                                f"Ollama model '{provider_model_name}' found locally at "
-                                f"{effective_ollama_host}.",
+                                f"Attempting to check Ollama model '{ollama_model_name_to_use}' locally...",
                                 0,
                             )
-                    except ollama.ResponseError:
-                        log_msg_download = (
-                            f"Ollama model '{provider_model_name}' not found at "
-                            f"{effective_ollama_host}. Attempting download..."
-                        )
+                        ollama_client.show(ollama_model_name_to_use)
                         if logger:
-                            logger.Log(log_msg_download, 1)
-                        else:
-                            print(log_msg_download)
+                            logger.Log(
+                                f"Ollama model '{ollama_model_name_to_use}' found locally.",
+                                0,
+                            )
+                    except ollama_lib.ResponseError as e:
+                        if logger:
+                            logger.Log(
+                                f"Ollama model '{ollama_model_name_to_use}' not found locally. Error: {e}",
+                                6,
+                            )
+                            logger.Log(
+                                f"Attempting to pull Ollama model '{ollama_model_name_to_use}'...",
+                                1,
+                            )
+                        try:
+                            ollama_download_stream = ollama_client.pull(
+                                ollama_model_name_to_use, stream=True
+                            )
+                            for chunk in ollama_download_stream:
+                                status = chunk.get("status", "")
+                                if "pulling" in status:
+                                    print(
+                                        f"Downloading {ollama_model_name_to_use}: {status}...",
+                                        end="\r",
+                                        flush=True,
+                                    )
+                            print(
+                                f"\nDownload attempt for {ollama_model_name_to_use} complete."
+                            )
+                            if logger:
+                                logger.Log(
+                                    f"Ollama model '{ollama_model_name_to_use}' pull attempt finished.",
+                                    0,
+                                )
+                        except Exception as pull_e:
+                            if logger:
+                                logger.Log(
+                                    f"CRITICAL: Failed to find or pull Ollama model '{ollama_model_name_to_use}': {pull_e}. Please ensure the model name is correct and the model is available.",
+                                    7,
+                                )
+                            raise Exception(
+                                f"Failed to find or pull Ollama model '{ollama_model_name_to_use}'."
+                            ) from pull_e
 
-                        ollama_download_stream = ollama.Client(
-                            host=effective_ollama_host
-                        ).pull(provider_model_name, stream=True)
-                        for chunk in ollama_download_stream:
-                            status = chunk.get("status", "")
-                            completed = chunk.get("completed", 0)
-                            total = chunk.get("total", 0)
-                            if total > 0 and completed >= 0:
-                                progress = (completed / total) * 100 if total > 0 else 0
-                                completed_size_mb = completed / (1024**2)
-                                total_size_mb = total / (1024**2)
-                                print(
-                                    f"Downloading {provider_model_name}: {progress:.2f}% "
-                                    f"({completed_size_mb:.2f}MB / {total_size_mb:.2f}MB)",
-                                    end="\r",
-                                    flush=True,
-                                )
-                            elif status:
-                                print(
-                                    f"{status} {provider_model_name}...",
-                                    end="\r",
-                                    flush=True,
-                                )
-                        print(
-                            "\nDownload complete."
-                            if total > 0
-                            else f"\nFinished: {status}"
-                        )
-                    self.clients[model_uri] = ollama.Client(host=effective_ollama_host)
+                    # Store the standard client
+                    self.clients[model_uri] = ollama_client
+                    # Store the resolved model name on the client for later retrieval
+                    self.clients[model_uri]._resolved_model_name = (
+                        ollama_model_name_to_use
+                    )
 
                 elif provider == "google":
                     self._ensure_package_is_installed("google-generativeai", logger)
@@ -184,7 +217,7 @@ class Interface:
                         )
                     genai.configure(api_key=google_api_key)
                     self.clients[model_uri] = genai.GenerativeModel(
-                        model_name=provider_model_name
+                        model_name=provider_model_name_original
                     )
 
                 elif provider == "openrouter":
@@ -197,7 +230,7 @@ class Interface:
                             "OPENROUTER_API_KEY not found for OpenRouter provider."
                         )
                     self.clients[model_uri] = OpenRouter(
-                        api_key=openrouter_api_key, model=provider_model_name
+                        api_key=openrouter_api_key, model=provider_model_name_original
                     )
                 else:
                     error_msg = f"Unsupported provider '{provider}' for '{model_uri}'."
@@ -206,7 +239,7 @@ class Interface:
                     raise ValueError(error_msg)
 
                 log_msg_success = (
-                    f"Loaded model '{provider_model_name}' for '{model_uri}'."
+                    f"Loaded model '{provider_model_name_original}' for '{model_uri}'."
                 )
                 if logger:
                     logger.Log(log_msg_success, 1)
@@ -219,6 +252,7 @@ class Interface:
                     logger.Log(error_msg_load, 7)
                 else:
                     print(error_msg_load)
+                raise
 
     def _get_model_and_provider(
         self, model_uri: str
@@ -231,41 +265,67 @@ class Interface:
 
         parsed = urlparse(model_uri)
         provider = parsed.scheme.lower()
-        path_parts = parsed.path.strip("/").split("@")
-        model_identifier_from_path = path_parts[0]
-        host_from_path = path_parts[1] if len(path_parts) > 1 else None
 
-        if parsed.netloc:
-            model_name = (
-                f"{parsed.netloc}{parsed.path.split('@')[0]}"
-                if parsed.path and "@" in parsed.path
-                else f"{parsed.netloc}{('/' + model_identifier_from_path) if model_identifier_from_path and not parsed.path.endswith(model_identifier_from_path) else parsed.path}"
-            )
-        else:
-            model_name = model_identifier_from_path
-
-        host = host_from_path
-        if not host and provider == "ollama":
-            host = Config.OLLAMA_HOST
-
+        model_name = ""
+        host = None
         query_params: Optional[Dict[str, Any]] = None
-        if parsed.query:
-            query_params = {}
-            for key, value_list in parse_qs(parsed.query).items():
-                value = value_list[0]
-                try:
-                    if "." in value:
-                        query_params[key] = float(value)
-                    else:
-                        query_params[key] = int(value)
-                except ValueError:
-                    if value.lower() == "true":
-                        query_params[key] = True
-                    elif value.lower() == "false":
-                        query_params[key] = False
-                    else:
-                        query_params[key] = value
-        return provider, model_name, host, query_params
+
+        if provider == "ollama":
+            raw_model_id = parsed.netloc + parsed.path.lstrip("/")
+            model_name_and_host_str = raw_model_id.split("?", 1)[0]
+            model_name_parts = model_name_and_host_str.split("@", 1)
+            model_name = model_name_parts[0]
+
+            if len(model_name_parts) > 1:
+                host = model_name_parts[1]
+            else:
+                host = Config.OLLAMA_HOST
+
+            if parsed.query:
+                query_params = {}
+                for key, value_list in parse_qs(parsed.query).items():
+                    value = value_list[0]
+                    try:
+                        if "." in value:
+                            query_params[key] = float(value)
+                        else:
+                            query_params[key] = int(value)
+                    except ValueError:
+                        if value.lower() == "true":
+                            query_params[key] = True
+                        elif value.lower() == "false":
+                            query_params[key] = False
+                        else:
+                            query_params[key] = value
+
+            return "ollama", model_name, host, query_params
+
+        else:
+            model_name = (
+                parsed.netloc + parsed.path.strip("/")
+                if parsed.netloc
+                else parsed.path.strip("/")
+            )
+            query_params = None
+            if parsed.query:
+                query_params = {}
+                for key, value_list in parse_qs(parsed.query).items():
+                    value = value_list[0]
+                    try:
+                        if "." in value:
+                            query_params[key] = float(value)
+                        else:
+                            query_params[key] = int(value)
+                    except ValueError:
+                        if value.lower() == "true":
+                            query_params[key] = True
+                        elif value.lower() == "false":
+                            query_params[key] = False
+                        else:
+                            query_params[key] = value
+
+            host = parsed.netloc if parsed.netloc else None
+            return provider, model_name, host, query_params
 
     def _clean_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         cleaned = []
@@ -286,15 +346,24 @@ class Interface:
         seed_override: int = -1,
         output_format: Optional[Literal["json"]] = None,
         min_word_count: int = 1,
+        max_tokens: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         current_messages = self._clean_messages(messages)
         max_retries_sgt = 3
+        response_messages: List[Dict[str, Any]] = []
+        last_response_text = ""
+
         for attempt in range(max_retries_sgt):
             effective_seed = (
                 seed_override if seed_override != -1 else (Config.SEED + attempt)
             )
             response_messages = self.chat_and_stream_response(
-                logger, current_messages, model_uri, effective_seed, output_format
+                logger,
+                current_messages,
+                model_uri,
+                effective_seed,
+                output_format,
+                max_tokens,
             )
             last_response_text = self.get_last_message_text(response_messages)
             word_count = len(last_response_text.split())
@@ -337,26 +406,31 @@ class Interface:
         model_uri: str,
         seed_override: int = -1,
         required_attribs: List[str] = [],
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        current_messages = self._clean_messages(messages)
+        max_tokens: Optional[int] = None,
+        expected_response_model: Optional[Type[BaseModel]] = None,
+    ) -> Tuple[List[Dict[str, Any]], Union[Dict[str, Any], List[Any]]]:
+
         max_json_attempts = 3
-        last_error_type = ""
+        current_messages_for_llm = self._clean_messages(messages)
+        response_messages: List[Dict[str, Any]] = []
+        last_response_text: str = ""
 
         for attempt in range(max_json_attempts):
             effective_seed = (
                 seed_override if seed_override != -1 else (Config.SEED + attempt)
             )
-            response_messages = self.chat_and_stream_response(
-                logger,
-                current_messages,
-                model_uri,
-                effective_seed,
-                output_format="json",
-            )
-            last_response_text = self.get_last_message_text(response_messages)
-            parsed_json: Optional[Dict[str, Any]] = None
 
             try:
+                response_messages = self.chat_and_stream_response(
+                    logger,
+                    current_messages_for_llm,
+                    model_uri,
+                    effective_seed,
+                    output_format="json",
+                    max_tokens=max_tokens,
+                )
+                last_response_text = self.get_last_message_text(response_messages)
+
                 cleaned_response_text = last_response_text.strip()
                 if cleaned_response_text.startswith("```json"):
                     cleaned_response_text = cleaned_response_text[7:]
@@ -366,59 +440,58 @@ class Interface:
 
                 if not cleaned_response_text:
                     raise json.JSONDecodeError(
-                        "Empty response cannot be parsed as JSON.", "", 0
+                        "Empty response cannot be parsed.", "", 0
                     )
 
                 parsed_json = json.loads(cleaned_response_text)
-                missing_attribs = [
-                    attr for attr in required_attribs if attr not in parsed_json
-                ]
 
-                if not missing_attribs:
-                    return response_messages, parsed_json  # Success
+                if expected_response_model:
+                    validated_model = expected_response_model.model_validate(
+                        parsed_json
+                    )
+                    parsed_json = validated_model.model_dump()
 
-                last_error_type = "missing_attributes"
+                if not expected_response_model and isinstance(parsed_json, dict):
+                    missing_attribs = [
+                        attr for attr in required_attribs if attr not in parsed_json
+                    ]
+                    if missing_attribs:
+                        raise ValueError(
+                            f"JSON missing required attributes: {', '.join(missing_attribs)}"
+                        )
+
+                return response_messages, parsed_json
+
+            except (json.JSONDecodeError, ValidationError, ValueError) as e:
+                last_error_type = type(e).__name__
                 logger.Log(
-                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): "
-                    f"JSON missing attributes: {missing_attribs}. Retrying.",
+                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): JSON error '{last_error_type}'. Retrying.",
                     6,
                 )
-                correction_prompt = (
-                    f"Your JSON response was missing the following required attributes: {', '.join(missing_attribs)}. "
-                    f"Please ensure your response is a valid JSON object containing all required attributes: {', '.join(required_attribs)}. "
-                    f"The previous full JSON attempt was:\n```json\n{last_response_text}\n```"
-                )
 
-            except json.JSONDecodeError as e:
-                last_error_type = "json_decode_error"
-                logger.Log(
-                    f"SafeGenerateJSON (Attempt {attempt + 1}/{max_json_attempts}): "
-                    f"JSONDecodeError: {e}. Response: '{last_response_text[:200]}...'. Retrying.",
-                    6,
+                # ** CRITICAL FIX **
+                # Rebuild the message list for the next attempt from the original, clean messages
+                # and add the specific error correction prompt. This prevents a "conversation death spiral".
+                current_messages_for_llm = self._clean_messages(messages)
+                retry_prompt = Prompts.JSON_PARSE_ERROR.format(
+                    _OriginalText=last_response_text, _Error=str(e)
                 )
-                # Use the generic JSON_PARSE_ERROR but also include the faulty text to help the LLM.
-                correction_prompt = (
-                    Prompts.JSON_PARSE_ERROR.format(_Error=str(e))
-                    + f"\nThe malformed JSON text was:\n```\n{last_response_text}\n```\n"
-                    + "Please provide the corrected JSON structure."
-                )
+                current_messages_for_llm.append(self.build_user_query(retry_prompt))
 
-            # Prepare for retry: use the response_messages that led to the error as history for correction
-            current_messages = response_messages
-            current_messages.append(self.build_user_query(correction_prompt))
+                if attempt == max_json_attempts - 1:
+                    error_message = f"SafeGenerateJSON: Failed after {max_json_attempts} attempts. Last error: {last_error_type}."
+                    logger.Log(error_message, 7)
+                    return response_messages, {
+                        "Error": error_message,
+                        "LastRawResponse": last_response_text,
+                    }
 
-            if attempt == max_json_attempts - 1:
-                error_message = (
-                    f"SafeGenerateJSON: Failed to generate valid JSON for {model_uri} "
-                    f"after {max_json_attempts} attempts. Last error type: {last_error_type}."
-                )
-                logger.Log(error_message, 7)
-                raise Exception(f"{error_message} Last response: {last_response_text}")
-
-        # This part should be unreachable if logic is correct
-        raise Exception(
+        # This should not be reached if the loop logic is correct
+        final_error_msg = (
             f"SafeGenerateJSON logic error for {model_uri}, exited loop unexpectedly."
         )
+        logger.Log(final_error_msg, 7)
+        return [], {"Error": final_error_msg}
 
     def chat_and_stream_response(
         self,
@@ -427,26 +500,29 @@ class Interface:
         model_uri: str,
         seed_override: int = -1,
         output_format: Optional[Literal["json"]] = None,
+        max_tokens: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        provider, provider_model_name, model_host, model_options_from_uri = (
+        provider, provider_model_name_original, model_host, model_options_from_uri = (
             self._get_model_and_provider(model_uri)
         )
         effective_seed = Config.SEED if seed_override == -1 else seed_override
         total_chars = sum(len(str(msg.get("content", ""))) for msg in messages)
-        estimated_tokens = total_chars / 4.5
-        logger.Log(
-            f"LLM call to '{provider_model_name}' ({provider}). Seed: {effective_seed}. "
-            f"Format: {output_format}. Est. Tokens: ~{estimated_tokens:.0f}",
-            4,
-        )
-        if estimated_tokens > (Config.OLLAMA_CTX * 0.8):
-            logger.Log(
-                f"Warning: Est. tokens ({estimated_tokens:.0f}) high for context "
-                f"{Config.OLLAMA_CTX}.",
-                6,
-            )
+        estimated_input_tokens = int(total_chars / 4)
 
-        if Config.DEBUG:
+        if logger:
+            logger.Log(
+                f"LLM call to '{provider_model_name_original}' ({provider}). Seed: {effective_seed}. "
+                f"Format: {output_format}. Est. Input Tokens: ~{estimated_input_tokens}. "
+                f"Max Output Tokens: {max_tokens if max_tokens is not None else 'Default'}.",
+                4,
+            )
+            if estimated_input_tokens > (Config.OLLAMA_CTX * 0.8):
+                logger.Log(
+                    f"Warning: Est. input tokens ({estimated_input_tokens}) high for context {Config.OLLAMA_CTX}.",
+                    6,
+                )
+
+        if Config.DEBUG and logger:
             logger.Log("--------- Message History START ---------", 0, stream=True)
             for i, msg in enumerate(messages):
                 role = msg.get("role", "unknown")
@@ -463,20 +539,31 @@ class Interface:
         start_time = time.time()
         full_response_content = ""
         final_model_options = {}
-        if Config.DEBUG_LEVEL > 1:
+        if Config.DEBUG_LEVEL > 1 and logger:
             logger.Log(f"Base model options for {provider}: {final_model_options}", 0)
         if model_options_from_uri:
             final_model_options.update(model_options_from_uri)
-            if Config.DEBUG_LEVEL > 1:
+            if Config.DEBUG_LEVEL > 1 and logger:
                 logger.Log(
                     f"Updated model options with URI params: {final_model_options}", 0
                 )
+
+        if max_tokens is not None:
+            if provider == "ollama":
+                final_model_options["num_predict"] = max_tokens
+            elif provider == "google":
+                pass
+            elif provider == "openrouter":
+                final_model_options["max_tokens"] = max_tokens
 
         max_llm_retries = 2
         for attempt in range(max_llm_retries):
             try:
                 if provider == "ollama":
-                    import ollama  # type: ignore
+                    client = self.clients[model_uri]
+                    resolved_ollama_model_name = getattr(
+                        client, "_resolved_model_name", provider_model_name_original
+                    )
 
                     ollama_options = final_model_options.copy()
                     ollama_options["seed"] = effective_seed
@@ -484,10 +571,12 @@ class Interface:
                         ollama_options["num_ctx"] = Config.OLLAMA_CTX
                     if output_format == "json":
                         ollama_options["format"] = "json"
-                    if Config.DEBUG_LEVEL > 0:
+
+                    if Config.DEBUG_LEVEL > 0 and logger:
                         logger.Log(f"Ollama options: {ollama_options}", 0)
-                    stream = self.clients[model_uri].chat(
-                        model=provider_model_name,
+
+                    stream = client.chat(
+                        model=resolved_ollama_model_name,
                         messages=messages,
                         stream=True,
                         options=ollama_options,
@@ -501,6 +590,7 @@ class Interface:
                     from google.generativeai.types import (
                         HarmCategory,
                         HarmBlockThreshold,
+                        GenerationConfig,
                     )
 
                     google_messages, system_instruction_text = [], None
@@ -549,19 +639,20 @@ class Interface:
                         and gen_config_dict["temperature"] is None
                     ):
                         del gen_config_dict["temperature"]
+                    if max_tokens is not None:
+                        gen_config_dict["max_output_tokens"] = max_tokens
+
                     gen_config_obj = (
-                        genai.types.GenerationConfig(**gen_config_dict)
-                        if gen_config_dict
-                        else None
+                        GenerationConfig(**gen_config_dict) if gen_config_dict else None
                     )
                     if output_format == "json":
                         if gen_config_obj:
                             gen_config_obj.response_mime_type = "application/json"
                         else:
-                            gen_config_obj = genai.types.GenerationConfig(
+                            gen_config_obj = GenerationConfig(
                                 response_mime_type="application/json"
                             )
-                    if Config.DEBUG_LEVEL > 0:
+                    if Config.DEBUG_LEVEL > 0 and logger:
                         logger.Log(
                             f"Google messages: {google_messages}, GenConfig: {gen_config_obj}",
                             0,
@@ -586,11 +677,15 @@ class Interface:
                     from Writer.Interface.OpenRouter import OpenRouter
 
                     client: OpenRouter = self.clients[model_uri]
+                    original_client_params, original_client_model = (
+                        client.params.copy(),
+                        client.model,
+                    )
                     client.set_params(**final_model_options)
-                    client.model = provider_model_name
+                    client.model = provider_model_name_original
                     if output_format == "json":
                         client.set_params(response_format={"type": "json_object"})
-                    if Config.DEBUG_LEVEL > 0:
+                    if Config.DEBUG_LEVEL > 0 and logger:
                         logger.Log(
                             f"OpenRouter params: {client.params}, model: {client.model}",
                             0,
@@ -598,19 +693,25 @@ class Interface:
                     full_response_content = client.chat(
                         messages=messages, seed=effective_seed
                     )
-                    logger.Log(
-                        f"OpenRouter full response (len: {len(full_response_content)}).",
-                        4,
-                        stream=False,
+                    client.params, client.model = (
+                        original_client_params,
+                        original_client_model,
                     )
+                    if logger:
+                        logger.Log(
+                            f"OpenRouter full response (len: {len(full_response_content)}).",
+                            4,
+                            stream=False,
+                        )
                 else:
                     raise NotImplementedError(f"Provider '{provider}' not implemented.")
                 break
             except Exception as e:
-                logger.Log(
-                    f"LLM Call Error (Attempt {attempt + 1}/{max_llm_retries}) for {model_uri}: {e}",
-                    7,
-                )
+                if logger:
+                    logger.Log(
+                        f"LLM Call Error (Attempt {attempt + 1}/{max_llm_retries}) for {model_uri}: {e}",
+                        7,
+                    )
                 if attempt == max_llm_retries - 1:
                     full_response_content = f"ERROR: LLM call failed after {max_llm_retries} attempts. Error: {e}"
                 time.sleep(1.5**attempt)
@@ -618,10 +719,11 @@ class Interface:
         duration = time.time() - start_time
         response_words = len(full_response_content.split())
         words_per_sec = response_words / duration if duration > 0 else 0
-        logger.Log(
-            f"Generated response in {duration:.2f}s. Approx. {response_words} words, ~{words_per_sec:.2f} words/s.",
-            4,
-        )
+        if logger:
+            logger.Log(
+                f"Generated response in {duration:.2f}s. Approx. {response_words} words, ~{words_per_sec:.2f} words/s.",
+                4,
+            )
         updated_messages = messages + [
             {"role": "assistant", "content": full_response_content}
         ]
@@ -629,32 +731,37 @@ class Interface:
         caller_function_name = "UnknownCaller"
         try:
             call_stack = inspect.stack()
-            relevant_frames = []
-            for i in range(1, min(4, len(call_stack))):
-                frame_info, func_name = call_stack[i], call_stack[i].function
-                if func_name == "<module>":
-                    if "self" in frame_info.frame.f_locals:
-                        func_name = frame_info.frame.f_locals["self"].__class__.__name__
-                    elif i == 1 and not relevant_frames:
-                        module_name = os.path.splitext(
-                            os.path.basename(frame_info.filename)
-                        )[0]
-                        func_name = (
-                            module_name
-                            if module_name != "__main__"
-                            else "MainExecution"
-                        )
-                relevant_frames.append(func_name)
-            caller_function_name = (
-                ".".join(reversed(relevant_frames)) if relevant_frames else "DirectCall"
-            )
+            for i in range(1, len(call_stack)):
+                frame_info = call_stack[i]
+                module_name = os.path.splitext(os.path.basename(frame_info.filename))[0]
+                if (
+                    module_name != "Wrapper"
+                    and module_name != "threading"
+                    and module_name != "runpy"
+                ):
+                    caller_function_name = module_name
+                    break
         except IndexError:
-            logger.Log("Could not determine full call stack for log naming.", 1)
+            if logger:
+                logger.Log("Could not determine full call stack for log naming.", 1)
 
-        simple_model_name = provider_model_name.split("/")[-1].split(":")[0]
-        logger.save_langchain_interaction(
-            f"{caller_function_name}.{simple_model_name}", updated_messages
-        )
+        if provider == "ollama" and hasattr(
+            self.clients[model_uri], "_resolved_model_name"
+        ):
+            simple_model_name = (
+                getattr(self.clients[model_uri], "_resolved_model_name")
+                .split("/")[-1]
+                .split(":")[0]
+            )
+        else:
+            simple_model_name = provider_model_name_original.split("/")[-1].split(":")[
+                0
+            ]
+
+        if logger:
+            logger.save_langchain_interaction(
+                f"{caller_function_name}.{simple_model_name}", updated_messages
+            )
         return updated_messages
 
     def _stream_response_internal(
@@ -671,14 +778,25 @@ class Interface:
                 current_chunk_text = chunk.get("message", {}).get("content", "")
             elif provider == "google":
                 try:
-                    current_chunk_text = chunk.text
-                except Exception:
-                    if Config.DEBUG_LEVEL > 1:
-                        logger.Log(f"Google stream chunk no text: {chunk}", 0)
+                    chunk_content = chunk.text
+                    if chunk_content is not None:
+                        current_chunk_text = chunk_content
+                    elif Config.DEBUG_LEVEL > 1 and logger:
+                        logger.Log(
+                            f"Google stream chunk with no text content: {chunk}", 0
+                        )
+                except Exception as e:
+                    if Config.DEBUG_LEVEL > 1 and logger:
+                        logger.Log(
+                            f"Google stream chunk processing error: {e}, chunk: {chunk}",
+                            0,
+                        )
                     continue
             else:
-                logger.Log(f"Streaming not implemented for provider: {provider}", 7)
+                if logger:
+                    logger.Log(f"Streaming not implemented for provider: {provider}", 7)
                 break
+
             if current_chunk_text:
                 response_text += current_chunk_text
                 if enable_console_stream:
@@ -687,7 +805,7 @@ class Interface:
         if enable_console_stream and chunk_count > 0:
             print()
         stream_duration = time.time() - stream_start_time
-        if chunk_count > 0:
+        if chunk_count > 0 and logger:
             logger.Log(
                 f"Streamed {chunk_count} chunks for {provider} in {stream_duration:.2f}s.",
                 0,

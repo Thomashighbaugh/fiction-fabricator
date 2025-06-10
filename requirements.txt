@@ -1,4 +1,6 @@
-ollama
-termcolor
 google.generativeai
+ollama
+pydantic
 python-dotenv
+requests
+termcolor
