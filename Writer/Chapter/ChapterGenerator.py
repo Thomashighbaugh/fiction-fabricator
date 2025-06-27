@@ -1,361 +1,219 @@
-# File: Writer/Chapter/ChapterGenerator.py
-# Purpose: Orchestrates the generation of a complete chapter by creating and assembling scenes.
+#!/usr/bin/python3
 
-"""
-Chapter Generation Orchestrator.
-
-This module manages the process of generating a full chapter. It uses a
-scene-by-scene approach:
-1.  It calls `SceneOutliner` to break down the chapter's plot outline into
-    a list of detailed scene outlines (blueprints). This step includes retries
-    if initial attempts fail.
-2.  It then iterates through these scene blueprints, calling `SceneGenerator`
-    to write the narrative text for each scene.
-3.  Context (summaries of previous scenes/chapters) is passed along to ensure
-    narrative continuity.
-4.  The generated scene narratives are compiled into a single chapter text.
-5.  Optionally, this assembled chapter can undergo further refinement or revision
-    using LLM-based feedback to improve flow, pacing, and overall cohesion.
-"""
-
-import Writer.Config as Config
-import Writer.Prompts as Prompts
-import Writer.Scene.SceneOutliner as SceneOutliner
-import Writer.Scene.SceneGenerator as SceneGenerator
-import Writer.Chapter.ChapterContext as ChapterContext
-import Writer.LLMEditor as LLMEditor
+import Writer.Config
+import Writer.LLMEditor
+import Writer.PrintUtils
+import Writer.Prompts
+import Writer.Scene.ChapterByScene
+import Writer.SummarizationUtils
+import Writer.CritiqueRevision
 from Writer.Interface.Wrapper import Interface
+from Writer.NarrativeContext import NarrativeContext, ChapterContext
 from Writer.PrintUtils import Logger
-from Writer.Statistics import get_word_count
-from typing import List, Dict, Any, Optional, Tuple
-
-# Heuristic: 1 word is approx 1.5 tokens in English, but can vary. Use 1.5-2 for safer estimation.
-WORD_TO_TOKEN_RATIO = 1.5
 
 
-def generate_chapter_by_scenes(
-    interface: Interface,
-    logger: Logger,
-    chapter_num: int,
-    total_chapters: int,
-    overall_story_outline: str,
-    current_chapter_plot_outline: str,
-    previous_chapter_context_summary: Optional[str],
-    base_story_context: Optional[str],
-) -> Tuple[str, List[Dict[str, Any]]]:
+def GenerateChapter(
+    Interface: Interface,
+    _Logger: Logger,
+    _ChapterNum: int,
+    _TotalChapters: int,
+    narrative_context: NarrativeContext,
+) -> str:
     """
-    Generates a complete chapter by first outlining scenes and then writing each scene.
-    Includes retries for scene outline generation.
-
-    Args:
-        interface (Interface): The LLM interaction wrapper.
-        logger (Logger): The logging instance.
-        chapter_num (int): The current chapter number being generated.
-        total_chapters (int): The total number of chapters in the story.
-        overall_story_outline (str): The main outline of the entire story (chapter summaries).
-        current_chapter_plot_outline (str): The specific plot outline/summary for this chapter,
-                                            used as input for scene breakdown.
-        previous_chapter_context_summary (Optional[str]): Contextual summary from the end
-                                                          of the previous chapter. None if first chapter.
-        base_story_context (Optional[str]): Overarching story context or user instructions.
-
-    Returns:
-        Tuple[str, List[Dict[str, Any]]]:
-            - The full text of the generated chapter. Returns an error message string
-              or placeholder if critical failures occur.
-            - The list of scene outlines used to generate the chapter.
+    Generates a single chapter of the novel, either through a multi-stage process or
+    a scene-by-scene pipeline, and ensures it is coherent with the story so far.
     """
-    logger.Log(
-        f"--- Starting Generation for Chapter {chapter_num}/{total_chapters} (Scene-by-Scene Pipeline) ---",
-        2,
-    )
 
-    if not current_chapter_plot_outline or not current_chapter_plot_outline.strip():
-        error_msg = (
-            f"Chapter {chapter_num} plot outline is empty. Cannot generate chapter."
-        )
-        logger.Log(error_msg, 7)
-        return f"// {error_msg} //", []
+    # --- Step 1: Setup Chapter Context ---
+    _Logger.Log(f"Setting up context for Chapter {_ChapterNum} generation.", 2)
 
-    logger.Log(
-        f"Step 1: Generating detailed scene outlines for Chapter {chapter_num}.", 3
-    )
-    list_of_scene_outlines: List[Dict[str, Any]] = []
-    scene_outline_attempts = 0
-
-    while (
-        not list_of_scene_outlines
-        and scene_outline_attempts < Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS
-    ):
-        scene_outline_attempts += 1
-        if scene_outline_attempts > 1:
-            logger.Log(
-                f"Retrying scene outline generation for Chapter {chapter_num} (Attempt {scene_outline_attempts}/{Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS})...",
-                5,
-            )
-
-        list_of_scene_outlines = SceneOutliner.generate_detailed_scene_outlines(
-            interface,
-            logger,
-            current_chapter_plot_outline,
-            overall_story_outline,
-            chapter_num,
-            previous_chapter_context_summary,
-            base_story_context,
-        )
-
-        if list_of_scene_outlines:
-            break
-        elif scene_outline_attempts < Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS:
-            logger.Log(
-                f"Scene outline generation attempt {scene_outline_attempts} for Chapter {chapter_num} yielded no scenes. Will retry if attempts remain.",
-                6,
-            )
-
-    if not list_of_scene_outlines:
-        error_msg = f"No scene outlines were generated for Chapter {chapter_num} after {Config.SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS} attempt(s). Chapter generation aborted."
-        logger.Log(error_msg, 7)
-        return f"// Chapter {chapter_num} - Generation Error: {error_msg} //", []
-
-    logger.Log(
-        f"Successfully generated {len(list_of_scene_outlines)} scene outlines for Chapter {chapter_num} after {scene_outline_attempts} attempt(s).",
-        3,
-    )
-
-    logger.Log(
-        f"Step 2: Generating narrative for each of the {len(list_of_scene_outlines)} scenes in Chapter {chapter_num}.",
-        3,
-    )
-    compiled_scene_texts: List[str] = []
-
-    current_scene_context_summary = (
-        previous_chapter_context_summary
-        if previous_chapter_context_summary
-        else f"This is the very first scene of Chapter {chapter_num}. Refer to the chapter's plot outline and overall story outline for initial context."
-    )
-
-    MAX_TOKENS_FOR_SCENE_NARRATIVE = int(
-        Config.SCENE_NARRATIVE_MIN_WORDS * WORD_TO_TOKEN_RATIO * 1.5
-    )
-
-    for scene_idx, scene_outline_blueprint in enumerate(list_of_scene_outlines):
-        scene_number_in_chapter = scene_idx + 1
-        scene_title = scene_outline_blueprint.get(
-            "scene_title", f"C{chapter_num}.S{scene_number_in_chapter}"
-        )
-        logger.Log(
-            f"Writing narrative for Scene {scene_number_in_chapter}/{len(list_of_scene_outlines)}: '{scene_title}'...",
-            4,
-        )
-
-        scene_narrative = SceneGenerator.write_scene_narrative(
-            interface,
-            logger,
-            scene_outline_blueprint,
-            overall_story_outline,
-            current_scene_context_summary,
-            chapter_num,
-            scene_number_in_chapter,
-            base_story_context,
-            max_tokens=MAX_TOKENS_FOR_SCENE_NARRATIVE,
-        )
-
-        if "Error:" in scene_narrative:
-            logger.Log(
-                f"Error generating narrative for scene '{scene_title}': {scene_narrative}. Skipping scene.",
-                6,
-            )
-            compiled_scene_texts.append(
-                f"\n\n// Scene '{scene_title}' - Generation Error: {scene_narrative} //\n\n"
-            )
-            current_scene_context_summary = f"Context after failed scene '{scene_title}': An error occurred. Attempting to proceed."
+    # Determine which outline to use for this chapter
+    chapter_specific_outline = ""
+    if narrative_context.expanded_novel_outline_markdown:
+        # Try to extract the specific chapter outline from the expanded outline
+        search_str = f"# Chapter {_ChapterNum}"
+        parts = narrative_context.expanded_novel_outline_markdown.split(search_str)
+        if len(parts) > 1:
+            chapter_specific_outline = parts[1].split("# Chapter ")[0].strip()
         else:
-            compiled_scene_texts.append(scene_narrative)
-            logger.Log(
-                f"Narrative for scene '{scene_title}' complete. Word count: {get_word_count(scene_narrative)}.",
-                4,
-            )
+            _Logger.Log(f"Could not find specific outline for Chapter {_ChapterNum} in expanded outline.", 6)
+            # Fallback to LLM extraction
+            messages = [Interface.BuildUserQuery(Writer.Prompts.CHAPTER_GENERATION_PROMPT.format(_Outline=narrative_context.base_novel_outline_markdown, _ChapterNum=_ChapterNum))]
+            messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, _MinWordCount=50)
+            chapter_specific_outline = Interface.GetLastMessageText(messages)
+    else:
+        # Fallback to extracting from the base outline
+        messages = [Interface.BuildUserQuery(Writer.Prompts.CHAPTER_GENERATION_PROMPT.format(_Outline=narrative_context.base_novel_outline_markdown, _ChapterNum=_ChapterNum))]
+        messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, _MinWordCount=50)
+        chapter_specific_outline = Interface.GetLastMessageText(messages)
 
-            if scene_idx < len(list_of_scene_outlines) - 1:
-                MAX_TOKENS_FOR_SCENE_SUMMARY = int(50 * WORD_TO_TOKEN_RATIO)
+    if not chapter_specific_outline:
+        _Logger.Log(f"CRITICAL: Could not generate or find an outline for Chapter {_ChapterNum}. Aborting.", 7)
+        return f"// ERROR: Failed to obtain outline for Chapter {_ChapterNum}. //"
 
-                current_scene_context_summary = (
-                    ChapterContext.generate_previous_scene_summary(
-                        interface,
-                        logger,
-                        scene_narrative,
-                        scene_outline_blueprint,
-                        max_tokens=MAX_TOKENS_FOR_SCENE_SUMMARY,
-                    )
-                )
-                if "Error:" in current_scene_context_summary:
-                    logger.Log(
-                        f"Error generating context summary after scene '{scene_title}'. Proceeding with caution.",
-                        6,
-                    )
-                    current_scene_context_summary = (
-                        f"Context after scene '{scene_title}': Summary generation failed. "
-                        f"The scene involved characters: {scene_outline_blueprint.get('characters_present',[])} "
-                        f"and events: {scene_outline_blueprint.get('key_events_actions',[])}."
-                    )
+    chapter_context = ChapterContext(chapter_number=_ChapterNum, initial_outline=chapter_specific_outline)
+    _Logger.Log(f"Created Chapter Context for Chapter {_ChapterNum}", 3)
 
-    scene_separator = "\n\n* * *\n\n"
-    full_chapter_text_from_scenes = scene_separator.join(compiled_scene_texts)
-    logger.Log(
-        f"Chapter {chapter_num} text assembled from {len(compiled_scene_texts)} scenes. Preliminary word count: {get_word_count(full_chapter_text_from_scenes)}.",
-        3,
-    )
 
-    refined_chapter_text = full_chapter_text_from_scenes
-    if not Config.CHAPTER_NO_REVISIONS and len(compiled_scene_texts) > 1:
-        logger.Log(
-            f"Step 3: Performing refinement pass on assembled Chapter {chapter_num}...",
-            3,
+    # --- Step 2: Generate Initial Chapter Draft ---
+
+    # Get the rich context summary from the narrative context object
+    context_for_generation = narrative_context.get_context_for_chapter_generation(_ChapterNum)
+
+    if Writer.Config.SCENE_GENERATION_PIPELINE:
+        # Use the Scene-by-Scene pipeline for the initial draft
+        _Logger.Log(f"Using Scene-by-Scene pipeline for Chapter {_ChapterNum}.", 3)
+        initial_chapter_draft = Writer.Scene.ChapterByScene.ChapterByScene(
+            Interface, _Logger, chapter_context, narrative_context
         )
-        try:
-            refinement_prompt_text = (
-                f"The following text is a draft of Chapter {chapter_num}, assembled from multiple individually-written scenes.\n"
-                f"Your task is to review and refine this draft to ensure:\n"
-                f"- Smooth and natural transitions between scenes.\n"
-                f"- Consistent narrative voice and tone throughout the chapter.\n"
-                f"- Good overall pacing and flow for the chapter as a whole.\n"
-                f"- Elimination of any jarring breaks, awkward phrasing, or minor redundancies that may have arisen from scene assembly.\n\n"
-                f"Do NOT significantly alter the core plot events, character actions, or dialogue of the individual scenes.\n"
-                f"Focus on enhancing readability, cohesion, and the literary quality of the chapter as a unified piece.\n\n"
-                f"Overall Story Outline (for context on this chapter's role):\n"
-                f"<OverallStoryOutline>\n{overall_story_outline}\n</OverallStoryOutline>\n\n"
-                f"Assembled Draft of Chapter {chapter_num}:\n---\n{full_chapter_text_from_scenes}\n---\n\n"
-                f"Provide ONLY the refined and improved text for Chapter {chapter_num}."
-            )
-            refinement_messages = [
-                interface.build_system_query(Prompts.DEFAULT_SYSTEM_PROMPT),
-                interface.build_user_query(refinement_prompt_text),
-            ]
+    else:
+        # Use the multi-stage generation pipeline for the initial draft
+        _Logger.Log(f"Using Multi-Stage pipeline for Chapter {_ChapterNum}.", 3)
 
-            current_chapter_words = get_word_count(full_chapter_text_from_scenes)
-            MAX_TOKENS_FOR_CHAPTER_REFINEMENT = int(
-                current_chapter_words * WORD_TO_TOKEN_RATIO * 1.1
-            )
-            MIN_WORDS_FOR_CHAPTER_REFINEMENT = int(current_chapter_words * 0.75)
-
-            response_refinement_messages = interface.safe_generate_text(
-                logger,
-                refinement_messages,
-                Config.MODEL_CHAPTER_ASSEMBLY_REFINER,
-                min_word_count=MIN_WORDS_FOR_CHAPTER_REFINEMENT,
-                max_tokens=MAX_TOKENS_FOR_CHAPTER_REFINEMENT,
-            )
-            refined_chapter_text = interface.get_last_message_text(
-                response_refinement_messages
-            )
-            logger.Log(
-                f"Chapter {chapter_num} refinement pass complete. Word count: {get_word_count(refined_chapter_text)}",
-                3,
-            )
-        except Exception as e:
-            logger.Log(
-                f"Error during chapter refinement pass for Chapter {chapter_num}: {e}. Using pre-refinement text.",
-                6,
-            )
-
-    final_chapter_text = refined_chapter_text
-    if not Config.CHAPTER_NO_REVISIONS:
-        logger.Log(
-            f"Step 4: Entering feedback/revision loop for Chapter {chapter_num} (post-assembly/refinement)...",
-            3,
+        # STAGE 1: Plot
+        plot_text = execute_generation_stage(
+            Interface, _Logger, "Plot Generation",
+            Writer.Prompts.CHAPTER_GENERATION_STAGE1,
+            {"ThisChapterOutline": chapter_specific_outline, "Feedback": ""},
+            context_for_generation, _ChapterNum, _TotalChapters,
+            Writer.Config.CHAPTER_STAGE1_WRITER_MODEL,
+            narrative_context
         )
 
-        current_revision_history: List[Dict[str, Any]] = [
-            interface.build_system_query(Prompts.DEFAULT_SYSTEM_PROMPT),
-            interface.build_assistant_query(final_chapter_text),
-        ]
+        # STAGE 2: Character Development
+        char_dev_text = execute_generation_stage(
+            Interface, _Logger, "Character Development",
+            Writer.Prompts.CHAPTER_GENERATION_STAGE2,
+            {"ThisChapterOutline": chapter_specific_outline, "Stage1Chapter": plot_text, "Feedback": ""},
+            context_for_generation, _ChapterNum, _TotalChapters,
+            Writer.Config.CHAPTER_STAGE2_WRITER_MODEL,
+            narrative_context
+        )
 
-        revision_iterations = 0
-        while revision_iterations < Config.CHAPTER_MAX_REVISIONS:
-            revision_iterations += 1
-            logger.Log(
-                f"Chapter {chapter_num} - Revision Iteration {revision_iterations}/{Config.CHAPTER_MAX_REVISIONS}",
-                4,
-            )
+        # STAGE 3: Dialogue
+        dialogue_text = execute_generation_stage(
+            Interface, _Logger, "Dialogue Addition",
+            Writer.Prompts.CHAPTER_GENERATION_STAGE3,
+            {"ThisChapterOutline": chapter_specific_outline, "Stage2Chapter": char_dev_text, "Feedback": ""},
+            context_for_generation, _ChapterNum, _TotalChapters,
+            Writer.Config.CHAPTER_STAGE3_WRITER_MODEL,
+            narrative_context
+        )
+        initial_chapter_draft = dialogue_text
 
-            try:
-                feedback_on_chapter = LLMEditor.GetFeedbackOnChapter(
-                    interface,
-                    logger,
-                    final_chapter_text,
-                    overall_story_outline,
-                )
+    _Logger.Log(f"Initial draft for Chapter {_ChapterNum} completed.", 4)
 
-                is_chapter_complete = LLMEditor.GetChapterRating(
-                    interface,
-                    logger,
-                    final_chapter_text,
-                )
+    # --- Step 3: Revision Cycle ---
 
-                if (
-                    is_chapter_complete
-                    and revision_iterations >= Config.CHAPTER_MIN_REVISIONS
-                ):
-                    logger.Log(
-                        f"Chapter {chapter_num} meets quality standards post-assembly. Exiting revision.",
-                        4,
-                    )
-                    break
+    if Writer.Config.CHAPTER_NO_REVISIONS:
+        _Logger.Log("Chapter revision disabled in config. Skipping revision loop.", 4)
+        final_chapter_text = initial_chapter_draft
+    else:
+        _Logger.Log(f"Entering feedback/revision loop for Chapter {_ChapterNum}.", 4)
+        current_chapter_text = initial_chapter_draft
+        iterations = 0
+        while True:
+            iterations += 1
 
-                if revision_iterations == Config.CHAPTER_MAX_REVISIONS:
-                    logger.Log(
-                        f"Max revisions ({Config.CHAPTER_MAX_REVISIONS}) reached for Chapter {chapter_num}. Proceeding with current version (IsComplete: {is_chapter_complete}).",
-                        6 if not is_chapter_complete else 4,
-                    )
-                    break
+            is_complete = Writer.LLMEditor.GetChapterRating(Interface, _Logger, current_chapter_text)
 
-                logger.Log(
-                    f"Revising Chapter {chapter_num} based on feedback (IsComplete: {is_chapter_complete})...",
-                    4,
-                )
-                chapter_revision_prompt_text = Prompts.CHAPTER_REVISION_PROMPT.format(
-                    _Chapter=final_chapter_text, _Feedback=feedback_on_chapter
-                )
-
-                messages_for_this_revision = current_revision_history[:]
-                messages_for_this_revision.append(
-                    interface.build_user_query(chapter_revision_prompt_text)
-                )
-
-                current_chapter_words_for_rev = get_word_count(final_chapter_text)
-                MIN_WORDS_FOR_CHAPTER_REVISION = int(
-                    current_chapter_words_for_rev * 0.7
-                )
-                MAX_TOKENS_FOR_CHAPTER_REVISION = int(
-                    current_chapter_words_for_rev * WORD_TO_TOKEN_RATIO * 1.2
-                )
-
-                response_revised_chapter_messages = interface.safe_generate_text(
-                    logger,
-                    messages_for_this_revision,
-                    Config.CHAPTER_REVISION_WRITER_MODEL,
-                    min_word_count=MIN_WORDS_FOR_CHAPTER_REVISION,
-                    max_tokens=MAX_TOKENS_FOR_CHAPTER_REVISION,
-                )
-
-                final_chapter_text = interface.get_last_message_text(
-                    response_revised_chapter_messages
-                )
-                current_revision_history = response_revised_chapter_messages
-                logger.Log(
-                    f"Chapter {chapter_num} revised. New word count: {get_word_count(final_chapter_text)}.",
-                    4,
-                )
-
-            except Exception as e:
-                logger.Log(
-                    f"Error during Chapter {chapter_num} revision loop (iteration {revision_iterations}): {e}. Using last good version.",
-                    7,
-                )
+            if iterations > Writer.Config.CHAPTER_MAX_REVISIONS:
+                _Logger.Log("Max revisions reached. Exiting.", 6)
+                break
+            if iterations > Writer.Config.CHAPTER_MIN_REVISIONS and is_complete:
+                _Logger.Log("Chapter meets quality standards. Exiting.", 5)
                 break
 
-    logger.Log(
-        f"--- Finished Generation for Chapter {chapter_num}/{total_chapters}. Final word count: {get_word_count(final_chapter_text)} ---",
-        2,
+            _Logger.Log(f"Chapter Revision Iteration {iterations}", 4)
+
+            feedback = Writer.LLMEditor.GetFeedbackOnChapter(
+                Interface, _Logger, current_chapter_text, narrative_context.base_novel_outline_markdown
+            )
+
+            _Logger.Log("Revising chapter based on feedback...", 2)
+            revision_prompt = Writer.Prompts.CHAPTER_REVISION.format(
+                _Chapter=current_chapter_text, _Feedback=feedback
+            )
+            revision_messages = [Interface.BuildUserQuery(revision_prompt)]
+            revision_messages = Interface.SafeGenerateText(
+                _Logger, revision_messages, Writer.Config.CHAPTER_REVISION_WRITER_MODEL,
+                _MinWordCount=len(current_chapter_text.split()) * 0.8
+            )
+            current_chapter_text = Interface.GetLastMessageText(revision_messages)
+            _Logger.Log("Done revising chapter.", 2)
+
+        final_chapter_text = current_chapter_text
+        _Logger.Log(f"Exited revision loop for Chapter {_ChapterNum}.", 4)
+
+    # --- Step 4: Finalize and Update Context ---
+
+    chapter_context.set_generated_content(final_chapter_text)
+
+    chapter_summary = Writer.SummarizationUtils.summarize_chapter(
+        Interface, _Logger, final_chapter_text, narrative_context, _ChapterNum
     )
-    return final_chapter_text, list_of_scene_outlines
+    chapter_context.set_summary(chapter_summary)
+    _Logger.Log(f"Chapter {chapter_context.chapter_number} Summary: {chapter_context.summary}", 2)
+
+    narrative_context.add_chapter(chapter_context)
+
+    return final_chapter_text
+
+
+def execute_generation_stage(
+    Interface: Interface,
+    _Logger: Logger,
+    stage_name: str,
+    prompt_template: str,
+    format_args: dict,
+    narrative_context_str: str,
+    chapter_num: int,
+    total_chapters: int,
+    model: str,
+    narrative_context: NarrativeContext,
+) -> str:
+    """
+    Executes a single stage of the multi-stage chapter generation process,
+    including a critique and revision cycle.
+    """
+    _Logger.Log(f"Executing Stage: {stage_name} for Chapter {chapter_num}", 5)
+
+    # --- Initial Generation ---
+    _Logger.Log(f"Generating initial content for {stage_name}...", 3)
+
+    full_format_args = {
+        "narrative_context": narrative_context_str,
+        "_ChapterNum": chapter_num,
+        "_TotalChapters": total_chapters,
+        **format_args
+    }
+    prompt = prompt_template.format(**full_format_args)
+    messages = [Interface.BuildUserQuery(prompt)]
+
+    min_words = 150
+    if "Stage1Chapter" in format_args:
+        min_words = len(format_args["Stage1Chapter"].split())
+    if "Stage2Chapter" in format_args:
+        min_words = len(format_args["Stage2Chapter"].split())
+
+    messages = Interface.SafeGenerateText(
+        _Logger, messages, model, _MinWordCount=min_words
+    )
+    initial_content = Interface.GetLastMessageText(messages)
+
+    # --- Critique and Revise ---
+    _Logger.Log(f"Critiquing and revising content for {stage_name}...", 3)
+
+    task_description = f"You are writing a novel. Your current task is '{stage_name}' for Chapter {chapter_num}. You need to generate content that fulfills this stage's specific goal (e.g., plot, character development, dialogue) while remaining coherent with the overall story."
+
+    revised_content = Writer.CritiqueRevision.critique_and_revise_creative_content(
+        Interface,
+        _Logger,
+        initial_content=initial_content,
+        task_description=task_description,
+        narrative_context_summary=narrative_context_str,
+        initial_user_prompt=narrative_context.initial_prompt,
+    )
+
+    _Logger.Log(f"Finished stage: {stage_name}", 5)
+    return revised_content

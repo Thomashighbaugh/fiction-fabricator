@@ -1,207 +1,107 @@
-# File: Writer/PrintUtils.py
-# Purpose: Utilities for logging and colored console output.
+#!/usr/bin/python3
 
-"""
-Logging and Printing Utilities.
-
-This module provides a `Logger` class for:
-- Writing timestamped log messages to both a file and the console.
-- Coloring console output based on log level using `termcolor`.
-- Saving Langchain message histories (LLM interactions) to separate debug files
-  in both JSON and Markdown formats.
-- Saving arbitrary artifact files (like stories, outlines) to the log directory.
-"""
-
-import termcolor
-import datetime
 import os
 import json
-from typing import List, Dict, Any, Optional
-
-import Writer.Config as Config
+import datetime
+import termcolor
+import Writer.Config
 
 
 class Logger:
-    """
-    Handles logging of messages to file and console, and saving debug information.
-    """
 
-    _LOG_LEVEL_COLORS: Dict[int, str] = {
-        0: "white",
-        1: "light_grey",
-        2: "blue",
-        3: "cyan",
-        4: "magenta",
-        5: "green",
-        6: "yellow",
-        7: "red",
-    }
-    _DEFAULT_COLOR = "white"
-
-    def __init__(self, log_dir_base: str = "Logs"):
+    def __init__(self, _LogfilePrefix="Logs"):
         """
-        Initializes the Logger, creating necessary log directories and files.
-
-        Args:
-            log_dir_base (str): The base directory name for storing all generation logs.
-                                Default is "Logs".
+        Initializes the logger, creating a unique directory for each run.
         """
-        current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.log_session_dir = os.path.join(
-            os.path.abspath(log_dir_base), f"Generation_{current_timestamp}"
-        )
-        self.langchain_debug_dir = os.path.join(self.log_session_dir, "LangchainDebug")
-
-        os.makedirs(self.langchain_debug_dir, exist_ok=True)
-
-        self.main_log_path = os.path.join(self.log_session_dir, "Main.log")
-
-        try:
-            self.log_file_handle = open(self.main_log_path, "a", encoding="utf-8")
-        except IOError as e:
-            print(
-                f"CRITICAL: Could not open main log file at {self.main_log_path}. Error: {e}"
-            )
-            self.log_file_handle = None
-
-        self.langchain_interaction_id: int = 0
-        self.log_items_buffer: List[str] = []
-
-        self.Log(
-            f"Logger initialized. Log session directory: {self.log_session_dir}", 0
-        )
-
-    def save_langchain_interaction(
-        self, interaction_label: str, messages: List[Dict[str, Any]]
-    ) -> None:
-        """
-        Saves a list of LLM messages (an interaction chain) to JSON and Markdown files
-        for debugging purposes.
-
-        Args:
-            interaction_label (str): A label for this interaction (e.g., function_name.model_name).
-            messages (List[Dict[str, Any]]): The list of message dictionaries.
-        """
-        if not self.log_file_handle:
-            print(
-                f"WARNING: Main log file not open. Skipping SaveLangchain for {interaction_label}."
-            )
-            return
-
-        safe_label = "".join(
-            c if c.isalnum() or c in [".", "_", "-"] else "_" for c in interaction_label
-        )
-        base_filename = f"{self.langchain_interaction_id:03d}_{safe_label}"
-        self.langchain_interaction_id += 1
-
-        json_filepath = os.path.join(self.langchain_debug_dir, f"{base_filename}.json")
-        md_filepath = os.path.join(self.langchain_debug_dir, f"{base_filename}.md")
-
-        try:
-            with open(json_filepath, "w", encoding="utf-8") as f_json:
-                json.dump(messages, f_json, indent=2, ensure_ascii=False)
-
-            md_content = f"# Langchain Interaction: {interaction_label}\n*(ID: {base_filename})*\n\n---\n"
-            for msg in messages:
-                role = msg.get("role", "unknown_role")
-                content = str(msg.get("content", ""))
-                safe_content = content.replace("`", "\\`")
-                md_content += (
-                    f"\n\n## Role: `{role}`\n\n```text\n{safe_content}\n```\n\n---\n"
-                )
-
-            with open(md_filepath, "w", encoding="utf-8") as f_md:
-                f_md.write(md_content)
-
-            self.Log(
-                f"Saved Langchain interaction '{interaction_label}' to {base_filename}.[json|md]",
-                0,
-            )
-        except IOError as e:
-            self.Log(
-                f"ERROR: Could not write Langchain debug files for {interaction_label}. Error: {e}",
-                7,
-            )
-        except Exception as e:
-            self.Log(
-                f"UNEXPECTED ERROR during SaveLangchain for {interaction_label}: {e}", 7
-            )
-
-    def save_artifact(
-        self, content: str, filename: str, subdirectory: Optional[str] = None
-    ) -> None:
-        """
-        Saves arbitrary text content (like a generated story, outline, etc.) to a file
-        within the current log session directory.
-
-        Args:
-            content (str): The text content to save.
-            filename (str): The desired filename.
-            subdirectory (Optional[str]): Saves within this subdirectory of the log_session_dir.
-        """
-        if not self.log_file_handle:
-            print(
-                f"WARNING: Main log file not open. Skipping SaveArtifact for {filename}."
-            )
-            return
-
-        save_path_dir = self.log_session_dir
-        if subdirectory:
-            save_path_dir = os.path.join(self.log_session_dir, subdirectory)
+        # Make Paths For Log
+        log_dir_name = f"{Writer.Config.PROJECT_NAME}_" + datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        log_dir_path = os.path.join(_LogfilePrefix, log_dir_name)
         
-        os.makedirs(save_path_dir, exist_ok=True)
-        filepath = os.path.join(save_path_dir, filename)
+        self.LangchainDebugPath = os.path.join(log_dir_path, "LangchainDebug")
+        os.makedirs(self.LangchainDebugPath, exist_ok=True)
 
+        # Setup Log Path
+        self.LogDirPrefix = log_dir_path
+        self.LogPath = os.path.join(log_dir_path, "Main.log")
+        self.File = open(self.LogPath, "a", encoding='utf-8')
+        self.LangchainID = 0
+
+    def SaveLangchain(self, _LangChainID: str, _LangChain: list):
+        """
+        Saves the entire language chain object as both JSON and Markdown for debugging.
+        """
+        # Sanitize the ID for use in file paths
+        safe_id = "".join(c for c in _LangChainID if c.isalnum() or c in ('-', '_')).rstrip()
+        
+        # Calculate Filepath For This Langchain
+        this_log_path_json = os.path.join(self.LangchainDebugPath, f"{self.LangchainID}_{safe_id}.json")
+        this_log_path_md = os.path.join(self.LangchainDebugPath, f"{self.LangchainID}_{safe_id}.md")
+        langchain_debug_title = f"{self.LangchainID}_{safe_id}"
+        self.LangchainID += 1
+
+        # Generate and Save JSON Version
         try:
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(content)
-            self.Log(f"Saved artifact to: {filepath}", 1)
-        except IOError as e:
-            self.Log(
-                f"ERROR: Could not write artifact '{filename}' to '{filepath}'. Error: {e}",
-                7,
-            )
+            with open(this_log_path_json, "w", encoding='utf-8') as f:
+                json.dump(_LangChain, f, indent=4, sort_keys=True)
         except Exception as e:
-            self.Log(
-                f"UNEXPECTED ERROR during SaveArtifact for '{filename}' to '{filepath}': {e}",
-                7,
-            )
+            self.Log(f"Failed to write Langchain JSON log for {langchain_debug_title}. Error: {e}", 7)
 
-    def Log(self, item: str, level: int, stream: bool = False) -> None:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        safe_level = max(0, min(level, max(self._LOG_LEVEL_COLORS.keys())))
-        log_entry_raw = f"[{str(safe_level).ljust(2)}] [{timestamp}] {item}"
+        # Now, Save Markdown Version
+        try:
+            with open(this_log_path_md, "w", encoding='utf-8') as f:
+                markdown_version = f"# Debug LangChain {langchain_debug_title}\n**Note: '```' tags have been removed in this version.**\n"
+                for message in _LangChain:
+                    role = message.get('role', 'unknown')
+                    content = message.get('content', '[NO CONTENT]')
+                    markdown_version += f"\n\n\n## Role: {role}\n"
+                    markdown_version += f"```\n{str(content).replace('```', '')}\n```"
+                f.write(markdown_version)
+        except Exception as e:
+            self.Log(f"Failed to write Langchain Markdown log for {langchain_debug_title}. Error: {e}", 7)
+            
+        self.Log(f"Wrote LangChain debug logs for {langchain_debug_title}", 1)
 
-        if self.log_file_handle:
-            try:
-                self.log_file_handle.write(log_entry_raw + "\n")
-                self.log_file_handle.flush()
-            except IOError as e:
-                print(
-                    f"CRITICAL FILE ERROR: Could not write to main log. Original message: {log_entry_raw}. Error: {e}"
-                )
 
-        self.log_items_buffer.append(log_entry_raw)
-        color = self._LOG_LEVEL_COLORS.get(safe_level, self._DEFAULT_COLOR)
+    def SaveStory(self, _StoryContent: str):
+        """Saves the given story to disk."""
+        story_path = os.path.join(self.LogDirPrefix, "Story.md")
+        try:
+            with open(story_path, "w", encoding='utf-8') as f:
+                f.write(_StoryContent)
+            self.Log(f"Wrote final story to disk at {story_path}", 5)
+        except Exception as e:
+            self.Log(f"Failed to write final story to disk. Error: {e}", 7)
 
-        should_print_to_console = True
-        if stream and (not Config.DEBUG or Config.DEBUG_LEVEL < 2):
-            should_print_to_console = False
 
-        if should_print_to_console:
-            try:
-                level_str = f"[{str(safe_level).ljust(2)}]"
-                timestamp_str = f"[{timestamp}]"
-                colored_level = termcolor.colored(level_str, color)
-                print(f"{colored_level} {timestamp_str} {item}")
-            except Exception as e:
-                print(f"Termcolor formatting failed: {e}. Raw log: {log_entry_raw}")
+    def Log(self, _Item, _Level: int = 1):
+        """Logs an item to the console and the log file with appropriate color-coding."""
+        # Create Log Entry
+        log_entry = f"[{str(_Level).ljust(2)}] [{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}] {_Item}"
 
-    def close(self) -> None:
-        if self.log_file_handle and not self.log_file_handle.closed:
-            self.Log("Closing logger.", 0)
-            self.log_file_handle.close()
-            self.log_file_handle = None
+        # Write it to file
+        self.File.write(log_entry + "\n")
+        self.File.flush() # Ensure logs are written immediately
 
-    def __del__(self) -> None:
-        self.close()
+        # Now color and print it to the console
+        color_map = {
+            0: "white",   # Verbose debug
+            1: "grey",    # Info
+            2: "blue",    # Process start/end
+            3: "cyan",    # Sub-process info
+            4: "magenta", # Important info
+            5: "green",   # Success/completion
+            6: "yellow",  # Warning
+            7: "red",     # Error/Critical
+        }
+        color = color_map.get(_Level, "white")
+        
+        try:
+            print(termcolor.colored(log_entry, color))
+        except Exception:
+            # Fallback for environments that don't support color
+            print(log_entry)
+
+
+    def __del__(self):
+        if self.File and not self.File.closed:
+            self.File.close()

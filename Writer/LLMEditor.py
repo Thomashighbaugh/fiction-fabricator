@@ -1,250 +1,101 @@
-# File: Writer/LLMEditor.py
-# Purpose: Provides LLM-based feedback and ratings for outlines and chapters.
-
-"""
-LLM-based Editing and Evaluation Module.
-
-This module contains functions that leverage LLMs to:
-- Provide constructive criticism on story outlines (`GetFeedbackOnOutline`).
-- Rate the completeness or quality of outlines (`GetOutlineRating`).
-- Offer editorial feedback on individual chapter texts (`GetFeedbackOnChapter`).
-- Assess if a chapter meets a certain quality standard (`GetChapterRating`).
-
-It uses prompts defined in `Writer.Prompts` and interacts with the LLM
-via the `Interface` class. JSON parsing is handled for structured responses.
-"""
+#!/usr/bin/python3
 
 import json
-import Writer.Config as Config
-import Writer.PrintUtils
+import Writer.Config
 import Writer.Prompts
 from Writer.Interface.Wrapper import Interface
-import Writer.Models as Models
+from Writer.PrintUtils import Logger
 
-# Heuristic: 1 word is approx 1.5 tokens in English, but can vary.
-WORD_TO_TOKEN_RATIO = 1.5
-
-
-class LLMEditorError(Exception):
-    """Custom exception for errors specific to LLMEditor operations."""
-
-    pass
-
-
-def GetFeedbackOnOutline(
-    interface: Interface, logger: Writer.PrintUtils.Logger, outline_text: str
-) -> str:
+def GetFeedbackOnOutline(Interface: Interface, _Logger: Logger, _Outline: str) -> str:
     """
-    Prompts an LLM to critique a story outline.
-
-    Args:
-        interface: The LLM interaction wrapper.
-        logger: The logging instance.
-        outline_text: The story outline text to be critiqued.
-
-    Returns:
-        A string containing the LLM's feedback on the outline.
+    Generates a critique of a given story outline. This function is intended to be
+    the 'critique' step in a larger revision process.
     """
-    logger.Log("Prompting LLM To Critique Outline", 5)
-
-    user_prompt_text: str = Writer.Prompts.OPTIMIZED_CRITIC_OUTLINE_PROMPT.format(
-        _Outline=outline_text
-    )
-
-    messages = [
-        interface.build_system_query(Writer.Prompts.DEFAULT_SYSTEM_PROMPT),
-        interface.build_user_query(user_prompt_text),
+    # Setup Initial Context History
+    History = [
+        Interface.BuildSystemQuery(Writer.Prompts.CRITIC_OUTLINE_INTRO),
+        Interface.BuildUserQuery(Writer.Prompts.CRITIC_OUTLINE_PROMPT.format(_Outline=_Outline))
     ]
 
-    # A critique should be concise, 500 words is a generous limit.
-    max_tokens_for_feedback = int(500 * WORD_TO_TOKEN_RATIO)
-
-    response_messages = interface.safe_generate_text(
-        logger,
-        messages,
-        Config.REVISION_MODEL,
-        min_word_count=70,
-        max_tokens=max_tokens_for_feedback,
+    _Logger.Log("Prompting LLM to critique outline...", 5)
+    # This is a creative task, so we want a substantive response.
+    History = Interface.SafeGenerateText(
+        _Logger, History, Writer.Config.REVISION_MODEL, _MinWordCount=50
     )
-    logger.Log("Finished Getting Outline Feedback", 5)
-    return interface.get_last_message_text(response_messages)
+    _Logger.Log("Finished getting outline feedback.", 5)
+
+    return Interface.GetLastMessageText(History)
 
 
-def GetOutlineRating(
-    interface: Interface, logger: Writer.PrintUtils.Logger, outline_text: str
-) -> bool:
+def GetOutlineRating(Interface: Interface, _Logger: Logger, _Outline: str) -> bool:
     """
-    Prompts an LLM to rate the completeness of a story outline.
-
-    Args:
-        interface: The LLM interaction wrapper.
-        logger: The logging instance.
-        outline_text: The story outline text to be rated.
-
-    Returns:
-        A boolean indicating if the LLM deems the outline complete (True) or not (False).
-        Returns False on parsing errors after multiple retries.
+    Asks an LLM to evaluate if an outline is complete and meets quality criteria.
+    Returns a simple boolean. This is a non-creative check.
     """
-    logger.Log("Prompting LLM To Get Outline Review JSON", 5)
-
-    user_prompt_text: str = Writer.Prompts.OUTLINE_COMPLETE_PROMPT.format(
-        _Outline=outline_text
-    )
-
-    system_prompt_text: str = (
-        "You are an AI assistant that evaluates story outlines and responds strictly in JSON format "
-        "as per the user's instructions."
-    )
-
-    messages = [
-        interface.build_system_query(system_prompt_text),
-        interface.build_user_query(user_prompt_text),
+    History = [
+        Interface.BuildSystemQuery(Writer.Prompts.OUTLINE_COMPLETE_INTRO),
+        Interface.BuildUserQuery(Writer.Prompts.OUTLINE_COMPLETE_PROMPT.format(_Outline=_Outline))
     ]
 
-    try:
-        # Expected output is a tiny JSON object.
-        max_tokens_for_rating = 50
-
-        _response_messages, parsed_json_data = interface.safe_generate_json(
-            logger,
-            messages,
-            Config.EVAL_MODEL,
-            required_attribs=["IsComplete"],
-            max_tokens=max_tokens_for_rating,
-            expected_response_model=Models.IsComplete,
-        )
-
-        if isinstance(parsed_json_data, dict):
-            is_complete = parsed_json_data.get("IsComplete", False)
-        else:
-            logger.Log(
-                f"LLM returned an unexpected type for outline rating: {type(parsed_json_data)}. Expected dict. Defaulting to False.",
-                6,
-            )
-            is_complete = False
-
-        if not isinstance(is_complete, bool):
-            logger.Log(
-                f"LLM returned non-boolean for IsComplete: {is_complete}. Defaulting to False.",
-                6,
-            )
-            return False
-        logger.Log(f"Editor Determined IsComplete for outline: {is_complete}", 5)
-        return is_complete
-    except Exception as e:
-        logger.Log(
-            f"Critical Error Parsing JSON for outline rating or LLM call failed: {e}", 7
-        )
-        return False
-
-
-def GetFeedbackOnChapter(
-    interface: Interface,
-    logger: Writer.PrintUtils.Logger,
-    chapter_text: str,
-    overall_story_outline: str,
-) -> str:
-    """
-    Prompts an LLM to critique a chapter text.
-
-    Args:
-        interface: The LLM interaction wrapper.
-        logger: The logging instance.
-        chapter_text: The chapter text to be critiqued.
-        overall_story_outline: The overall story outline for context.
-
-    Returns:
-        A string containing the LLM's feedback on the chapter.
-    """
-    logger.Log("Prompting LLM To Critique Chapter", 5)
-
-    user_prompt_text: str = Writer.Prompts.OPTIMIZED_CRITIC_CHAPTER_PROMPT.format(
-        _ChapterText=chapter_text,
-        _OverallStoryOutline=overall_story_outline,
+    _Logger.Log("Prompting LLM for outline completion rating (JSON)...", 5)
+    
+    # This call generates non-creative JSON. The SafeGenerateJSON function handles retries for format.
+    _, ResponseJSON = Interface.SafeGenerateJSON(
+        _Logger, History, Writer.Config.EVAL_MODEL, _RequiredAttribs=["IsComplete"]
     )
+    
+    IsComplete = ResponseJSON.get("IsComplete", False)
+    _Logger.Log(f"Editor determined IsComplete: {IsComplete}", 5)
+    
+    # Ensure the returned value is a boolean
+    if isinstance(IsComplete, bool):
+        return IsComplete
+    elif isinstance(IsComplete, str):
+        return IsComplete.lower() == 'true'
+    return False
 
-    messages_for_llm = [
-        interface.build_system_query(Writer.Prompts.DEFAULT_SYSTEM_PROMPT),
-        interface.build_user_query(user_prompt_text),
+
+def GetFeedbackOnChapter(Interface: Interface, _Logger: Logger, _Chapter: str, _Outline: str) -> str:
+    """
+    Generates a critique of a given chapter. This function is intended to be
+    the 'critique' step in a larger revision process.
+    """
+    History = [
+        Interface.BuildSystemQuery(Writer.Prompts.CRITIC_CHAPTER_INTRO),
+        Interface.BuildUserQuery(Writer.Prompts.CRITIC_CHAPTER_PROMPT.format(_Chapter=_Chapter, _Outline=_Outline))
     ]
 
-    # A critique should be concise, 500 words is a generous limit.
-    max_tokens_for_feedback = int(500 * WORD_TO_TOKEN_RATIO)
-
-    response_messages = interface.safe_generate_text(
-        logger,
-        messages_for_llm,
-        Config.REVISION_MODEL,
-        min_word_count=100,
-        max_tokens=max_tokens_for_feedback,
+    _Logger.Log("Prompting LLM to critique chapter...", 5)
+    Messages = Interface.SafeGenerateText(
+        _Logger, History, Writer.Config.REVISION_MODEL, _MinWordCount=50
     )
-    logger.Log("Finished Getting Chapter Feedback", 5)
-    return interface.get_last_message_text(response_messages)
+    _Logger.Log("Finished getting chapter feedback.", 5)
+
+    return Interface.GetLastMessageText(Messages)
 
 
-def GetChapterRating(
-    interface: Interface, logger: Writer.PrintUtils.Logger, chapter_text: str
-) -> bool:
+def GetChapterRating(Interface: Interface, _Logger: Logger, _Chapter: str) -> bool:
     """
-    Prompts an LLM to rate the completeness/quality of a chapter.
-
-    Args:
-        interface: The LLM interaction wrapper.
-        logger: The logging instance.
-        chapter_text: The chapter text to be rated.
-
-    Returns:
-        A boolean indicating if the LLM deems the chapter complete/good (True) or not (False).
-        Returns False on parsing errors after multiple retries.
+    Asks an LLM to evaluate if a chapter is complete and meets quality criteria.
+    Returns a simple boolean. This is a non-creative check.
     """
-    logger.Log("Prompting LLM To Get Chapter Review JSON", 5)
-
-    user_prompt_text: str = Writer.Prompts.CHAPTER_COMPLETE_PROMPT.format(
-        _Chapter=chapter_text
-    )
-
-    system_prompt_text: str = (
-        "You are an AI assistant that evaluates story chapters and responds strictly in JSON format "
-        "as per the user's instructions."
-    )
-
-    messages = [
-        interface.build_system_query(system_prompt_text),
-        interface.build_user_query(user_prompt_text),
+    History = [
+        Interface.BuildSystemQuery(Writer.Prompts.CHAPTER_COMPLETE_INTRO),
+        Interface.BuildUserQuery(Writer.Prompts.CHAPTER_COMPLETE_PROMPT.format(_Chapter=_Chapter))
     ]
 
-    try:
-        # Expected output is a tiny JSON object.
-        max_tokens_for_rating = 50
+    _Logger.Log("Prompting LLM for chapter completion rating (JSON)...", 5)
 
-        _response_messages, parsed_json_data = interface.safe_generate_json(
-            logger,
-            messages,
-            Config.EVAL_MODEL,
-            required_attribs=["IsComplete"],
-            max_tokens=max_tokens_for_rating,
-            expected_response_model=Models.IsComplete,
-        )
+    # This call generates non-creative JSON.
+    _, ResponseJSON = Interface.SafeGenerateJSON(
+        _Logger, History, Writer.Config.EVAL_MODEL, _RequiredAttribs=["IsComplete"]
+    )
 
-        if isinstance(parsed_json_data, dict):
-            is_complete = parsed_json_data.get("IsComplete", False)
-        else:
-            logger.Log(
-                f"LLM returned an unexpected type for chapter rating: {type(parsed_json_data)}. Expected dict. Defaulting to False.",
-                6,
-            )
-            is_complete = False
+    IsComplete = ResponseJSON.get("IsComplete", False)
+    _Logger.Log(f"Editor determined IsComplete: {IsComplete}", 5)
 
-        if not isinstance(is_complete, bool):
-            logger.Log(
-                f"LLM returned non-boolean for IsComplete: {is_complete}. Defaulting to False.",
-                6,
-            )
-            return False
-        logger.Log(f"Editor Determined IsComplete for chapter: {is_complete}", 5)
-        return is_complete
-    except Exception as e:
-        logger.Log(
-            f"Critical Error Parsing JSON for chapter rating or LLM call failed: {e}", 7
-        )
-        return False
+    if isinstance(IsComplete, bool):
+        return IsComplete
+    elif isinstance(IsComplete, str):
+        return IsComplete.lower() == 'true'
+    return False

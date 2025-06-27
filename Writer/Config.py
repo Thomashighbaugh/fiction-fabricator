@@ -1,89 +1,110 @@
-# File: Writer/Config.py
-# Purpose: Central configuration for models, API keys, and generation parameters.
+#!/usr/bin/python3
 
-"""
-Central configuration module for the FictionFabricator.
+import configparser
+import os
+import termcolor
 
-This module defines default values for various settings, including:
-- LLM model identifiers for different generation tasks.
-- API keys and endpoint configurations (though sensitive keys are best loaded from .env).
-- Parameters controlling the generation process (e.g., revision counts, seed).
-- Flags for enabling/disabling features (e.g., debugging, translation).
+# --- Configuration Loading ---
 
-These default values can be overridden by command-line arguments at runtime.
-"""
+# Create a ConfigParser instance
+config = configparser.ConfigParser()
 
-# --- Model Configuration ---
-# These will be populated by argparse or default values.
-# It's recommended to use specific, descriptive names for each model's role.
-# Example format: "provider://model_identifier@host?param1=value1¶m2=value2"
-# or "provider://model_identifier" (host/params optional or provider-specific)
+# Define the path to config.ini relative to this file's location
+# This assumes Config.py is in Writer/, and config.ini is in the project root.
+config_path = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
 
-# Core Creative Models
-INITIAL_OUTLINE_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest"
-MODEL_STORY_ELEMENTS_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For generating detailed story elements
-MODEL_SCENE_OUTLINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For breaking chapters into scene outlines
-MODEL_SCENE_NARRATIVE_GENERATOR: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For writing individual scene narratives
-MODEL_CHAPTER_ASSEMBLY_REFINER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For refining assembled scenes into a cohesive chapter
+# Read the configuration file and add explicit, prominent logging
+print(termcolor.colored("--- Initializing Configuration ---", "yellow"))
+if os.path.exists(config_path):
+    try:
+        config.read(config_path)
+        # Convert section names to lowercase for consistency
+        config._sections = {k.lower(): v for k, v in config._sections.items()}
+        print(termcolor.colored(f"[CONFIG] Successfully read config.ini from: {config_path}", "green"))
+        loaded_sections = list(config.sections())
+        print(termcolor.colored(f"[CONFIG] Found sections: {loaded_sections}", "cyan"))
 
-# Supporting and Utility Models
-MODEL_CHAPTER_CONTEXT_SUMMARIZER: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For summarizing previous chapter/scene for context
-REVISION_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For providing critique/feedback
-CHAPTER_REVISION_WRITER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For revising chapters based on feedback
-EVAL_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For evaluation tasks (e.g., IsComplete checks, JSON ratings)
-INFO_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For extracting story metadata (title, summary, tags)
-SCRUB_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For cleaning final output
-CHECKER_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For JSON parsing checks or simple validations
-TRANSLATOR_MODEL: str = "huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF:latest" # For translation tasks
+        # Explicitly check for NVIDIA section and key for debugging
+        if 'nvidia_settings' in loaded_sections:
+            nvidia_models_value = config.get('nvidia_settings', 'available_models', fallback="[NOT FOUND]")
+            nvidia_url_value = config.get('nvidia_settings', 'base_url', fallback="[NOT FOUND]")
+            print(termcolor.colored(f"[CONFIG] Raw value for [nvidia_settings]/available_models: '{nvidia_models_value}'", "cyan"))
+            print(termcolor.colored(f"[CONFIG] Raw value for [nvidia_settings]/base_url: '{nvidia_url_value}'", "cyan"))
+        else:
+            print(termcolor.colored("[CONFIG] Section [nvidia_settings] not found in config.ini.", "red"))
 
-# --- API and System Settings ---
-OLLAMA_CTX: int = 32768  # Default context window size for Ollama models Default model lists 131072 but went with 32k for now, adjust based on context_length running `ollama show [model name]`
-OLLAMA_HOST: str = "http://localhost:11434" # Default Ollama host URL
+    except configparser.Error as e:
+        print(termcolor.colored(f"[CONFIG] CRITICAL: Failed to parse config.ini. Error: {e}", "red"))
+else:
+    print(termcolor.colored(f"[CONFIG] WARNING: config.ini not found at expected path: {config_path}", "red"))
 
-# API keys should ideally be loaded from environment variables (.env file)
-# and not hardcoded here. The Wrapper.py handles loading from os.environ.
-# Example (actual values will be loaded from .env by the interface):
-# GOOGLE_API_KEY: Optional[str] = None
-# OPENROUTER_API_KEY: Optional[str] = None
+print(termcolor.colored("------------------------------------", "yellow"))
 
-SEED: int = 108  # Default seed for reproducibility and appeasing my superstitions, can be overridden by argparse
 
-# --- Generation Parameters ---
-TRANSLATE_LANGUAGE: str = ""  # Target language for story translation (e.g., "French")
-TRANSLATE_PROMPT_LANGUAGE: str = ""  # Target language for initial user prompt translation
+def get_config_or_default(section, key, default, is_bool=False, is_int=False):
+    """
+    Safely get a value from the config file, otherwise return the default.
+    Handles type conversion for boolean and integer values.
+    Uses lowercase for section names as per configparser standard.
+    """
+    section = section.lower()
+    if is_bool:
+        return config.getboolean(section, key, fallback=default)
+    if is_int:
+        return config.getint(section, key, fallback=default)
+    return config.get(section, key, fallback=default)
 
-# Outline revision settings
-OUTLINE_MIN_REVISIONS: int = 1  # Minimum number of revision cycles for the main outline
-OUTLINE_MAX_REVISIONS: int = 3  # Maximum number of revision cycles for the main outline
+# --- Project Info ---
+PROJECT_NAME = get_config_or_default('PROJECT_INFO', 'project_name', 'Fiction Fabricator')
 
-# Chapter/Scene revision settings
-CHAPTER_NO_REVISIONS: bool = False  # If True, skips feedback/revision loops for assembled chapters
-CHAPTER_MIN_REVISIONS: int = 1  # Minimum revision cycles for an assembled chapter
-CHAPTER_MAX_REVISIONS: int = 3  # Maximum revision cycles for an assembled chapter
 
-# Scene-specific generation parameters
-SCENE_NARRATIVE_MIN_WORDS: int = 350  # Minimum expected word count for a single generated scene narrative
-SCENE_OUTLINE_MIN_SCENES_PER_CHAPTER: int = 4 # Minimum scenes expected from the scene outliner per chapter
-SCENE_OUTLINE_GENERATION_MAX_ATTEMPTS: int = 5 # Max attempts to generate scene outlines if initial fails
+# --- LLM Model Selection ---
+INITIAL_OUTLINE_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'initial_outline_writer_model', "google://gemini-1.5-pro-latest")
+CHAPTER_OUTLINE_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'chapter_outline_writer_model', "google://gemini-1.5-flash-latest")
+CHAPTER_STAGE1_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'chapter_stage1_writer_model', "google://gemini-1.5-flash-latest")
+CHAPTER_STAGE2_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'chapter_stage2_writer_model', "google://gemini-1.5-flash-latest")
+CHAPTER_STAGE3_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'chapter_stage3_writer_model', "google://gemini-1.5-flash-latest")
+CHAPTER_STAGE4_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'chapter_stage4_writer_model', "google://gemini-1.5-flash-latest")
+CHAPTER_REVISION_WRITER_MODEL = get_config_or_default('LLM_SELECTION', 'chapter_revision_writer_model', "google://gemini-1.5-pro-latest")
+CRITIQUE_LLM = get_config_or_default('LLM_SELECTION', 'critique_llm', "google://gemini-1.5-flash-latest")
+REVISION_MODEL = get_config_or_default('LLM_SELECTION', 'revision_model', "google://gemini-1.5-flash-latest")
+EVAL_MODEL = get_config_or_default('LLM_SELECTION', 'eval_model', "google://gemini-1.5-flash-latest")
+INFO_MODEL = get_config_or_default('LLM_SELECTION', 'info_model', "google://gemini-1.5-flash-latest")
+SCRUB_MODEL = get_config_or_default('LLM_SELECTION', 'scrub_model', "google://gemini-1.5-flash-latest")
+CHECKER_MODEL = get_config_or_default('LLM_SELECTION', 'checker_model', "google://gemini-1.5-flash-latest")
 
-# --- Feature Flags ---
-SCRUB_NO_SCRUB: bool = False  # If True, skips the final scrubbing pass
-# EXPAND_OUTLINE is deprecated as scene-by-scene is the primary flow.
-# The main outline is now expected to be a chapter-level plot outline.
-ENABLE_FINAL_EDIT_PASS: bool = True # Enables a global novel editing pass after all chapters are assembled
 
-SCENE_GENERATION_PIPELINE: bool = True  # Master flag for scene-by-scene generation (should be True for this refactor)
-OPTIMIZE_PROMPTS_VERSION: str = "v2.1" # Version for tracking prompt sets, useful for A/B testing or updates
+# --- NVIDIA Specific Settings (if used) ---
+NVIDIA_AVAILABLE_MODELS = get_config_or_default('NVIDIA_SETTINGS', 'available_models', '')
+NVIDIA_BASE_URL = get_config_or_default('NVIDIA_SETTINGS', 'base_url', 'https://integrate.api.nvidia.com/v1')
 
-# --- Output Settings ---
-OPTIONAL_OUTPUT_NAME: str = ""  # If set, overrides default output filename generation
 
-# --- Debugging and Logging ---
-DEBUG: bool = False  # Enables verbose logging, including potentially printing full prompts/responses
-DEBUG_LEVEL: int = 0 # 0: Normal, 1: Basic Debug, 2: Detailed Debug (e.g. stream chunks)
+# --- Ollama Specific Settings (if used) ---
+OLLAMA_CTX = get_config_or_default('WRITER_SETTINGS', 'ollama_ctx', 8192, is_int=True)
 
-# --- Model Endpoint Overrides from Args (will be populated by Write.py) ---
-# These are placeholders to indicate that Write.py will manage overriding the above defaults.
-# For example, ARGS_INITIAL_OUTLINE_WRITER_MODEL: Optional[str] = None
-# Actual update logic is in Write.py
-# --- API and System Settings ---
+
+# --- Writer Settings ---
+SEED = get_config_or_default('WRITER_SETTINGS', 'seed', 108, is_int=True)
+OUTLINE_MIN_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'outline_min_revisions', 0, is_int=True)
+OUTLINE_MAX_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'outline_max_revisions', 3, is_int=True)
+CHAPTER_NO_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_no_revisions', False, is_bool=True)
+CHAPTER_MIN_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_min_revisions', 2, is_int=True)
+CHAPTER_MAX_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_max_revisions', 3, is_int=True)
+MINIMUM_CHAPTERS = get_config_or_default('WRITER_SETTINGS', 'minimum_chapters', 12, is_int=True)
+SCRUB_NO_SCRUB = get_config_or_default('WRITER_SETTINGS', 'scrub_no_scrub', False, is_bool=True)
+EXPAND_OUTLINE = get_config_or_default('WRITER_SETTINGS', 'expand_outline', True, is_bool=True)
+ENABLE_FINAL_EDIT_PASS = get_config_or_default('WRITER_SETTINGS', 'enable_final_edit_pass', False, is_bool=True)
+SCENE_GENERATION_PIPELINE = get_config_or_default('WRITER_SETTINGS', 'scene_generation_pipeline', True, is_bool=True)
+DEBUG = get_config_or_default('WRITER_SETTINGS', 'debug', False, is_bool=True)
+
+# Optional output name override from command-line (not set from config)
+OPTIONAL_OUTPUT_NAME = ""
+
+
+# Example models for reference:
+# "google://gemini-1.5-pro-latest"
+# "mistralai://mistral-large-latest"
+# "groq://mixtral-8x7b-32768"
+# "nvidia://meta/llama3-8b-instruct"
+# "ollama://llama3:70b"
+# "ollama://command-r-plus@10.1.65.4:11434"

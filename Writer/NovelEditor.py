@@ -1,173 +1,107 @@
-# File: Writer/NovelEditor.py
-# Purpose: Performs an optional global editing pass on the assembled novel for consistency and flow.
+#!/usr/bin/python3
 
-"""
-Global Novel Editing Module.
-
-This module provides functionality for an optional, high-level editing pass
-over the entire assembled novel (all generated chapters). Its purpose is to:
-- Enhance inter-chapter consistency in plot, characterization, and tone.
-- Smooth out transitions between chapters.
-- Identify and potentially refine areas where foreshadowing could be
-  strengthened or payoffs made more impactful, based on the complete narrative.
-- Improve overall pacing across the entire story arc.
-
-This pass is distinct from the per-chapter or per-scene revisions. It assumes
-individual chapters are already reasonably well-written and focuses on their
-integration into the larger work.
-"""
-
-import Writer.Config as Config
-import Writer.Prompts as Prompts
+import Writer.Config
+import Writer.Prompts
+import Writer.CritiqueRevision
+import Writer.Statistics
 from Writer.Interface.Wrapper import Interface
+from Writer.NarrativeContext import NarrativeContext
 from Writer.PrintUtils import Logger
-from Writer.Statistics import get_word_count
-from typing import List, Dict, Any, Optional
-
-# Heuristic: 1 word is approx 1.5 tokens in English, but can vary.
-WORD_TO_TOKEN_RATIO = 1.5
 
 
-def edit_novel_globally(
-    interface: Interface,
-    logger: Logger,
-    assembled_chapters: List[str],
-    overall_story_outline: str,
-) -> List[str]:
+def EditNovel(
+    Interface: Interface,
+    _Logger: Logger,
+    narrative_context: NarrativeContext,
+) -> NarrativeContext:
     """
-    Performs a global editing pass on a list of assembled chapter texts.
-    Each chapter is reviewed by an LLM in the context of preceding chapters
-    and the overall story outline to improve global narrative cohesion.
+    Performs a final, holistic editing pass on the entire novel.
+    It iterates through each chapter, re-editing it with the full context of the novel so far,
+    applying a critique-and-revision cycle to each edit.
 
     Args:
-        interface (Interface): The LLM interaction wrapper.
-        logger (Logger): The logging instance.
-        assembled_chapters (List[str]): A list of strings, where each string is
-                                        the text of an assembled and potentially
-                                        individually revised chapter.
-        overall_story_outline (str): The original high-level, chapter-by-chapter
-                                     plot outline for the entire story.
+        Interface: The LLM interface wrapper.
+        _Logger: The logger instance.
+        narrative_context: The context object containing all chapters and story info.
 
     Returns:
-        List[str]: A list of globally edited chapter texts. If editing fails for
-                   a chapter, the pre-edit version of that chapter might be returned.
+        The updated NarrativeContext object with edited chapters.
     """
-    if not assembled_chapters:
-        logger.Log(
-            "No chapters provided for global novel editing. Returning empty list.", 1
-        )
-        return []
+    _Logger.Log("Starting final holistic novel editing pass...", 2)
 
-    if not overall_story_outline or not overall_story_outline.strip():
-        logger.Log(
-            "Overall story outline is empty. Global editing context is limited.", 6
-        )
-        overall_story_outline = "Overall story outline not provided for full context."
+    total_chapters = len(narrative_context.chapters)
+    if total_chapters == 0:
+        _Logger.Log("No chapters found in narrative context to edit.", 6)
+        return narrative_context
 
-    total_chapters = len(assembled_chapters)
-    logger.Log(
-        f"Starting global novel editing pass for {total_chapters} chapter(s)...", 2
-    )
+    # Create a static list of original chapter content to use as context
+    original_chapters_content = {
+        chap.chapter_number: chap.generated_content for chap in narrative_context.chapters
+    }
 
-    globally_edited_chapters: List[str] = list(assembled_chapters)
+    for i in range(total_chapters):
+        chapter_num = i + 1
+        _Logger.Log(f"--- Editing Chapter {chapter_num}/{total_chapters} ---", 3)
 
-    novel_text_so_far_for_context = ""
-
-    for chapter_idx, current_chapter_text in enumerate(globally_edited_chapters):
-        chapter_num = chapter_idx + 1
-        original_word_count = get_word_count(current_chapter_text)
-        logger.Log(
-            f"Performing global edit review on Chapter {chapter_num}/{total_chapters} (Word count: {original_word_count})...",
-            3,
-        )
-
-        if not current_chapter_text or not current_chapter_text.strip():
-            logger.Log(
-                f"Chapter {chapter_num} is empty. Skipping global edit for this chapter.",
-                5,
-            )
-            novel_text_so_far_for_context += f"\n\n## Chapter {chapter_num} (Empty)\n\n"
+        chapter_to_edit_content = original_chapters_content.get(chapter_num)
+        if not chapter_to_edit_content:
+            _Logger.Log(f"Chapter {chapter_num} has no content to edit. Skipping.", 6)
             continue
 
-        try:
-            prompt_template = Prompts.GLOBAL_NOVEL_CHAPTER_EDIT_PROMPT
-            text_before_current_chapter = novel_text_so_far_for_context
+        # --- Step 1: Initial Edit Generation ---
+        _Logger.Log(f"Generating initial edit for Chapter {chapter_num}...", 5)
 
-            formatted_prompt = prompt_template.format(
-                ChapterNum=chapter_num,
-                _OverallStoryOutline=overall_story_outline,
-                _NovelTextSoFar=(
-                    text_before_current_chapter
-                    if text_before_current_chapter
-                    else "This is the first chapter of the novel."
-                ),
-                _ChapterTextToEdit=current_chapter_text,
-            )
-        except KeyError as e:
-            error_msg = f"Formatting error in GLOBAL_NOVEL_CHAPTER_EDIT_PROMPT for Chapter {chapter_num}: Missing key {e}"
-            logger.Log(error_msg, 7)
-            novel_text_so_far_for_context += (
-                f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
-            )
-            continue
-        except Exception as e:
-            error_msg = f"Unexpected error formatting global edit prompt for Chapter {chapter_num}: {e}"
-            logger.Log(error_msg, 7)
-            novel_text_so_far_for_context += (
-                f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
-            )
-            continue
+        # Build the context from all *other* chapters using the original, unedited content
+        novel_text_context = ""
+        for num, content in original_chapters_content.items():
+            if num != chapter_num:
+                novel_text_context += f"### Chapter {num}\n\n{content}\n\n\n"
 
-        messages: List[Dict[str, Any]] = [
-            interface.build_system_query(
-                Prompts.DEFAULT_SYSTEM_PROMPT
-            ),
-            interface.build_user_query(formatted_prompt),
-        ]
+        prompt = Writer.Prompts.CHAPTER_EDIT_PROMPT.format(
+            _Outline=narrative_context.base_novel_outline_markdown,
+            NovelText=novel_text_context,
+            i=chapter_num,
+            _Chapter=chapter_to_edit_content
+        )
 
-        try:
-            MIN_WORDS_AFTER_GLOBAL_EDIT = max(50, int(original_word_count * 0.75))
-            MAX_TOKENS_FOR_GLOBAL_EDIT = int(original_word_count * WORD_TO_TOKEN_RATIO * 1.15)
-            
-            response_messages = interface.safe_generate_text(
-                logger,
-                messages,
-                Config.CHAPTER_REVISION_WRITER_MODEL,
-                min_word_count=MIN_WORDS_AFTER_GLOBAL_EDIT,
-                max_tokens=MAX_TOKENS_FOR_GLOBAL_EDIT,
-            )
+        messages = [Interface.BuildUserQuery(prompt)]
 
-            updated_chapter_text: str = interface.get_last_message_text(
-                response_messages
-            )
+        min_words = int(len(chapter_to_edit_content.split()) * 0.9)
 
-            if not updated_chapter_text or "Error:" in updated_chapter_text:
-                logger.Log(
-                    f"LLM failed global edit for Chapter {chapter_num} or returned an error. Keeping pre-edit version.",
-                    6,
-                )
-                novel_text_so_far_for_context += (
-                    f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
-                )
-            else:
-                globally_edited_chapters[chapter_idx] = updated_chapter_text
-                edited_word_count = get_word_count(updated_chapter_text)
-                logger.Log(
-                    f"Global edit review for Chapter {chapter_num} complete. New word count: {edited_word_count}.",
-                    4,
-                )
-                novel_text_so_far_for_context += (
-                    f"\n\n## Chapter {chapter_num}\n\n{updated_chapter_text}\n\n"
-                )
+        messages = Interface.SafeGenerateText(
+            _Logger, messages, Writer.Config.CHAPTER_REVISION_WRITER_MODEL, _MinWordCount=min_words
+        )
+        initial_edited_chapter = Interface.GetLastMessageText(messages)
 
-        except Exception as e:
-            error_msg_runtime = f"An unexpected critical error during global editing of Chapter {chapter_num}: {e}"
-            logger.Log(error_msg_runtime, 7)
-            novel_text_so_far_for_context += (
-                f"\n\n## Chapter {chapter_num}\n\n{current_chapter_text}\n\n"
-            )
+        # --- Step 2: Critique and Revise the Edit ---
+        _Logger.Log(f"Critiquing and revising the edit for Chapter {chapter_num}...", 4)
 
-    logger.Log(
-        f"Global novel editing pass complete for all {total_chapters} chapter(s).", 2
-    )
-    return globally_edited_chapters
+        task_description = (
+            f"You are performing a final, holistic edit on Chapter {chapter_num}. "
+            "Your goal is to refine the chapter to improve its pacing, prose, and consistency, "
+            f"ensuring it flows perfectly with the preceding and succeeding chapters."
+        )
+
+        context_summary = narrative_context.get_full_story_summary_so_far()
+
+        revised_edited_chapter = Writer.CritiqueRevision.critique_and_revise_creative_content(
+            Interface,
+            _Logger,
+            initial_content=initial_edited_chapter,
+            task_description=task_description,
+            narrative_context_summary=context_summary,
+            initial_user_prompt=narrative_context.initial_prompt,
+        )
+
+        # Update the chapter in the narrative context object
+        chapter_obj = narrative_context.get_chapter(chapter_num)
+        if chapter_obj:
+            chapter_obj.set_generated_content(revised_edited_chapter)
+
+        chapter_word_count = Writer.Statistics.GetWordCount(revised_edited_chapter)
+        _Logger.Log(f"New word count for edited Chapter {chapter_num}: {chapter_word_count}", 3)
+
+        _Logger.Log(f"--- Finished editing Chapter {chapter_num} ---", 3)
+
+    _Logger.Log("Finished final novel editing pass.", 2)
+    return narrative_context

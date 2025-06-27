@@ -1,6 +1,20 @@
-google.generativeai
+# Core Langchain and provider packages for LLM integration
+langchain
+langchain-core
+langchain-community
+langchain-google-genai
+google-generativeai
+# CORRECTED: Pin mistralai to a version compatible with langchain-mistralai
+langchain-mistralai
+mistralai==0.1.8
+langchain-groq
+langchain-nvidia-ai-endpoints
+
+# Ollama client library for local model support
 ollama
-pydantic
+
+# Utility packages
 python-dotenv
-requests
 termcolor
+requests
+configparser

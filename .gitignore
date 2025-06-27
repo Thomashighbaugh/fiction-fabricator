@@ -165,4 +165,5 @@ Prompts/*
 Logs/*
 EvalLogs/*
 .github/Improvements
+.github/improvements/prompt*
 .vscode

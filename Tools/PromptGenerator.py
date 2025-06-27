@@ -1,27 +1,28 @@
 # File: Tools/prompt_generator.py
 # Purpose: Generates a refined prompt.txt for FictionFabricator using an LLM.
-# This script is self-contained and should be run from the project's root directory
-# or have the project root in its Python path if run from Tools/.
+# This script is self-contained and should be run from the project's root directory.
 
 """
 FictionFabricator Prompt Generator Utility.
 
-This script takes a basic user idea, a desired story title, and an Ollama model
-to generate a more detailed and refined `prompt.txt` file. This output file
-is structured to be an effective input for the main Write.py script.
+This script takes a basic user idea and a desired story title to generate a more
+detailed and refined `prompt.txt` file. This output file is structured to be an
+effective input for the main Write.py script.
 
 The process involves:
-1. Expanding the user's initial idea using the LLM.
-2. Having the LLM critique its own expansion based on criteria beneficial for FictionFabricator.
-3. Refining the prompt based on this critique.
-4. Saving the final prompt to `Prompts/<SanitizedTitle>/prompt.txt`.
+1. Dynamically selecting an LLM from available providers (Google, Groq, Mistral, Ollama, NVIDIA).
+2. Expanding the user's initial idea using the selected LLM.
+3. Having the LLM critique its own expansion.
+4. Refining the prompt based on this critique.
+5. Saving the final prompt to `Prompts/<SanitizedTitle>/prompt.txt`.
 
 Requirements:
-- ollama Python library (`pip install ollama`)
-- An accessible Ollama server with the specified model.
+- All packages from the main project's `requirements.txt`.
+- A configured `.env` file with API keys for desired providers.
+- An accessible Ollama server if using local models.
 
 Usage:
-python Tools/prompt_generator.py -m "ollama://huggingface.co/DavidAU/Llama-3.2-8X4B-MOE-V2-Dark-Champion-Instruct-uncensored-abliterated-21B-GGUF" -t "CrashLanded" -i "After the surveying vessel crashed on the planet it was sent to determine viability for human colonization, the spunky 23 year old mechanic Jade and the hardened 31 year old security officer Charles find the planet is not uninhabited but teeming with humans living in primitive tribal conditions and covered in the ruins of an extinct human society which had advanced technologies beyond what are known to Earth. Now they must navigate the politics of these tribes while trying to repair their communication equipment to call for rescue, while learning to work together despite their initial skepticism about the other."
+python Tools/prompt_generator.py -t "CrashLanded" -i "After the surveying vessel crashed on the planet it was sent to determine viability for human colonization, the spunky 23 year old mechanic Jade and the hardened 31 year old security officer Charles find the planet is not uninhabited but teeming with humans living in primitive tribal conditions and covered in the ruins of an extinct human society which had advanced technologies beyond what are known to Earth. Now they must navigate the politics of these tribes while trying to repair their communication equipment to call for rescue, while learning to work together despite their initial skepticism about the other."
 """
 
 import argparse
@@ -29,107 +30,151 @@ import os
 import sys
 import json
 import re
-import subprocess  # For checking/installing ollama
-import importlib  # For checking/installing ollama
+import dotenv
 
-# --- Self-Contained Ollama Client ---
+# --- Add project root to path for imports and load .env explicitly ---
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
+try:
+    dotenv_path = os.path.join(project_root, '.env')
+    if os.path.exists(dotenv_path):
+        dotenv.load_dotenv(dotenv_path=dotenv_path)
+        print(f"--- Successfully loaded .env file from: {dotenv_path} ---")
+    else:
+        print("--- .env file not found, proceeding with environment variables if available. ---")
+except Exception as e:
+    print(f"--- Error loading .env file: {e} ---")
 
-def ensure_ollama_installed():
-    """Checks if the ollama library is installed and prompts for installation if not."""
+# --- Standardized Imports from Main Project ---
+from Writer.Interface.Wrapper import Interface
+from Writer.PrintUtils import Logger
+import Writer.Config # Import config to access NVIDIA model list
+
+# --- Model Discovery Functions (copied from Write.py) ---
+def get_ollama_models(logger):
+    """Queries local Ollama for available models."""
     try:
-        importlib.import_module("ollama")
-        print("Ollama library found.")
+        import ollama
+        logger.Log("Querying Ollama for local models...", 1)
+        models_data = ollama.list().get("models", [])
+        available_models = [f"ollama://{model.get('name') or model.get('model')}" for model in models_data if model.get('name') or model.get('model')]
+        logger.Log(f"Found {len(available_models)} Ollama models.", 3)
+        return available_models
     except ImportError:
-        print("Ollama library not found.")
-        try:
-            print("Attempting to install ollama library...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "ollama"])
-            print("Ollama library installed successfully. Please re-run the script.")
-            sys.exit(0)  # Exit so user can re-run with library now available
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to install ollama: {e}")
-            print("Please install it manually: pip install ollama")
-            sys.exit(1)
+        logger.Log("'ollama' library not installed. Skipping Ollama provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Could not get Ollama models. (Error: {e})", 6)
+        return []
 
+def get_google_models(logger):
+    """Queries Google for available Gemini models."""
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        print("-> Google: GOOGLE_API_KEY not found in .env file. Skipping.")
+        return []
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        logger.Log("Querying Google for available Gemini models...", 1)
+        available = [f"google://{m.name.replace('models/', '')}" for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        logger.Log(f"Found {len(available)} Google models.", 3)
+        return available
+    except ImportError:
+        logger.Log("'google-generativeai' library not installed. Skipping Google provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Failed to query Google models. (Error: {e})", 6)
+        return []
 
-ensure_ollama_installed()
-import ollama  # Now safe to import
+def get_groq_models(logger):
+    """Queries GroqCloud for available models."""
+    if not os.environ.get("GROQ_API_KEY"):
+        print("-> GroqCloud: GROQ_API_KEY not found in .env file. Skipping.")
+        return []
+    try:
+        from groq import Groq
+        logger.Log("Querying GroqCloud for available models...", 1)
+        client = Groq()
+        models = client.models.list().data
+        logger.Log(f"Found {len(models)} GroqCloud models.", 3)
+        return [f"groq://{model.id}" for model in models]
+    except ImportError:
+        logger.Log("'groq' library not installed. Skipping GroqCloud provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Failed to query GroqCloud models. (Error: {e})", 6)
+        return []
 
+def get_mistral_models(logger):
+    """Queries MistralAI for available models."""
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        print("-> MistralAI: MISTRAL_API_KEY not found in .env file. Skipping.")
+        return []
+    try:
+        from mistralai.client import MistralClient
+        logger.Log("Querying MistralAI for available models...", 1)
+        client = MistralClient(api_key=api_key)
+        models_data = client.list_models().data
+        known_chat_prefixes = ['mistral-large', 'mistral-medium', 'mistral-small', 'open-mistral', 'open-mixtral']
+        available_models = [f"mistralai://{model.id}" for model in models_data if any(model.id.startswith(prefix) for prefix in known_chat_prefixes)]
+        logger.Log(f"Found {len(available_models)} compatible MistralAI models.", 3)
+        return available_models
+    except ImportError:
+        logger.Log("'mistralai' library not installed. Skipping MistralAI provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Failed to query MistralAI models. (Error: {e})", 6)
+        return []
 
-class SimpleOllamaClient:
-    """A basic client to interact with an Ollama model."""
+def get_nvidia_models(logger):
+    """Reads the user-defined NVIDIA models from config.ini."""
+    if not os.environ.get("NVIDIA_API_KEY"):
+        logger.Log("NVIDIA provider skipped: NVIDIA_API_KEY not found in environment.", 6)
+        return []
+    
+    logger.Log("Reading manual NVIDIA model list from config.ini...", 1)
+    model_list_str = Writer.Config.NVIDIA_AVAILABLE_MODELS
+    if not model_list_str:
+        logger.Log("NVIDIA provider skipped: No models listed in config.ini under [NVIDIA_SETTINGS] -> 'available_models'.", 6)
+        return []
+    
+    model_names = [name.strip() for name in model_list_str.split(',') if name.strip()]
+    available_models = [f"nvidia://{name}" for name in model_names]
+    logger.Log(f"Found {len(available_models)} NVIDIA models in config.ini.", 3)
+    return available_models
 
-    def __init__(self, model_uri: str, host: str = "http://localhost:11434"):
-        self.model_name = self._parse_model_name(model_uri)
-        self.host = host
-        try:
-            self.client = ollama.Client(host=self.host)
-            # Check if model exists, try to pull if not
-            try:
-                self.client.show(self.model_name)
-                print(
-                    f"Model '{self.model_name}' found on Ollama server at {self.host}."
-                )
-            except ollama.ResponseError:
-                print(
-                    f"Model '{self.model_name}' not found locally. Attempting to pull..."
-                )
-                self.client.pull(self.model_name)
-                print(f"Model '{self.model_name}' pulled successfully.")
-        except Exception as e:
-            print(
-                f"Error initializing Ollama client or pulling model '{self.model_name}' from '{self.host}': {e}"
-            )
-            print("Please ensure Ollama server is running and the model is available.")
-            sys.exit(1)
+def get_llm_selection_menu_for_tool(logger):
+    """
+    Queries providers, presents a menu to the user, and returns the chosen model URI.
+    """
+    print("\n--- Querying available models from configured providers... ---")
+    all_models = []
+    all_models.extend(get_google_models(logger))
+    all_models.extend(get_groq_models(logger))
+    all_models.extend(get_mistral_models(logger))
+    all_models.extend(get_nvidia_models(logger))
+    all_models.extend(get_ollama_models(logger))
+    if not all_models:
+        logger.Log("No models found from any provider. Please check API keys in .env and model lists in config.ini.", 7)
+        return None
 
-    def _parse_model_name(self, model_uri: str) -> str:
-        """Extracts the model name from a model URI, stripping the scheme and any host info."""
-        # Remove "ollama://" or "ollama:" prefix
-        if model_uri.startswith("ollama://"):
-            model_part = model_uri[len("ollama://") :]
-        elif model_uri.startswith("ollama:"):
-            model_part = model_uri[len("ollama:") :]
+    print("\n--- Prompt Generator LLM Selection ---")
+    print("Please select the model for prompt generation:")
+    sorted_models = sorted(all_models)
+    for i, model in enumerate(sorted_models):
+        print(f"[{i+1}] {model}")
+
+    while True:
+        choice = input("> ").strip().lower()
+        if choice.isdigit() and 1 <= int(choice) <= len(sorted_models):
+            selected_model = sorted_models[int(choice) - 1]
+            print(f"Selected: {selected_model}")
+            return selected_model
         else:
-            model_part = model_uri
-
-        # The model name is everything before the '@', which might denote a host.
-        # This simple client uses a separate host argument, so we discard the one in the URI.
-        model_name = model_part.split("@")[0]
-        return model_name
-
-    def generate(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float = 0.7,
-        max_tokens: int = 2048,
-    ) -> str:
-        """Generates text using the Ollama model."""
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": user_prompt})
-
-        try:
-            print(f"\nSending request to Ollama model: {self.model_name}...")
-            if len(user_prompt) > 100:
-                print(f"User Prompt (first 100 chars): {user_prompt[:100]}...")
-            else:
-                print(f"User Prompt: {user_prompt}")
-
-            response = self.client.chat(
-                model=self.model_name,
-                messages=messages,
-                options={"temperature": temperature, "num_predict": max_tokens},
-            )
-            content = response["message"]["content"]
-            return content
-        except Exception as e:
-            print(f"Error during Ollama generation: {e}")
-            return f"Error: Could not generate response from Ollama - {e}"
-
+            print("Invalid choice. Please enter a number from the list.")
 
 # --- Prompts for this script ---
 
@@ -232,50 +277,33 @@ def _extract_core_prompt(llm_response: str) -> str:
     Cleans LLM response to extract only the core prompt text.
     Removes common preambles, headers, and other conversational/formatting artifacts.
     """
-    if not isinstance(llm_response, str):  # Should not happen if LLM client works
+    if not isinstance(llm_response, str):
         return ""
 
     lines = llm_response.strip().split("\n")
-
-    # Remove ALL leading empty lines first
     start_index = 0
     while start_index < len(lines) and not lines[start_index].strip():
         start_index += 1
-
     lines = lines[start_index:]
-
     if not lines:
         return ""
 
-    # Patterns for header-only lines to strip from the beginning.
     header_patterns = [
-        re.compile(
-            r"^\s*(?:OKAY|SURE|CERTAINLY|ALRIGHT|UNDERSTOOD)\s*[,.]?\s*HERE(?:'S| IS)? THE (?:REVISED|FINAL|EXPANDED|REQUESTED)?\s*PROMPT\s*[:.]?\s*$",
-            re.IGNORECASE,
-        ),
-        re.compile(
-            r"^\s*HERE(?:'S| IS)? THE (?:REVISED|FINAL|EXPANDED|REQUESTED)?\s*PROMPT\s*[:.]?\s*$",
-            re.IGNORECASE,
-        ),
-        re.compile(
-            r"^\s*(?:REVISED|FINAL|EXPANDED|STORY)?\s*PROMPT\s*[:]?\s*$", re.IGNORECASE
-        ),
+        re.compile(r"^\s*(?:OKAY|SURE|CERTAINLY|ALRIGHT|UNDERSTOOD)\s*[,.]?\s*HERE(?:'S| IS)? THE (?:REVISED|FINAL|EXPANDED|REQUESTED)?\s*PROMPT\s*[:.]?\s*$", re.IGNORECASE),
+        re.compile(r"^\s*HERE(?:'S| IS)? THE (?:REVISED|FINAL|EXPANDED|REQUESTED)?\s*PROMPT\s*[:.]?\s*$", re.IGNORECASE),
+        re.compile(r"^\s*(?:REVISED|FINAL|EXPANDED|STORY)?\s*PROMPT\s*[:]?\s*$", re.IGNORECASE),
         re.compile(r"^\s*OUTPUT\s*[:]?\s*$", re.IGNORECASE),
-        re.compile(
-            r"^\s*HERE IS THE .* PROMPT TEXT(?:,? CONTAINING ONLY THE PROMPT ITSELF)?\s*[:.]?\s*$",
-            re.IGNORECASE,
-        ),
+        re.compile(r"^\s*HERE IS THE .* PROMPT TEXT(?:,? CONTAINING ONLY THE PROMPT ITSELF)?\s*[:.]?\s*$", re.IGNORECASE),
         re.compile(r"^\s*OKAY\s*[,.]?\s*$", re.IGNORECASE),
         re.compile(r"^\s*SURE\s*[,.]?\s*$", re.IGNORECASE),
         re.compile(r"^\s*HERE YOU GO\s*[:.]?\s*$", re.IGNORECASE),
     ]
 
-    # Check if the first non-empty line is a header to be stripped
     if lines:
         first_line_content = lines[0].strip()
         for pattern in header_patterns:
             if pattern.fullmatch(first_line_content):
-                lines.pop(0)  # Remove the matched header line
+                lines.pop(0)
                 while lines and not lines[0].strip():
                     lines.pop(0)
                 break
@@ -284,52 +312,38 @@ def _extract_core_prompt(llm_response: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="FictionFabricator Self-Contained Prompt Generator."
-    )
-    parser.add_argument(
-        "-m",
-        "--model",
-        required=True,
-        help="Ollama model URI (e.g., 'ollama://llama3:8b' or just 'llama3:8b').",
-    )
-    parser.add_argument(
-        "-t",
-        "--title",
-        required=True,
-        help="Desired title for the story (used for subdirectory name).",
-    )
-    parser.add_argument(
-        "-i", "--idea", required=True, help="The user's basic story idea or concept."
-    )
-    parser.add_argument(
-        "--host",
-        default="http://localhost:11434",
-        help="Ollama server host address (default: http://localhost:11434).",
-    )
-    parser.add_argument(
-        "--temp",
-        type=float,
-        default=0.7,
-        help="Temperature for LLM generation (default: 0.7).",
-    )
-
+    parser = argparse.ArgumentParser(description="FictionFabricator Self-Contained Prompt Generator.")
+    parser.add_argument("-t", "--title", required=True, help="Desired title for the story (used for subdirectory name).")
+    parser.add_argument("-i", "--idea", required=True, help="The user's basic story idea or concept.")
+    parser.add_argument("--temp", type=float, default=0.7, help="Temperature for LLM generation (default: 0.7).")
     args = parser.parse_args()
 
     print("--- FictionFabricator Prompt Generator ---")
-    ollama_client = SimpleOllamaClient(model_uri=args.model, host=args.host)
+    sys_logger = Logger("PromptGenLogs")
 
+    # --- Dynamic Model Selection ---
+    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger)
+    if not selected_model_uri:
+        sys_logger.Log("No model was selected or discovered. Exiting.", 7)
+        sys.exit(1)
+
+    # --- Instantiate Interface and load selected model ---
+    interface = Interface()
+    interface.LoadModels([selected_model_uri])
+
+    # --- Generation Logic ---
     print("\nStep 1: Expanding user's idea...")
-    expand_user_prompt = EXPAND_IDEA_PROMPT_TEMPLATE.format(
-        title=args.title, idea=args.idea
-    )
-    expanded_prompt_raw = ollama_client.generate(
-        system_prompt="You are a creative assistant helping to flesh out story ideas.",
-        user_prompt=expand_user_prompt,
-        temperature=args.temp,
-        max_tokens=1500,
-    )
-    if expanded_prompt_raw.startswith("Error:"):
+    expand_user_prompt = EXPAND_IDEA_PROMPT_TEMPLATE.format(title=args.title, idea=args.idea)
+    expand_model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=1500"
+
+    expand_messages = [
+        interface.BuildSystemQuery("You are a creative assistant helping to flesh out story ideas."),
+        interface.BuildUserQuery(expand_user_prompt)
+    ]
+    response_history = interface.SafeGenerateText(sys_logger, expand_messages, expand_model_with_params, _MinWordCount=100)
+    expanded_prompt_raw = interface.GetLastMessageText(response_history)
+
+    if "[ERROR:" in expanded_prompt_raw:
         print(f"Failed to expand prompt: {expanded_prompt_raw}")
         sys.exit(1)
 
@@ -343,21 +357,19 @@ def main():
         sys.exit(1)
 
     print("\nStep 2: Critiquing the expanded prompt...")
-    critique_user_prompt = CRITIQUE_EXPANDED_PROMPT_TEMPLATE.format(
-        expanded_prompt=expanded_prompt
-    )
-    critique = ollama_client.generate(
-        system_prompt="You are an expert AI prompt engineer and literary critic.",
-        user_prompt=critique_user_prompt,
-        temperature=0.5,
-        max_tokens=1000,
-    ).strip()
+    critique_user_prompt = CRITIQUE_EXPANDED_PROMPT_TEMPLATE.format(expanded_prompt=expanded_prompt)
+    critique_model_with_params = f"{selected_model_uri}?temperature=0.5&max_tokens=1000"
+
+    critique_messages = [
+        interface.BuildSystemQuery("You are an expert AI prompt engineer and literary critic."),
+        interface.BuildUserQuery(critique_user_prompt)
+    ]
+    critique_history = interface.SafeGenerateText(sys_logger, critique_messages, critique_model_with_params, _MinWordCount=20)
+    critique = interface.GetLastMessageText(critique_history).strip()
 
     final_prompt_text_candidate: str
-    if critique.startswith("Error:") or not critique.strip():
-        print(
-            "Warning: Critique failed or was empty. Proceeding with the initially expanded prompt."
-        )
+    if "[ERROR:" in critique or not critique.strip():
+        print("Warning: Critique failed or was empty. Proceeding with the initially expanded prompt.")
         final_prompt_text_candidate = expanded_prompt
     else:
         print("\n--- Critique ---")
@@ -365,17 +377,17 @@ def main():
         print("----------------")
 
         print("\nStep 3: Refining prompt based on critique...")
-        refine_user_prompt = REFINE_PROMPT_BASED_ON_CRITIQUE_TEMPLATE.format(
-            expanded_prompt=expanded_prompt,
-            critique=critique,
-        )
-        refined_text_raw = ollama_client.generate(
-            system_prompt="You are a master creative assistant, skilled at revising text based on feedback.",
-            user_prompt=refine_user_prompt,
-            temperature=args.temp,
-            max_tokens=1500,
-        )
-        if refined_text_raw.startswith("Error:"):
+        refine_user_prompt = REFINE_PROMPT_BASED_ON_CRITIQUE_TEMPLATE.format(expanded_prompt=expanded_prompt, critique=critique)
+        refine_model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=1500"
+
+        refine_messages = [
+            interface.BuildSystemQuery("You are a master creative assistant, skilled at revising text based on feedback."),
+            interface.BuildUserQuery(refine_user_prompt)
+        ]
+        refine_history = interface.SafeGenerateText(sys_logger, refine_messages, refine_model_with_params, _MinWordCount=100)
+        refined_text_raw = interface.GetLastMessageText(refine_history)
+
+        if "[ERROR:" in refined_text_raw:
             print(f"Failed to refine prompt: {refined_text_raw}")
             print("Warning: Refinement failed. Using the initially expanded prompt.")
             final_prompt_text_candidate = expanded_prompt
@@ -395,8 +407,6 @@ def main():
     print(final_prompt_text)
     print("-------------------------------------------")
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
     prompts_base_dir = os.path.join(project_root, "Prompts")
     os.makedirs(prompts_base_dir, exist_ok=True)
 
