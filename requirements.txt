@@ -9,6 +9,7 @@ langchain-mistralai
 mistralai==0.1.8
 langchain-groq
 langchain-nvidia-ai-endpoints
+langchain-openai
 
 # Ollama client library for local model support
 ollama

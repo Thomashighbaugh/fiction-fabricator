@@ -146,6 +146,39 @@ def get_nvidia_models(logger):
     logger.Log(f"Found {len(available_models)} NVIDIA models in config.ini.", 3)
     return available_models
 
+def get_github_models(logger):
+    """Returns a static list of available GitHub models, checking for required env vars."""
+    if not os.environ.get("GITHUB_ACCESS_TOKEN") or not os.environ.get("AZURE_OPENAI_ENDPOINT"):
+        logger.Log("GitHub provider skipped: GITHUB_ACCESS_TOKEN or AZURE_OPENAI_ENDPOINT not found in environment.", 6)
+        return []
+
+    logger.Log("Loading GitHub model list...", 1)
+    
+    # Static list of the exact deployment names for models from the GitHub Marketplace.
+    deployment_names = [
+        "openai/o1", "openai/o1-mini", "openai/o1-preview", "openai/gpt-4o-mini", "openai/gpt-4o",
+        "deepseek/DeepSeek-V3-0324", "deepseek/DeepSeek-R1",
+        "ai21-labs/AI21-Jamba-1.5-Large", "ai21-labs/AI21-Jamba-1.5-Mini",
+        "cohere/cohere-command-r", "cohere/cohere-command-r-plus", "cohere/cohere-command-a",
+        "mistral-ai/Mistral-Nemo", "mistral-ai/Mistral-Small",
+        "mistral-ai/Mistral-Large-2411", "mistral-ai/Codestral-22B-v0.1",
+        "meta/Llama-3.2-11B-Vision-Instruct", "meta/Llama-3.2-90B-Vision-Instruct",
+        "meta/Llama-3.3-70B-Instruct", "meta/Llama-3.1-8B-Instruct",
+        "meta/Llama-3.1-70B-Instruct", "meta/Llama-3.1-405B-Instruct",
+        "meta/Llama-3-8B-Instruct", "meta/Llama-3-70B-Instruct",
+        "microsoft/Phi-4", "microsoft/Phi-3.5-MoE-instruct",
+        "microsoft/Phi-3.5-mini-instruct", "microsoft/Phi-3.5-vision-instruct",
+        "microsoft/Phi-3-mini-4k-instruct", "microsoft/Phi-3-mini-128k-instruct",
+        "microsoft/Phi-3-small-8k-instruct", "microsoft/Phi-3-small-128k-instruct",
+        "microsoft/Phi-3-medium-4k-instruct", "microsoft/Phi-3-medium-128k-instruct",
+        "xai/grok-3",
+        "core42/jais-30b-chat"
+    ]
+    
+    available_models = [f"github://{name}" for name in deployment_names]
+    logger.Log(f"Found {len(available_models)} GitHub models.", 3)
+    return available_models
+
 def get_llm_selection_menu_for_tool(logger):
     """
     Queries providers, presents a menu to the user, and returns the chosen model URI.
@@ -156,6 +189,7 @@ def get_llm_selection_menu_for_tool(logger):
     all_models.extend(get_groq_models(logger))
     all_models.extend(get_mistral_models(logger))
     all_models.extend(get_nvidia_models(logger))
+    all_models.extend(get_github_models(logger))
     all_models.extend(get_ollama_models(logger))
     if not all_models:
         logger.Log("No models found from any provider. Please check API keys in .env and model lists in config.ini.", 7)

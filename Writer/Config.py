@@ -79,6 +79,10 @@ NVIDIA_AVAILABLE_MODELS = get_config_or_default('NVIDIA_SETTINGS', 'available_mo
 NVIDIA_BASE_URL = get_config_or_default('NVIDIA_SETTINGS', 'base_url', 'https://integrate.api.nvidia.com/v1')
 
 
+# --- GitHub Specific Settings (if used) ---
+GITHUB_API_VERSION = get_config_or_default('GITHUB_SETTINGS', 'api_version', '2024-05-01-preview')
+
+
 # --- Ollama Specific Settings (if used) ---
 OLLAMA_CTX = get_config_or_default('WRITER_SETTINGS', 'ollama_ctx', 8192, is_int=True)
 
@@ -106,5 +110,6 @@ OPTIONAL_OUTPUT_NAME = ""
 # "mistralai://mistral-large-latest"
 # "groq://mixtral-8x7b-32768"
 # "nvidia://meta/llama3-8b-instruct"
+# "github://o1-mini"
 # "ollama://llama3:70b"
 # "ollama://command-r-plus@10.1.65.4:11434"

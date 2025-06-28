@@ -18,6 +18,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mistralai.chat_models import ChatMistralAI
 from langchain_groq import ChatGroq
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 # Note: dotenv is loaded at the main entry point in Write.py.
 
@@ -26,6 +27,7 @@ SAFE_PARAMS = {
     "google": ["temperature", "top_p", "top_k", "max_output_tokens", "seed", "response_mime_type"],
     "groq": ["temperature", "top_p", "max_tokens", "seed"],
     "nvidia": ["temperature", "top_p", "max_tokens", "seed"],
+    "github": ["temperature", "top_p", "max_tokens", "seed"], # Covers multiple underlying clients
     "ollama": ["temperature", "top_p", "top_k", "seed", "format", "num_predict"],
     "mistralai": ["temperature", "top_p", "max_tokens"]
 }
@@ -85,47 +87,28 @@ class Interface:
 
             Provider, ProviderModel, ModelHost, ModelOptions = self.GetModelAndProvider(Model)
             _Logger = Logger()
-            _Logger.Log(f"Loading Model '{ProviderModel}' from '{Provider}' @ '{ModelHost or 'default'}'", 2)
+            _Logger.Log(f"Verifying config for Model '{ProviderModel}' from '{Provider}'", 2)
             try:
                 if Provider == "ollama":
-                    import ollama
-                    base_url = f"http://{ModelHost}" if ModelHost else "http://localhost:11434"
-                    try:
-                        ollama.Client(host=ModelHost).show(ProviderModel)
-                    except ollama.ResponseError:
-                        _Logger.Log(f"Model '{ProviderModel}' not found in Ollama. Attempting to pull...", 6)
-                        stream = ollama.Client(host=ModelHost).pull(ProviderModel, stream=True)
-                        for chunk in stream:
-                            if "completed" in chunk and "total" in chunk and chunk["total"] > 0:
-                                prg = chunk["completed"] / chunk["total"]
-                                c, t = chunk["completed"] / 1e9, chunk["total"] / 1e9
-                                print(f"Downloading {ProviderModel}: {prg*100:.2f}% ({c:.3f}GB/{t:.3f}GB)", end="\r")
-                        print("\n")
-                    self.Clients[base_model_uri] = ChatOllama(model=ProviderModel, base_url=base_url)
+                    self.Clients[base_model_uri] = ChatOllama(model=ProviderModel, base_url=f"http://{ModelHost}" if ModelHost else "http://localhost:11434")
                 elif Provider == "google":
-                    if not os.environ.get("GOOGLE_API_KEY"):
-                        raise ValueError("GOOGLE_API_KEY not in environment variables.")
                     self.Clients[base_model_uri] = ChatGoogleGenerativeAI(model=ProviderModel, convert_system_message_to_human=True)
                 elif Provider == "mistralai":
-                    if not os.environ.get("MISTRAL_API_KEY"):
-                        raise ValueError("MISTRAL_API_KEY not in environment variables.")
                     self.Clients[base_model_uri] = ChatMistralAI(model=ProviderModel)
                 elif Provider == "groq":
-                    if not os.environ.get("GROQ_API_KEY"):
-                        raise ValueError("GROQ_API_KEY not in environment variables.")
                     self.Clients[base_model_uri] = ChatGroq(model_name=ProviderModel)
                 elif Provider == "nvidia":
-                    # For NVIDIA, we will not cache the client. We just verify the keys exist.
-                    # The client will be created on-demand in ChatAndStreamResponse.
-                    if not os.environ.get("NVIDIA_API_KEY"):
-                        raise ValueError("NVIDIA_API_KEY not found in environment variables.")
-                    self.Clients[base_model_uri] = "NVIDIA_PLACEHOLDER" # Mark as valid but needs on-demand creation
+                     self.Clients[base_model_uri] = ChatNVIDIA(model=ProviderModel, base_url=os.environ.get("NVIDIA_BASE_URL") or Writer.Config.NVIDIA_BASE_URL)
+                elif Provider == "github":
+                    if not os.environ.get("GITHUB_ACCESS_TOKEN") or not os.environ.get("AZURE_OPENAI_ENDPOINT"):
+                        raise ValueError("GITHUB_ACCESS_TOKEN or AZURE_OPENAI_ENDPOINT not in environment variables.")
+                    self.Clients[base_model_uri] = "GITHUB_PLACEHOLDER"
                 else:
                     raise ValueError(f"Model Provider '{Provider}' for '{Model}' is not supported.")
 
-                _Logger.Log(f"Successfully loaded client for '{base_model_uri}'.", 3)
+                _Logger.Log(f"Successfully verified config for '{base_model_uri}'.", 3)
             except Exception as e:
-                _Logger.Log(f"CRITICAL: Failed to load model '{Model}'. Error: {e}", 7)
+                _Logger.Log(f"CRITICAL: Failed to verify config for model '{Model}'. Error: {e}", 7)
 
     def SafeGenerateText(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, _MinWordCount: int = 1) -> list:
         _Messages = [msg for msg in _Messages if msg.get("content", "").strip()]
@@ -176,20 +159,39 @@ class Interface:
                 ModelOptions['response_mime_type'] = 'application/json'
 
         client = None
-        if Provider == "nvidia":
-            # For NVIDIA, create a fresh client for every single request to avoid state issues.
+        if Provider == "github":
             try:
-                nvidia_base_url = os.environ.get("NVIDIA_BASE_URL") or Writer.Config.NVIDIA_BASE_URL
-                client = ChatNVIDIA(model=ProviderModel, base_url=nvidia_base_url)
+                github_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+                github_token = os.environ.get("GITHUB_ACCESS_TOKEN")
+                
+                # This is the new dispatcher logic to select the correct client based on the model ID prefix.
+                if ProviderModel.startswith("mistral-ai/"):
+                    _Logger.Log(f"Using MistralAI client for GitHub model: {ProviderModel}", 1)
+                    client = ChatMistralAI(
+                        endpoint=github_endpoint,
+                        api_key=github_token,
+                        model=ProviderModel
+                    )
+                elif ProviderModel.startswith(("openai/", "cohere/", "xai/", "deepseek/")):
+                    _Logger.Log(f"Using OpenAI-compatible client for GitHub model: {ProviderModel}", 1)
+                    client = ChatOpenAI(
+                        base_url=github_endpoint,
+                        api_key=github_token,
+                        model=ProviderModel
+                    )
+                else: # Default to the Azure client for Microsoft, Meta, AI21 and others.
+                    _Logger.Log(f"Using AzureOpenAI client for GitHub model: {ProviderModel}", 1)
+                    client = AzureChatOpenAI(
+                        azure_endpoint=github_endpoint,
+                        api_key=github_token,
+                        azure_deployment=ProviderModel,
+                        api_version=Writer.Config.GITHUB_API_VERSION,
+                    )
             except Exception as e:
-                _Logger.Log(f"Failed to create on-demand NVIDIA client for '{ProviderModel}'. Error: {e}", 7)
-                _Messages.append({"role": "assistant", "content": f"[ERROR: Failed to create NVIDIA client.]"})
+                _Logger.Log(f"Failed to create on-demand GitHub client for '{ProviderModel}'. Error: {e}", 7)
+                _Messages.append({"role": "assistant", "content": f"[ERROR: Failed to create GitHub client.]"})
                 return _Messages
         else:
-            if base_model_uri not in self.Clients:
-                _Logger.Log(f"Model '{base_model_uri}' not loaded. Attempting to load on-the-fly.", 6)
-                self.LoadModels([base_model_uri])
-            
             client = self.Clients.get(base_model_uri)
 
         if not client:
@@ -229,7 +231,6 @@ class Interface:
                 bound_client = client.bind(**seed_to_bind) if seed_to_bind else client
                 stream = bound_client.stream(langchain_messages, generation_config=generation_config)
             else:
-                # This now handles NVIDIA calls (with a fresh client) and all other providers
                 bound_client = client.bind(**filtered_options) if filtered_options else client
                 stream = bound_client.stream(langchain_messages)
 

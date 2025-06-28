@@ -24,7 +24,7 @@ def GenerateStoryElements(
     _Logger.Log("Generating initial Story Elements...", 4)
     messages = [Interface.BuildUserQuery(prompt)]
     messages = Interface.SafeGenerateText(
-        _Logger, messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, _MinWordCount=150
+        _Logger, messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, _MinWordCount=75
     )
     initial_elements = Interface.GetLastMessageText(messages)
     _Logger.Log("Done generating initial Story Elements.", 4)
@@ -81,7 +81,7 @@ def GenerateOutline(
     )
     messages = [Interface.BuildUserQuery(initial_outline_prompt)]
     messages = Interface.SafeGenerateText(
-        _Logger, messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, _MinWordCount=250
+        _Logger, messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, _MinWordCount=100
     )
     outline = Interface.GetLastMessageText(messages)
     _Logger.Log("Done generating initial rough outline.", 4)
@@ -114,7 +114,7 @@ def GenerateOutline(
             _Logger,
             revision_messages,
             Writer.Config.INITIAL_OUTLINE_WRITER_MODEL,
-            _MinWordCount=250,
+            _MinWordCount=100,
         )
         outline = Interface.GetLastMessageText(revision_messages)
         _Logger.Log("Done revising outline.", 2)
