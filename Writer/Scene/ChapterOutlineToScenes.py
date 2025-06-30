@@ -46,7 +46,7 @@ def ChapterOutlineToScenes(
     ]
 
     response_messages = Interface.SafeGenerateText(
-        _Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, _MinWordCount=100
+        _Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, min_word_count_target=100
     )
     initial_scene_breakdown = Interface.GetLastMessageText(response_messages)
     _Logger.Log("Finished initial scene breakdown generation.", 5)

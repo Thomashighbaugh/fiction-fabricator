@@ -374,7 +374,7 @@ def main():
         interface.BuildSystemQuery("You are a creative assistant helping to flesh out story ideas."),
         interface.BuildUserQuery(expand_user_prompt)
     ]
-    response_history = interface.SafeGenerateText(sys_logger, expand_messages, expand_model_with_params, _MinWordCount=100)
+    response_history = interface.SafeGenerateText(sys_logger, expand_messages, expand_model_with_params, min_word_count_target=100)
     expanded_prompt_raw = interface.GetLastMessageText(response_history)
 
     if "[ERROR:" in expanded_prompt_raw:
@@ -398,7 +398,7 @@ def main():
         interface.BuildSystemQuery("You are an expert AI prompt engineer and literary critic."),
         interface.BuildUserQuery(critique_user_prompt)
     ]
-    critique_history = interface.SafeGenerateText(sys_logger, critique_messages, critique_model_with_params, _MinWordCount=20)
+    critique_history = interface.SafeGenerateText(sys_logger, critique_messages, critique_model_with_params, min_word_count_target=20)
     critique = interface.GetLastMessageText(critique_history).strip()
 
     final_prompt_text_candidate: str
@@ -418,7 +418,7 @@ def main():
             interface.BuildSystemQuery("You are a master creative assistant, skilled at revising text based on feedback."),
             interface.BuildUserQuery(refine_user_prompt)
         ]
-        refine_history = interface.SafeGenerateText(sys_logger, refine_messages, refine_model_with_params, _MinWordCount=100)
+        refine_history = interface.SafeGenerateText(sys_logger, refine_messages, refine_model_with_params, min_word_count_target=100)
         refined_text_raw = interface.GetLastMessageText(refine_history)
 
         if "[ERROR:" in refined_text_raw:

@@ -27,7 +27,7 @@ def LLMSummaryCheck(Interface: Interface, _Logger: Logger, _RefSummary: str, _Wo
         Interface.BuildUserQuery(Writer.Prompts.SUMMARY_CHECK_PROMPT.format(_Work=_Work))
     ]
     SummaryLangchain = Interface.SafeGenerateText(
-        _Logger, SummaryLangchain, Writer.Config.CHECKER_MODEL, _MinWordCount=30
+        _Logger, SummaryLangchain, Writer.Config.CHECKER_MODEL, min_word_count_target=30
     )
     WorkSummary = Interface.GetLastMessageText(SummaryLangchain)
 
@@ -38,7 +38,7 @@ def LLMSummaryCheck(Interface: Interface, _Logger: Logger, _RefSummary: str, _Wo
         Interface.BuildUserQuery(Writer.Prompts.SUMMARY_OUTLINE_PROMPT.format(_RefSummary=_RefSummary))
     ]
     SummaryLangchain = Interface.SafeGenerateText(
-        _Logger, SummaryLangchain, Writer.Config.CHECKER_MODEL, _MinWordCount=30
+        _Logger, SummaryLangchain, Writer.Config.CHECKER_MODEL, min_word_count_target=30
     )
     OutlineSummary = Interface.GetLastMessageText(SummaryLangchain)
 

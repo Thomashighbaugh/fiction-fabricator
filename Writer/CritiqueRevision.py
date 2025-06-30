@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import json
+import re
 import Writer.Config
 import Writer.Prompts
 from Writer.Interface.Wrapper import Interface
@@ -60,7 +61,7 @@ def critique_and_revise_creative_content(
         _Logger,
         critique_messages,
         critique_model,
-        _MinWordCount=20
+        min_word_count_target=40 # Critiques should be substantive
     )
     critique = Interface.GetLastMessageText(critique_messages)
     _Logger.Log(f"Critique received:\n---\n{critique}\n---", 4)
@@ -99,13 +100,15 @@ def critique_and_revise_creative_content(
         )
         revised_content = Interface.GetLastMessageText(final_messages)
     else:
-        min_words = max(10, int(len(initial_content.split()) * 0.75))
+        # Use robust word count with a high floor to ensure revisions are substantial.
+        word_count = len(re.findall(r'\b\w+\b', initial_content))
+        min_words = max(100, int(word_count * 0.8))
         final_messages = Interface.SafeGenerateText(
             _Logger,
             revision_messages,
             revision_model,
             _Format=revision_format,
-            _MinWordCount=min_words
+            min_word_count_target=min_words
         )
         revised_content = Interface.GetLastMessageText(final_messages)
 

@@ -93,7 +93,7 @@ def summarize_chapter(
 
     _Logger.Log("Generating initial chapter summary...", 5)
     messages = Interface.SafeGenerateText(
-        _Logger, messages, Writer.Config.CHECKER_MODEL, _MinWordCount=50
+        _Logger, messages, Writer.Config.CHECKER_MODEL, min_word_count_target=50
     )
     initial_summary = Interface.GetLastMessageText(messages)
     _Logger.Log("Initial chapter summary generated.", 5)

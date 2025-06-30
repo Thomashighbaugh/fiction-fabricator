@@ -189,27 +189,49 @@ The goal is a richer, more detailed story that naturally fills the required numb
 Your response should be the new, complete, chapter-by-chapter markdown outline.
 """
 
-CHAPTER_OUTLINE_PROMPT = """
-You are a master storyteller and outliner. Your task is to expand a single chapter from a high-level novel outline into a more detailed, scene-by-scene breakdown.
+SUMMARIZE_OUTLINE_RANGE_PROMPT = """
+You are a story analyst. Your task is to read a full novel outline and summarize a specific range of chapters.
 
 # FULL NOVEL OUTLINE
-Here is the complete outline for the story, providing context for the chapter you are about to detail.
 ---
 {_Outline}
 ---
 
 # YOUR TASK
-Now, focus *only* on **Chapter {_Chapter}** from the outline above.
-Expand this single chapter into a detailed scene-by-scene outline.
+Provide a concise summary of the events, character arcs, and key plot points that occur between **Chapter {_StartChapter} and Chapter {_EndChapter}**, based *only* on the full outline provided above.
 
-For each scene, please provide:
-- A clear heading (e.g., "Scene 1: The Ambush").
-- A list of characters present.
-- A description of the setting.
-- A summary of the key events and actions that take place.
-- Notes on character development or important dialogue beats.
+Your response should be a single, coherent paragraph. Do not include any introductory text or headings.
+"""
 
-Your output should be formatted in markdown and contain *only* the detailed outline for Chapter {_Chapter}. Do not re-state the full outline or add introductory text.
+GENERATE_CHAPTER_GROUP_OUTLINE_PROMPT = """
+You are a master storyteller and outliner. Your task is to expand a group of chapters from a high-level novel outline into a more detailed, scene-by-scene breakdown.
+
+# FULL NOVEL OUTLINE
+This is the complete outline for the entire story. Use it for high-level context.
+---
+{_Outline}
+---
+
+# SUMMARY OF OTHER STORY PARTS
+To ensure your detailed outline is coherent with the rest of the novel, here is a summary of the major events and arcs from the other parts of the story. You must ensure the chapters you are outlining connect logically to these events.
+---
+{_OtherGroupsSummary}
+---
+
+# YOUR TASK
+Your sole focus is to generate detailed, scene-by-scene outlines for the chapters in the following range: **Chapters {_StartChapter} through {_EndChapter}**.
+
+For EACH chapter in this range, provide a markdown block that includes:
+- A main markdown header for the chapter (e.g., `# Chapter X: The Title`).
+- Multiple scene-by-scene breakdowns under that chapter header.
+- For each scene, please provide:
+    - A clear heading (e.g., "## Scene 1: The Ambush").
+    - A list of characters present.
+    - A description of the setting.
+    - A summary of the key events and actions that take place.
+    - Notes on character development or important dialogue beats.
+
+Your output should be a single, continuous markdown document containing the detailed outlines for ALL chapters in the specified range.
 """
 
 # ======================================================================================

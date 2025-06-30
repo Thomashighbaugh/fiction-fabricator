@@ -47,7 +47,7 @@ def ScrubNovel(
         # SafeGenerateText ensures we get a non-empty response.
         # Scrubbing is non-creative, so no critique cycle is needed.
         messages = Interface.SafeGenerateText(
-            _Logger, messages, Writer.Config.SCRUB_MODEL
+            _Logger, messages, Writer.Config.SCRUB_MODEL, min_word_count_target=1
         )
         
         scrubbed_content = Interface.GetLastMessageText(messages)

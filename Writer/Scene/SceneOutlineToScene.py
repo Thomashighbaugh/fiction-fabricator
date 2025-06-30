@@ -51,7 +51,7 @@ def SceneOutlineToScene(
     ]
 
     response_messages = Interface.SafeGenerateText(
-        _Logger, messages, Writer.Config.CHAPTER_STAGE1_WRITER_MODEL, _MinWordCount=100
+        _Logger, messages, Writer.Config.CHAPTER_STAGE1_WRITER_MODEL, min_word_count_target=100
     )
     initial_scene_text = Interface.GetLastMessageText(response_messages)
     _Logger.Log("Finished initial scene generation.", 5)

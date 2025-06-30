@@ -92,7 +92,7 @@ SEED = get_config_or_default('WRITER_SETTINGS', 'seed', 108, is_int=True)
 OUTLINE_MIN_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'outline_min_revisions', 0, is_int=True)
 OUTLINE_MAX_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'outline_max_revisions', 3, is_int=True)
 CHAPTER_NO_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_no_revisions', False, is_bool=True)
-CHAPTER_MIN_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_min_revisions', 2, is_int=True)
+CHAPTER_MIN_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_min_revisions', 1, is_int=True)
 CHAPTER_MAX_REVISIONS = get_config_or_default('WRITER_SETTINGS', 'chapter_max_revisions', 3, is_int=True)
 MINIMUM_CHAPTERS = get_config_or_default('WRITER_SETTINGS', 'minimum_chapters', 12, is_int=True)
 SCRUB_NO_SCRUB = get_config_or_default('WRITER_SETTINGS', 'scrub_no_scrub', False, is_bool=True)
@@ -100,6 +100,12 @@ EXPAND_OUTLINE = get_config_or_default('WRITER_SETTINGS', 'expand_outline', True
 ENABLE_FINAL_EDIT_PASS = get_config_or_default('WRITER_SETTINGS', 'enable_final_edit_pass', False, is_bool=True)
 SCENE_GENERATION_PIPELINE = get_config_or_default('WRITER_SETTINGS', 'scene_generation_pipeline', True, is_bool=True)
 DEBUG = get_config_or_default('WRITER_SETTINGS', 'debug', False, is_bool=True)
+
+
+# --- Timeout Settings ---
+DEFAULT_TIMEOUT = get_config_or_default('TIMEOUTS', 'default_timeout', 180, is_int=True)
+OLLAMA_TIMEOUT = get_config_or_default('TIMEOUTS', 'ollama_timeout', 360, is_int=True)
+
 
 # Optional output name override from command-line (not set from config)
 OPTIONAL_OUTPUT_NAME = ""

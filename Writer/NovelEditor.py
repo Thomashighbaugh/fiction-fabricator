@@ -69,7 +69,7 @@ def EditNovel(
         min_words = int(len(chapter_to_edit_content.split()) * 0.9)
 
         messages = Interface.SafeGenerateText(
-            _Logger, messages, Writer.Config.CHAPTER_REVISION_WRITER_MODEL, _MinWordCount=min_words
+            _Logger, messages, Writer.Config.CHAPTER_REVISION_WRITER_MODEL, min_word_count_target=min_words
         )
         initial_edited_chapter = Interface.GetLastMessageText(messages)
 

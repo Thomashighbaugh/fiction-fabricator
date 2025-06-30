@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import re
 import Writer.Config
 import Writer.LLMEditor
 import Writer.PrintUtils
@@ -39,12 +40,12 @@ def GenerateChapter(
             _Logger.Log(f"Could not find specific outline for Chapter {_ChapterNum} in expanded outline.", 6)
             # Fallback to LLM extraction
             messages = [Interface.BuildUserQuery(Writer.Prompts.CHAPTER_GENERATION_PROMPT.format(_Outline=narrative_context.base_novel_outline_markdown, _ChapterNum=_ChapterNum))]
-            messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, _MinWordCount=50)
+            messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, min_word_count_target=50)
             chapter_specific_outline = Interface.GetLastMessageText(messages)
     else:
         # Fallback to extracting from the base outline
         messages = [Interface.BuildUserQuery(Writer.Prompts.CHAPTER_GENERATION_PROMPT.format(_Outline=narrative_context.base_novel_outline_markdown, _ChapterNum=_ChapterNum))]
-        messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, _MinWordCount=50)
+        messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, min_word_count_target=50)
         chapter_specific_outline = Interface.GetLastMessageText(messages)
 
     if not chapter_specific_outline:
@@ -135,9 +136,14 @@ def GenerateChapter(
                 _Chapter=current_chapter_text, _Feedback=feedback
             )
             revision_messages = [Interface.BuildUserQuery(revision_prompt)]
+
+            # Use robust word count and a high floor for revisions
+            word_count = len(re.findall(r'\b\w+\b', current_chapter_text))
+            min_word_count_target = max(150, int(word_count * 0.8))
+
             revision_messages = Interface.SafeGenerateText(
                 _Logger, revision_messages, Writer.Config.CHAPTER_REVISION_WRITER_MODEL,
-                _MinWordCount=len(current_chapter_text.split()) * 0.8
+                min_word_count_target=min_word_count_target
             )
             current_chapter_text = Interface.GetLastMessageText(revision_messages)
             _Logger.Log("Done revising chapter.", 2)
@@ -190,14 +196,19 @@ def execute_generation_stage(
     prompt = prompt_template.format(**full_format_args)
     messages = [Interface.BuildUserQuery(prompt)]
 
-    min_words = 150
-    if "Stage1Chapter" in format_args:
-        min_words = len(format_args["Stage1Chapter"].split())
-    if "Stage2Chapter" in format_args:
-        min_words = len(format_args["Stage2Chapter"].split())
+    # Set minimum word count with a high floor to prevent cascading failures
+    min_words = 200  # Default for Stage 1 (Plot)
+
+    if "Stage2Chapter" in format_args: # Stage 3 (Dialogue)
+        word_count = len(re.findall(r'\b\w+\b', format_args["Stage2Chapter"]))
+        min_words = max(250, int(word_count * 0.95))
+    elif "Stage1Chapter" in format_args: # Stage 2 (Char Dev)
+        word_count = len(re.findall(r'\b\w+\b', format_args["Stage1Chapter"]))
+        min_words = max(250, int(word_count * 0.95))
+
 
     messages = Interface.SafeGenerateText(
-        _Logger, messages, model, _MinWordCount=min_words
+        _Logger, messages, model, min_word_count_target=min_words
     )
     initial_content = Interface.GetLastMessageText(messages)
 

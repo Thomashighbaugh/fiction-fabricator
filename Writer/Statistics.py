@@ -14,3 +14,4 @@ def GetWordCount(_Text: str) -> int:
     if not isinstance(_Text, str):
         return 0
     return len(_Text.split())
+

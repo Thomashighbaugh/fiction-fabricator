@@ -5,6 +5,9 @@ import time
 import json
 import random
 import inspect
+import signal
+import platform
+import re
 from urllib.parse import parse_qs
 
 import Writer.Config
@@ -27,11 +30,17 @@ SAFE_PARAMS = {
     "google": ["temperature", "top_p", "top_k", "max_output_tokens", "seed", "response_mime_type"],
     "groq": ["temperature", "top_p", "max_tokens", "seed"],
     "nvidia": ["temperature", "top_p", "max_tokens", "seed"],
-    "github": ["temperature", "top_p", "max_tokens", "seed"], # Covers multiple underlying clients
+    "github": ["temperature", "top_p", "max_tokens"],
     "ollama": ["temperature", "top_p", "top_k", "seed", "format", "num_predict"],
     "mistralai": ["temperature", "top_p", "max_tokens"]
 }
 
+
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException
 
 class Interface:
 
@@ -110,26 +119,72 @@ class Interface:
             except Exception as e:
                 _Logger.Log(f"CRITICAL: Failed to verify config for model '{Model}'. Error: {e}", 7)
 
-    def SafeGenerateText(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, _MinWordCount: int = 1) -> list:
+    def SafeGenerateText(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, min_word_count_target: int = 50) -> list:
         _Messages = [msg for msg in _Messages if msg.get("content", "").strip()]
-        NewMsgHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format)
 
-        while not self.GetLastMessageText(NewMsgHistory).strip() or len(self.GetLastMessageText(NewMsgHistory).split()) < _MinWordCount:
-            if not self.GetLastMessageText(NewMsgHistory).strip():
+        # Dynamically set max_tokens to give the model enough headroom.
+        # Assume ~2.5 tokens per word for a generous buffer.
+        max_tokens_override = int(min_word_count_target * 2.5)
+
+
+        # --- First Attempt ---
+        NewMsgHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format, max_tokens_override=max_tokens_override)
+
+        last_response_text = self.GetLastMessageText(NewMsgHistory)
+        word_count = len(re.findall(r'\b\w+\b', last_response_text))
+
+        # --- Check and Retry Logic ---
+        if not last_response_text.strip() or word_count < min_word_count_target:
+            if not last_response_text.strip():
                 _Logger.Log("SafeGenerateText: Generation failed (empty). Retrying...", 7)
             else:
-                _Logger.Log(f"SafeGenerateText: Generation failed (short response: {len(self.GetLastMessageText(NewMsgHistory).split())} words, min: {_MinWordCount}). Retrying...", 7)
+                _Logger.Log(f"SafeGenerateText: Generation failed (short response: {word_count} words, target: {min_word_count_target}). Retrying...", 7)
 
             if NewMsgHistory and NewMsgHistory[-1].get("role") == "assistant":
-                NewMsgHistory.pop()
+                NewMsgHistory.pop() # Remove the failed assistant response
 
-            NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format)
+            forceful_retry_prompt = f"The previous response was too short. It is crucial that you generate a detailed and comprehensive, multi-paragraph response that is AT LEAST {min_word_count_target} words long. Do not stop writing until you have met this requirement. Fulfill the original request completely and at the required length."
+            NewMsgHistory.append(self.BuildUserQuery(forceful_retry_prompt))
+
+            # --- Second Attempt ---
+            # Increase the max_tokens even more for the retry
+            max_tokens_override_retry = int(min_word_count_target * 4)
+            NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format, max_tokens_override=max_tokens_override_retry)
+
+            last_response_text = self.GetLastMessageText(NewMsgHistory)
+            word_count = len(re.findall(r'\b\w+\b', last_response_text))
+
+            # --- Final Check with User Interaction ---
+            if not last_response_text.strip() or word_count < min_word_count_target:
+                _Logger.Log(f"SafeGenerateText: Retry also failed to meet word count (got {word_count}, target {min_word_count_target}).", 6)
+                while True:
+                    user_choice = input("Do you want to [c]ontinue with the short response or [t]ry again? (c/t): ").lower()
+                    if user_choice == 't':
+                        if NewMsgHistory and NewMsgHistory[-1].get("role") == "assistant":
+                            NewMsgHistory.pop() # Remove the second failed response
+
+                        NewMsgHistory.append(self.BuildUserQuery(forceful_retry_prompt))
+                        NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format, max_tokens_override=max_tokens_override_retry)
+                        last_response_text = self.GetLastMessageText(NewMsgHistory)
+                        word_count = len(re.findall(r'\b\w+\b', last_response_text))
+                        if word_count >= min_word_count_target:
+                            _Logger.Log("Success on manual retry.", 5)
+                            break
+                        else:
+                             _Logger.Log(f"Manual retry also failed (got {word_count}).", 6)
+                    elif user_choice == 'c':
+                        _Logger.Log("User chose to continue with the short response.", 4)
+                        break
+                    else:
+                        print("Invalid input. Please enter 'c' or 't'.")
 
         return NewMsgHistory
 
     def SafeGenerateJSON(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _RequiredAttribs: list = []) -> (list, dict):
         while True:
-            ResponseHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format="json")
+            # For JSON, we don't need a word count, but we still need a reasonable max_tokens
+            max_tokens_override = 2048
+            ResponseHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format="json", max_tokens_override=max_tokens_override)
             try:
                 RawResponse = self.GetLastMessageText(ResponseHistory).replace("```json", "").replace("```", "").strip()
                 JSONResponse = json.loads(RawResponse)
@@ -143,7 +198,7 @@ class Interface:
                     ResponseHistory.pop()
                 _SeedOverride = random.randint(0, 99999)
 
-    def ChatAndStreamResponse(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None) -> list:
+    def ChatAndStreamResponse(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, max_tokens_override: int = None) -> list:
         Provider, ProviderModel, ModelHost, ModelOptions = self.GetModelAndProvider(_Model)
         base_model_uri = _Model.split('?')[0]
 
@@ -158,35 +213,31 @@ class Interface:
             elif Provider == 'google':
                 ModelOptions['response_mime_type'] = 'application/json'
 
+        # Set max_tokens override if provided
+        if max_tokens_override is not None:
+            if Provider == 'ollama':
+                ModelOptions['num_predict'] = max_tokens_override
+            elif Provider == 'google':
+                ModelOptions['max_output_tokens'] = max_tokens_override
+            else:
+                ModelOptions['max_tokens'] = max_tokens_override
+
+
         client = None
         if Provider == "github":
             try:
                 github_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
                 github_token = os.environ.get("GITHUB_ACCESS_TOKEN")
-                
-                # This is the new dispatcher logic to select the correct client based on the model ID prefix.
+
                 if ProviderModel.startswith("mistral-ai/"):
                     _Logger.Log(f"Using MistralAI client for GitHub model: {ProviderModel}", 1)
-                    client = ChatMistralAI(
-                        endpoint=github_endpoint,
-                        api_key=github_token,
-                        model=ProviderModel
-                    )
+                    client = ChatMistralAI(endpoint=github_endpoint, api_key=github_token, model=ProviderModel)
                 elif ProviderModel.startswith(("openai/", "cohere/", "xai/", "deepseek/")):
                     _Logger.Log(f"Using OpenAI-compatible client for GitHub model: {ProviderModel}", 1)
-                    client = ChatOpenAI(
-                        base_url=github_endpoint,
-                        api_key=github_token,
-                        model=ProviderModel
-                    )
-                else: # Default to the Azure client for Microsoft, Meta, AI21 and others.
+                    client = ChatOpenAI(base_url=github_endpoint, api_key=github_token, model=ProviderModel)
+                else:
                     _Logger.Log(f"Using AzureOpenAI client for GitHub model: {ProviderModel}", 1)
-                    client = AzureChatOpenAI(
-                        azure_endpoint=github_endpoint,
-                        api_key=github_token,
-                        azure_deployment=ProviderModel,
-                        api_version=Writer.Config.GITHUB_API_VERSION,
-                    )
+                    client = AzureChatOpenAI(azure_endpoint=github_endpoint, api_key=github_token, azure_deployment=ProviderModel, api_version=Writer.Config.GITHUB_API_VERSION)
             except Exception as e:
                 _Logger.Log(f"Failed to create on-demand GitHub client for '{ProviderModel}'. Error: {e}", 7)
                 _Messages.append({"role": "assistant", "content": f"[ERROR: Failed to create GitHub client.]"})
@@ -202,10 +253,12 @@ class Interface:
         provider_safe_params = SAFE_PARAMS.get(Provider, [])
         filtered_options = {k: v for k, v in ModelOptions.items() if k in provider_safe_params}
 
+        # Handle provider-specific parameter name changes if they weren't caught by the override logic
         if Provider == 'ollama' and 'max_tokens' in filtered_options:
             filtered_options['num_predict'] = filtered_options.pop('max_tokens')
         if Provider == 'google' and 'max_tokens' in filtered_options:
             filtered_options['max_output_tokens'] = filtered_options.pop('max_tokens')
+
 
         _Logger.Log(f"Using Model '{ProviderModel}' from '{Provider}'", 4)
         if Writer.Config.DEBUG:
@@ -217,32 +270,48 @@ class Interface:
 
         start_time = time.time()
         full_response = ""
+
+        # Determine appropriate timeout
+        timeout_duration = Writer.Config.OLLAMA_TIMEOUT if Provider == 'ollama' else Writer.Config.DEFAULT_TIMEOUT
+
+        # Set up signal handler for timeout, only on non-Windows systems
+        if platform.system() != "Windows":
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_duration)
+
         try:
             if Provider == 'ollama':
                 stream = client.stream(langchain_messages, options=filtered_options)
             elif Provider == 'google':
                 gen_config_keys = ["temperature", "top_p", "top_k", "max_output_tokens", "response_mime_type"]
                 generation_config = {k: v for k, v in filtered_options.items() if k in gen_config_keys}
-                
+
                 seed_to_bind = {}
                 if 'seed' in filtered_options:
                     seed_to_bind['seed'] = filtered_options['seed']
-                
+
                 bound_client = client.bind(**seed_to_bind) if seed_to_bind else client
                 stream = bound_client.stream(langchain_messages, generation_config=generation_config)
             else:
                 bound_client = client.bind(**filtered_options) if filtered_options else client
                 stream = bound_client.stream(langchain_messages)
 
-            _Logger.Log("Streaming response...", 0)
+            _Logger.Log(f"Streaming response (timeout set to {timeout_duration}s)...", 0)
             for chunk in stream:
                 chunk_text = chunk.content if hasattr(chunk, 'content') else str(chunk)
                 full_response += chunk_text
                 print(chunk_text, end="", flush=True)
             print("\n")
+        except TimeoutException:
+            full_response = f"[ERROR: Generation timed out after {timeout_duration} seconds.]"
+            _Logger.Log(f"CRITICAL: LLM call to '{_Model}' timed out.", 7)
         except Exception as e:
             _Logger.Log(f"CRITICAL: Exception during LLM call to '{_Model}': {e}", 7)
             full_response = f"[ERROR: Generation failed. {e}]"
+        finally:
+            # Disable the alarm
+            if platform.system() != "Windows":
+                signal.alarm(0)
 
         elapsed = time.time() - start_time
         _Logger.Log(f"Generated response in {elapsed:.2f}s", 4)

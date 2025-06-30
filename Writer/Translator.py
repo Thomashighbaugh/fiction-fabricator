@@ -8,13 +8,13 @@ def TranslatePrompt(Interface, _Logger, _Prompt: str, _Language: str = "French")
     Prompt: str = Writer.Prompts.TRANSLATE_PROMPT.format(
         _Prompt=_Prompt, _Language=_Language
     )
-    _Logger.Log(f"Prompting LLM To Translate User Prompt", 5)
+    _Logger.Log("Prompting LLM To Translate User Prompt", 5)
     Messages = []
     Messages.append(Interface.BuildUserQuery(Prompt))
     Messages = Interface.SafeGenerateText(
-        _Logger, Messages, Writer.Config.TRANSLATOR_MODEL, _MinWordCount=50
+        _Logger, Messages, Writer.Config.TRANSLATOR_MODEL, min_word_count_target=50
     )
-    _Logger.Log(f"Finished Prompt Translation", 5)
+    _Logger.Log("Finished Prompt Translation", 5)
 
     return Interface.GetLastMessageText(Messages)
 

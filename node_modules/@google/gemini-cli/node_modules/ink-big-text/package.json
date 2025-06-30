@@ -1,0 +1,88 @@
+{
+	"name": "ink-big-text",
+	"version": "2.0.0",
+	"description": "Awesome text component for Ink",
+	"license": "MIT",
+	"repository": "sindresorhus/ink-big-text",
+	"funding": "https://github.com/sponsors/sindresorhus",
+	"author": {
+		"name": "Sindre Sorhus",
+		"email": "sindresorhus@gmail.com",
+		"url": "https://sindresorhus.com"
+	},
+	"type": "module",
+	"exports": {
+		"types": "./dist/index.d.ts",
+		"default": "./dist/index.js"
+	},
+	"engines": {
+		"node": ">=14.16"
+	},
+	"scripts": {
+		"build": "tsc",
+		"test": "xo && ava",
+		"prepublish": "npm run build",
+		"pretest": "npm run build"
+	},
+	"files": [
+		"dist"
+	],
+	"keywords": [
+		"ink-component",
+		"ink",
+		"component",
+		"text",
+		"font",
+		"big",
+		"large",
+		"string",
+		"react",
+		"jsx",
+		"terminal",
+		"term",
+		"console",
+		"command-line"
+	],
+	"dependencies": {
+		"cfonts": "^3.1.1",
+		"prop-types": "^15.8.1"
+	},
+	"devDependencies": {
+		"@sindresorhus/tsconfig": "^3.0.1",
+		"@types/react": "^18.0.28",
+		"ava": "^5.2.0",
+		"clear-module": "^4.1.2",
+		"eslint-config-xo-react": "^0.27.0",
+		"eslint-plugin-react": "^7.32.2",
+		"eslint-plugin-react-hooks": "^4.6.0",
+		"ink": "^4.0.0",
+		"ink-testing-library": "^3.0.0",
+		"react": "^18.2.0",
+		"strip-ansi": "^7.0.1",
+		"ts-node": "^10.9.1",
+		"typescript": "^5.0.2",
+		"xo": "^0.53.1"
+	},
+	"peerDependencies": {
+		"ink": ">=4",
+		"react": ">=18"
+	},
+	"xo": {
+		"extends": [
+			"xo-react"
+		],
+		"rules": {
+			"unicorn/filename-case": "off",
+			"@typescript-eslint/naming-convention": "off"
+		}
+	},
+	"ava": {
+		"extensions": {
+			"ts": "module",
+			"tsx": "module"
+		},
+		"nodeArguments": [
+			"--loader=ts-node/esm"
+		]
+	}
+}

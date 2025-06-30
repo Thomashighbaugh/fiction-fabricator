@@ -20,7 +20,7 @@ def GetFeedbackOnOutline(Interface: Interface, _Logger: Logger, _Outline: str) -
     _Logger.Log("Prompting LLM to critique outline...", 5)
     # This is a creative task, so we want a substantive response.
     History = Interface.SafeGenerateText(
-        _Logger, History, Writer.Config.REVISION_MODEL, _MinWordCount=50
+        _Logger, History, Writer.Config.REVISION_MODEL, min_word_count_target=50
     )
     _Logger.Log("Finished getting outline feedback.", 5)
 
@@ -67,7 +67,7 @@ def GetFeedbackOnChapter(Interface: Interface, _Logger: Logger, _Chapter: str, _
 
     _Logger.Log("Prompting LLM to critique chapter...", 5)
     Messages = Interface.SafeGenerateText(
-        _Logger, History, Writer.Config.REVISION_MODEL, _MinWordCount=50
+        _Logger, History, Writer.Config.REVISION_MODEL, min_word_count_target=50
     )
     _Logger.Log("Finished getting chapter feedback.", 5)
 
