@@ -164,8 +164,8 @@ Please use the below template for formatting your response.
 - Important point 2
 </EXAMPLE>
 
-Do NOT write the outline itself, just the extra context. Keep your responses short and in a bulleted list.
-If no such context exists, respond with "No additional context found."
+Do NOT write the outline itself, **just the extra context**. Keep your responses short and in a bulleted list.
+If the prompt provides no such context, you must respond with "No additional context found."
 """
 
 EXPAND_OUTLINE_TO_MIN_CHAPTERS_PROMPT = """

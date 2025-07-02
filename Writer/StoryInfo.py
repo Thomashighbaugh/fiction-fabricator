@@ -26,7 +26,7 @@ def GetStoryInfo(Interface: Interface, _Logger: Logger, _Messages: list) -> dict
         _Logger,
         _Messages,
         Writer.Config.INFO_MODEL,
-        _RequiredAttribs=["Title", "Summary", "Tags"]
+        _RequiredAttribs=["Title", "Summary", "Tags", "OverallRating"]
     )
 
     _Logger.Log("Finished getting story info.", 5)

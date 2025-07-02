@@ -251,7 +251,7 @@ def main():
     narrative_context = Writer.OutlineGenerator.GenerateOutline(Interface, SysLogger, Prompt, narrative_context)
     SysLogger.Log("Starting Chapter Writing phase...", 2)
     total_chapters = Writer.Chapter.ChapterDetector.LLMCountChapters(Interface, SysLogger, narrative_context.base_novel_outline_markdown)
-    if total_chapters > 0 and total_chapters < 50:
+    if total_chapters > 0 and total_chapters < 100:
         for i in range(1, total_chapters + 1):
             Writer.Chapter.ChapterGenerator.GenerateChapter(Interface, SysLogger, i, total_chapters, narrative_context)
     else:
@@ -265,7 +265,10 @@ def main():
         SysLogger.Log("Skipping final scrubbing pass due to config.", 4)
 
     StoryBodyText = "\n\n\n".join([f"### Chapter {chap.chapter_number}\n\n{chap.generated_content}" for chap in narrative_context.chapters if chap.generated_content])
-    Info = Writer.StoryInfo.GetStoryInfo(Interface, SysLogger, [Interface.BuildUserQuery(narrative_context.base_novel_outline_markdown)])
+    
+    # Corrected call to GetStoryInfo with the base outline for concise and reliable context.
+    info_messages = [Interface.BuildUserQuery(narrative_context.base_novel_outline_markdown)]
+    Info = Writer.StoryInfo.GetStoryInfo(Interface, SysLogger, info_messages)
     Title = Info.get("Title", "Untitled Story")
 
     SysLogger.Log(f"Story Title: {Title}", 5)
@@ -293,15 +296,30 @@ def main():
     safe_title = "".join(c for c in Title if c.isalnum() or c in (' ', '_')).rstrip()
     file_name_base = f"Stories/{safe_title.replace(' ', '_')}"
     if Writer.Config.OPTIONAL_OUTPUT_NAME:
-        file_name_base = Writer.Config.OPTIONAL_OUTPUT_NAME
-    with open(f"{file_name_base}.md", "w", encoding="utf-8") as f:
+        file_name_base = f"Stories/{Writer.Config.OPTIONAL_OUTPUT_NAME}"
+    
+    md_file_path = f"{file_name_base}.md"
+    json_file_path = f"{file_name_base}.json"
+
+    # Write the Markdown file
+    with open(md_file_path, "w", encoding="utf-8") as f:
         output_content = f"# {Title}\n\n{StoryBodyText}\n\n---\n\n{StatsString}\n\n---\n\n## Full Outline\n```\n{narrative_context.base_novel_outline_markdown}\n```"
         f.write(output_content)
-        SysLogger.SaveStory(output_content)
 
-    with open(f"{file_name_base}.json", "w", encoding="utf-8") as f:
+    # Write the JSON file
+    with open(json_file_path, "w", encoding="utf-8") as f:
         json.dump(narrative_context.to_dict(), f, indent=4)
+    
+    # Log the final, correct output paths
     SysLogger.Log("Generation complete!", 5)
+    final_message = f"""
+--------------------------------------------------
+Output Files Saved:
+- Markdown Story: {os.path.abspath(md_file_path)}
+- JSON Data File: {os.path.abspath(json_file_path)}
+--------------------------------------------------"""
+    print(termcolor.colored(final_message, "green"))
+
 
 if __name__ == "__main__":
     main()

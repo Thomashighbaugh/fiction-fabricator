@@ -162,8 +162,13 @@ cython_debug/
 
 Stories/*
 Prompts/*
+Premises/*
+PremiseGenLogs/*
+PromptGenLogs/*
 Logs/*
 EvalLogs/*
+node_modules/*
+package-lock.json
 .github/Improvements
 .github/improvements/prompt*
 .vscode

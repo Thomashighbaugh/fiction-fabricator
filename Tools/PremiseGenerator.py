@@ -15,10 +15,10 @@ for the main `Write.py` application.
 The process involves:
 1. Dynamically selecting an LLM from available providers.
 2. Prompting the LLM to generate 10 creative and detailed story premises based on the user's theme.
-3. Having the LLM critique its own list of premises for quality and variety.
+3. Having the LLM critique its own list of premises for quality, originality, and thematic coherence.
 4. Revising the list of premises based on the critique.
 5. Displaying the final, revised premises to the user.
-6. Saving the list to a text file in the `Premises/` directory.
+6. Saving the list to a timestamped text file in the `Premises/` directory.
 
 Requirements:
 - All packages from the main project's `requirements.txt`.
@@ -35,6 +35,7 @@ import os
 import sys
 import json
 import re
+import datetime
 import dotenv
 
 # --- Add project root to path for imports and load .env explicitly ---
@@ -254,7 +255,7 @@ Do not include any other text, titles, or explanations outside of this JSON obje
 """
 
 CRITIQUE_PREMISES_PROMPT_TEMPLATE = """
-You are a professional story editor and creative consultant. You have been given a list of 10 story premises based on a user's initial idea. Your task is to provide constructive criticism to improve the list.
+You are a professional story editor and creative consultant with a strong aversion to clichés and thematic inconsistency. You have been given a list of story premises based on a user's initial idea. Your task is to provide sharp, constructive criticism to elevate the list.
 
 USER'S ORIGINAL IDEA: "{idea}"
 
@@ -263,17 +264,16 @@ LIST OF PREMISES TO CRITIQUE:
 {premises_json}
 ---
 
-Please critique the list based on the following criteria:
-1.  **Variety:** Are the 10 premises sufficiently different from one another, or are they too similar? Do they explore the user's idea from different angles?
-2.  **Creativity & Originality:** Do the premises feel fresh and exciting, or do they rely on common clichés for the given idea?
-3.  **Completeness:** Does each premise contain a clear conflict, interesting characters, and compelling stakes, as requested?
-4.  **Adherence to Theme:** How well does the list of premises align with the user's original idea?
+Please critique the list based on the following rigorous criteria:
+1.  **Conceptual Originality vs. Cliché:** Do these premises creatively explore the *core* of the user's idea, or do they immediately fall back on the most predictable, overused tropes and clichés for this genre? Identify specific premises that are too generic and suggest pushing for a more unique angle.
+2.  **Thematic Cohesion:** Does every premise remain faithful to the specific tone and concept of the user's original idea? Aggressively flag any premise that introduces elements from unrelated genres or themes that clash with the core concept (e.g., adding a magical spring to a hard sci-fi cyberpunk idea). The goal is *thematically consistent variety*, not random genre-mashing.
+3.  **Depth and Uniqueness:** Beyond just being different, do the premises offer unique perspectives on the core idea? Do they ask interesting "what if" questions or subvert expectations? Or are they just minor variations of the same basic plot?
 
-Provide your critique as a few bullet points of actionable feedback. Your goal is to guide the next AI to create a stronger, more varied, and more interesting set of premises. Your output should be a plain string of text.
+Provide your critique as a few bullet points of direct, actionable feedback. Your goal is to guide the next AI to create a stronger, more original, and more thematically pure set of premises that avoids lazy, generic tropes. Your output should be a plain string of text.
 """
 
 REVISE_PREMISES_BASED_ON_CRITIQUE_TEMPLATE = """
-You are a master storyteller and creative writer. Your task is to revise a list of 10 story premises based on an editor's critique.
+You are a master storyteller and creative writer. Your task is to revise a list of 10 story premises based on an editor's sharp critique. The critique is focused on avoiding clichés and ensuring thematic integrity.
 
 USER'S ORIGINAL IDEA: "{idea}"
 
@@ -289,28 +289,21 @@ EDITOR'S CRITIQUE:
 
 YOUR TASK:
 Rewrite the list of 10 premises to directly address the points in the "EDITOR'S CRITIQUE".
-- If the critique mentioned a lack of variety, create more distinct premises.
-- If the critique mentioned clichés, invent more original concepts.
-- If premises were incomplete, flesh them out with stronger conflicts, characters, and stakes.
-- Ensure all revised premises still align with the "USER'S ORIGINAL IDEA".
+- **Eliminate Clichés:** For any premise the critique flagged as generic, invent a more original concept that still honors the user's idea. Subvert common tropes instead of repeating them.
+- **Enforce Thematic Purity:** Remove any elements that clash with the user's core concept, as pointed out by the critique. Ensure every premise is a unique but *consistent* exploration of the original idea.
+- **Deepen the Concepts:** For any premise noted as shallow, flesh it out with a stronger, more unique conflict, more interesting character dynamics, and higher stakes.
 
 **CRUCIAL:** Your entire output MUST be a single, valid JSON object, identical in format to the original. It must have one key, "premises", which is a list of exactly 10 strings. Do not include any text or explanations outside of the JSON object.
 """
-
-def sanitize_filename(name: str) -> str:
-    """Sanitizes a string to be suitable for a filename or directory name."""
-    name = re.sub(
-        r"[^\w\s-]", "", name
-    ).strip()  # Remove non-alphanumeric (except underscore, hyphen, space)
-    name = re.sub(r"[-\s]+", "_", name)  # Replace spaces and hyphens with underscores
-    return name if name else "Untitled_Premise"
-
 
 def main():
     parser = argparse.ArgumentParser(description="FictionFabricator Self-Contained Premise Generator.")
     parser.add_argument("-i", "--idea", required=True, help="The user's high-level story theme or genre.")
     parser.add_argument("--temp", type=float, default=0.8, help="Temperature for LLM generation (default: 0.8).")
     args = parser.parse_args()
+
+    # Capture the initialization time
+    generation_timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     print("--- FictionFabricator Premise Generator ---")
     sys_logger = Logger("PremiseGenLogs")
@@ -352,7 +345,7 @@ def main():
         idea=args.idea, premises_json=json.dumps(initial_response_json, indent=2)
     )
     critique_messages = [
-        interface.BuildSystemQuery("You are a professional story editor and creative consultant."),
+        interface.BuildSystemQuery("You are a professional story editor with a strong aversion to clichés."),
         interface.BuildUserQuery(critique_prompt)
     ]
     critique_history = interface.SafeGenerateText(
@@ -374,7 +367,7 @@ def main():
             critique=critique
         )
         revision_messages = [
-            interface.BuildSystemQuery("You are a master storyteller revising a list of premises in JSON format based on a critique."),
+            interface.BuildSystemQuery("You are a master storyteller revising a list of premises in JSON format based on a sharp critique."),
             interface.BuildUserQuery(revision_prompt)
         ]
         _, revised_response_json = interface.SafeGenerateJSON(
@@ -404,13 +397,14 @@ def main():
     premises_base_dir = os.path.join(project_root, "Premises")
     os.makedirs(premises_base_dir, exist_ok=True)
 
-    sanitized_idea = sanitize_filename(args.idea)
-    output_filename = f"{sanitized_idea}.txt"
+    # Use the timestamp captured at the start of the run for the filename
+    output_filename = f"Premise_List_{generation_timestamp}.txt"
     output_path = os.path.join(premises_base_dir, output_filename)
 
     try:
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write(f"# Premises for Idea: {args.idea}\n\n")
+            f.write(f"# Premises for Idea: {args.idea}\n")
+            f.write(f"# Generated on: {generation_timestamp}\n\n")
             f.write(formatted_output)
         print(f"\nSuccessfully saved generated premises to: {output_path}")
     except OSError as e:

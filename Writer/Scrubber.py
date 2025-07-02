@@ -44,10 +44,19 @@ def ScrubNovel(
         
         messages = [Interface.BuildUserQuery(prompt)]
         
-        # SafeGenerateText ensures we get a non-empty response.
+        # --- FIX: Implement robust word count target for scrubbing ---
+        # Calculate the original word count to prevent the chapter from being overwritten by a short, failed response.
+        original_word_count = Writer.Statistics.GetWordCount(original_content)
+        
+        # Set a safe minimum word count for the scrubbed output. It should be a large fraction of the original.
+        # We set a floor of 50 words to handle very short chapters.
+        min_word_target = max(50, int(original_word_count * 0.8))
+        _Logger.Log(f"Scrubbing Chapter {chapter_num} with a minimum word target of {min_word_target} (original was {original_word_count}).", 1)
+
+        # SafeGenerateText ensures we get a response that meets the robust word count target.
         # Scrubbing is non-creative, so no critique cycle is needed.
         messages = Interface.SafeGenerateText(
-            _Logger, messages, Writer.Config.SCRUB_MODEL, min_word_count_target=1
+            _Logger, messages, Writer.Config.SCRUB_MODEL, min_word_count_target=min_word_target
         )
         
         scrubbed_content = Interface.GetLastMessageText(messages)

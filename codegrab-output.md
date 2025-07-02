@@ -2,7 +2,15 @@
 
 ```
 fiction-fabricator/
+├── .github/
+│   └── documentation/
+│       ├── 1_introduction_and_features.md
+│       ├── 2_installation_guide.md
+│       ├── 3_configuration_guide.md
+│       ├── 4_usage_workflow.md
+│       └── 5_advanced_tools.md
 ├── Tools/
+│   ├── PremiseGenerator.py
 │   ├── PromptGenerator.py
 │   └── Test.py
 ├── Writer/
@@ -37,11 +45,732 @@ fiction-fabricator/
 ├── Evaluate.py
 ├── README.md
 ├── Write.py
-├── config.ini
-└── requirements.txt
+└── config.ini
 ```
 
 # Project Files
+
+## File: `.github/documentation/1_introduction_and_features.md`
+
+```markdown
+# 1. Introduction and Features
+
+Fiction Fabricator is an advanced, AI-powered framework for generating complete, multi-chapter novels from a single creative prompt. It leverages a suite of modern Language Learning Models (LLMs) through a unified interface, employing a sophisticated, multi-stage pipeline of outlining, scene-by-scene generation, and iterative revision to produce high-quality, coherent long-form narratives.
+
+This project is a significantly modified and enhanced fork of **[AIStoryteller by datacrystals](https://github.com/datacrystals/AIStoryteller)**. It was created to enhance the original project with a focus on provider flexibility, improved narrative coherence, and a more powerful, user-configurable generation process.
+
+## Purpose
+
+The purpose of this project is to create long-form fictional prose content leveraging the text generation capabilities of modern LLMs. Fiction Fabricator is designed to be a powerful, flexible, and transparent tool for creating long-form fiction with AI, which unlike other projects that focus on content generation, Fiction Fabricator is especially tailored to creating coherent, enjoyable novels that can be read and enjoyed by humans but which require minimal human intervention during the creation process.
+
+### Creation Workflow
+
+To give you a high level overview of the book creation process this project enables, here is a brief outline of the workflow:
+
+1. Human provides a prompt, which is a premise written into several sentences (Tools/PromptGenerator.py can help with this and Tools/PremiseGenerator.py can help brainstorm ideas).
+2. Human selects a model from the list of available models on the screen
+3. Fiction Fabricator then outlines, critiques, revises and then writes the book, chapter by chapter with each chapter being broken down into scenes.
+4. Content is dumped into the `Stories/` directory, with each run generating a unique, timestamped directory containing the final story, run statistics, and detailed debug files for every LLM call, providing complete transparency into the generation process.
+5. User should then read the content and make any necessary edits as the content is not guaranteed to be perfect and making edits is what case law suggests is necessary to own the copyright to the content.
+
+Frighteningly simple, right? A lot simpler than Steven King doing a gram of cocaine per page while writing "It".
+
+## Key Features & Modifications
+
+- **Unified Multi-Provider Interface**: Seamlessly switch between LLM providers like **Google Gemini, Groq, Mistral, Ollama, and NVIDIA NIM** using a simple URI format (e.g., `groq://llama3-70b-8192`).
+- **Robust & Predictable NVIDIA NIM Integration**: The NVIDIA integration has been specifically hardened to provide full user control. Models are **manually and explicitly listed** in the `config.ini` file, removing the unpredictability of a dynamic discovery function and ensuring that any model you have access to can be used.
+- **Flexible API Configuration**: Easily configure API endpoints, including the crucial `NVIDIA_BASE_URL`, either through a `.env` file for security or directly in `config.ini` for simplicity.
+- **Advanced Scene-by-Scene Generation**: Instead of attempting to generate entire chapters at once, Fiction Fabricator breaks chapter outlines down into individual scenes. It writes each scene with context from the preceding one, dramatically improving narrative flow and short-term coherence.
+- **Iterative Critique & Revision Engine**: At critical stages of generation (outline, scene breakdown, chapter writing), the system uses an LLM to critique its own output and then revise it based on that feedback. This self-correction loop significantly enhances the quality of the final product.
+- **Intelligent Prompt Engineering**: Includes a powerful utility (`Tools/PromptGenerator.py`) that takes a user's simple idea and uses an LLM-driven, multi-step process to expand it into a rich, detailed prompt perfect for generating a complex story.
+- **Comprehensive Logging**: Every run generates a unique, timestamped directory in `Logs/`, containing the final story, run statistics, and detailed debug files for every LLM call, providing complete transparency into the generation process.
+- **Developer & Power-User Utilities**:
+  - **`Tools/Test.py`**: A testing script for quickly running generations with different pre-defined model configurations.
+  - **`Evaluate.py`**: A powerful A/B testing tool that uses an LLM to compare two generated stories on multiple axes, such as plot, style, and dialogue.
+  - **`Tools/PromptGenerator.py`**: A tool to generate the more comprehensive prompt in `Prompt/` expected as a parameter by `Write.py`.
+  - **`Tools/PremiseGenerator.py`**: A brainstorming tool to generate 10 unique premises from a high-level theme.
+
+```
+
+## File: `.github/documentation/2_installation_guide.md`
+
+```markdown
+# 2. Installation Guide
+
+This guide provides everything you need to know to install the project and set up its dependencies.
+
+## Prerequisites
+
+- Python 3.10 or higher.
+- `git` for cloning the repository.
+
+## Installation Steps
+
+Follow these steps from your terminal to get the project running.
+
+```bash
+# 1. Clone the repository
+# Replace <your-repository-url> with the actual URL of the project repository
+git clone <your-repository-url>
+
+# 2. Navigate into the project directory
+cd fiction-fabricator # Or your project's root directory name
+
+# 3. (Recommended) Create and activate a virtual environment
+# This isolates the project's dependencies from your system's Python installation.
+python -m venv venv
+
+# Activate the virtual environment:
+# On macOS/Linux:
+source venv/bin/activate
+
+# On Windows:
+venv\Scripts\activate
+
+# 4. Install the required packages
+# The requirements.txt file contains all necessary Python libraries.
+pip install -r requirements.txt
+```
+
+Once these steps are complete, the application is installed and you can proceed to the configuration step.
+
+```
+
+## File: `.github/documentation/3_configuration_guide.md`
+
+```markdown
+# 3. Configuration Guide
+
+Configuration for Fiction Fabricator is handled by two key files located in the project's root directory: `.env` for secret API keys and `config.ini` for general application settings.
+
+## The `.env` File (For Secrets)
+
+This is the **most secure and recommended** place for your API keys. The application will automatically load this file if it exists. Create a file named `.env` in the project's root directory.
+
+**Example `.env` file content:**
+
+```
+# Provider API Keys
+GOOGLE_API_KEY="your-google-api-key"
+MISTRAL_API_KEY="your-mistral-api-key"
+GROQ_API_KEY="your-groq-api-key"
+
+# For NVIDIA, the API key is required.
+NVIDIA_API_KEY="nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# The NVIDIA Base URL is optional here. If set, it will OVERRIDE the value in config.ini.
+# This is useful for pointing to custom, preview, or self-hosted NIM endpoints.
+# NVIDIA_BASE_URL="https://your-custom-nim-url.com/v1"
+
+# For GitHub Models Marketplace, you must provide your GitHub Access Token
+# and the correct endpoint URL.
+GITHUB_ACCESS_TOKEN="github_pat_..."
+AZURE_OPENAI_ENDPOINT="https://models.github.ai/inference"
+```
+
+## The `config.ini` File (For Settings)
+
+This file controls the application's behavior, default model selection, and generation parameters. You can override most of these settings with command-line arguments when you run the `Write.py` script.
+
+### [LLM_SELECTION]
+
+Set the default models for each step of the generation process.
+
+- **Format:** `provider://model_identifier`
+- **Examples:** `google://gemini-1.5-pro-latest`, `groq://mixtral-8x7b-32768`, `ollama://llama3`
+
+### [NVIDIA_SETTINGS]
+
+- `base_url`: The API endpoint for NVIDIA models. The default (`https://integrate.api.nvidia.com/v1`) is for standard, managed models.
+- `available_models`: **This is a crucial, manual list.** Add the specific model IDs you have access to and wish to use, separated by commas. These will appear in the interactive selection menu.
+  - _Example_: `available_models = meta/llama3-70b-instruct, mistralai/mistral-large`
+
+### [GITHUB_SETTINGS]
+
+- `api_version`: The specific API version required by the Azure OpenAI client used for the GitHub provider. It's best not to change this unless you know what you are doing.
+
+### [WRITER_SETTINGS]
+
+Fine-tune the generation process.
+
+- `scene_generation_pipeline`: (Default: `true`) Highly recommended. Enables the advanced scene-by-scene workflow.
+- `enable_final_edit_pass`: (Default: `false`) Performs a final, holistic edit of the entire novel. Can increase cost and time but may improve consistency.
+- `expand_outline`: (Default: `true`) Enables the multi-group detailed outline generation process.
+- `minimum_chapters`: The minimum number of chapters the final outline should have.
+- `seed`: A seed for randomization to ensure reproducible results.
+- `debug`: (Default: `false`) Enables verbose logging, including saving all LLM prompts and responses.
+
+### [TIMEOUTS]
+
+- `default_timeout`: Request timeout in seconds for most API calls.
+- `ollama_timeout`: A longer timeout specifically for Ollama, which may have long load times for local models.
+
+```
+
+## File: `.github/documentation/4_usage_workflow.md`
+
+```markdown
+# 4. Usage Workflow
+
+This guide outlines the recommended workflow for generating a novel with Fiction Fabricator, from initial idea to final output.
+
+## Step 1: Brainstorm Premises (Optional but Recommended)
+
+If you only have a high-level theme (e.g., "haunted spaceship"), you can use the `PremiseGenerator.py` tool to brainstorm more concrete ideas.
+
+````bash
+# Run the tool with your high-level theme
+python Tools/PremiseGenerator.py -i "haunted spaceship"```
+
+The tool will present a model selection menu and then generate 10 distinct premises based on your theme. The output is saved to a timestamped file in the `Premises/` directory. You can use any of these premises as input for the next step.
+
+## Step 2: Create a High-Quality Prompt
+
+A detailed prompt produces a better story. Use the `PromptGenerator.py` tool to expand a simple idea or one of the premises from the previous step into a rich, detailed prompt suitable for the main application.
+
+```bash
+# Run the tool with your chosen story title and premise
+python Tools/PromptGenerator.py -t "The Last Signal" -i "A lone astronaut on Mars discovers a strange, repeating signal from a polar ice cap, but her mission command on Earth insists it's just a malfunction."
+````
+
+This will again prompt you to select a model for the generation and will save a detailed `prompt.txt` file in `Prompts/The_Last_Signal/`.
+
+## Step 3: Write the Novel
+
+Use the main `Write.py` script to start the full generation process, using the prompt file you just created.
+
+### Interactive Mode (Easiest)
+
+Simply provide the prompt file path. The script will present an interactive menu to select the primary writing model from all your configured providers.
+
+```bash
+python Write.py -Prompt "Prompts/The_Last_Signal/prompt.txt"
+```
+
+### Custom/Headless Mode
+
+You can specify all models and settings via command-line arguments. This is useful for automated runs or for overriding the settings in `config.ini`.
+
+```bash
+# Example of a custom run using different models for different tasks
+python Write.py \
+-Prompt "Prompts/The_Last_Signal/prompt.txt" \
+-InitialOutlineModel "google://gemini-1.5-pro-latest" \
+-ChapterS1Model "groq://llama3-70b-8192" \
+-ChapterRevisionModel "nvidia://meta/llama3-70b-instruct" \
+-EnableFinalEditPass \
+-Seed 42
+```
+
+## Step 4: Find Your Story
+
+All output is saved to uniquely named directories to prevent overwriting your work.
+
+- **`Stories/`**: Contains the final, user-facing output. For each run, you will get:
+
+  - `Your_Story_Title.md`: A markdown file with the formatted story, generation statistics, and the full outline.
+  - `Your_Story_Title.json`: A structured JSON file containing the complete narrative context, including all outlines, chapter text, and summaries. This file can be used for analysis or further processing.
+
+- **`Logs/`**: Contains detailed logs for debugging. A new directory is created for each run, containing:
+  - `Main.log`: A human-readable log of all steps, warnings, and errors.
+  - `LangchainDebug/`: A folder with `.json` and `.md` files for every single call made to an LLM, showing the exact prompts and responses. This is invaluable for debugging and understanding the generation process.
+
+```
+
+## File: `.github/documentation/5_advanced_tools.md`
+
+```markdown
+# 5. Advanced Tools
+
+Fiction Fabricator includes several powerful utilities for power users, developers, and those who want to experiment with different models and generation strategies.
+
+## Testing Model Configurations (`Tools/Test.py`)
+
+The `Test.py` script is designed for rapid experimentation. You can define different sets of models for various roles directly within the Python script and then quickly launch a generation with that pre-defined configuration.
+
+### How to Use:
+
+1.  **Edit `Tools/Test.py`**: Open the file and modify the `MODEL_CONFIGS` dictionary. You can add new configurations or change existing ones.
+    ```python
+    # Example configuration in Test.py
+    "7": {
+        "name": "NVIDIA Llama3 70B (Full Stack)",
+        "models": {
+            "InitialOutlineModel": "nvidia://meta/llama3-70b-instruct",
+            "ChapterOutlineModel": "nvidia://meta/llama3-70b-instruct",
+            # ... and so on for all model parameters
+        }
+    },
+    ```
+2.  **Run the script**:
+    ```bash
+    python Tools/Test.py
+    ```
+3.  **Select a Configuration**: The script will prompt you to choose one of your defined configurations, select a prompt, and add any extra flags. It then constructs and executes the full `Write.py` command for you.
+
+This is the perfect tool for testing the performance and writing style of different LLM providers and models.
+
+## Evaluating Stories (`Evaluate.py`)
+
+After generating two or more stories, you might want to compare them objectively. The `Evaluate.py` tool uses a powerful LLM to act as a literary critic, comparing two generated stories on multiple axes.
+
+### How to Use:
+
+The tool takes the `.json` output files from two different story runs as input.
+
+```bash
+# Example command
+python Evaluate.py -Story1 "Stories/Story_A_output.json" -Story2 "Stories/Story_B_output.json" -Output "Comparison_Report.md"
+```
+
+The script will:
+
+1.  Prompt the evaluation model to compare the outlines of both stories.
+2.  Prompt the model to compare each chapter, one by one.
+3.  Tally the "wins" for each story across categories like Plot, Style, and Dialogue.
+4.  Generate a detailed `Comparison_Report.md` file with its findings.
+
+## Brainstorming Premises (`Tools/PremiseGenerator.py`)
+
+As described in the Usage Workflow, this tool is your starting point when you only have a rough theme. It takes a high-level concept and generates 10 fleshed-out premises, each of which can serve as a high-quality input for `Tools/PromptGenerator.py`.
+
+### How to Use:
+
+```bash
+python Tools/PremiseGenerator.py -i "A hardboiled detective who is also a ghost"
+```
+
+This will initiate the model selection menu and the generation/critique/revision cycle, saving the final 10 premises to a timestamped file in the `Premises/` directory.
+
+```
+
+## File: `Tools/PremiseGenerator.py`
+
+```python
+# File: Tools/PremiseGenerator.py
+# Purpose: Generates 10 story premises from a rough theme or idea using an LLM.
+# This script is self-contained and should be run from the project's root directory.
+
+"""
+FictionFabricator Premise Generator Utility.
+
+This script takes a high-level user theme or genre (e.g., "space opera romance")
+and uses an LLM to brainstorm 10 distinct story premises.
+
+Each generated premise is formatted to be a suitable input for the
+`Tools/PromptGenerator.py` script, which can then expand it into a full prompt
+for the main `Write.py` application.
+
+The process involves:
+1. Dynamically selecting an LLM from available providers.
+2. Prompting the LLM to generate 10 creative and detailed story premises based on the user's theme.
+3. Having the LLM critique its own list of premises for quality, originality, and thematic coherence.
+4. Revising the list of premises based on the critique.
+5. Displaying the final, revised premises to the user.
+6. Saving the list to a timestamped text file in the `Premises/` directory.
+
+Requirements:
+- All packages from the main project's `requirements.txt`.
+- A configured `.env` file with API keys for desired providers.
+- An accessible Ollama server if using local models.
+
+Usage:
+python Tools/PremiseGenerator.py -i "space opera romance"
+python Tools/PremiseGenerator.py --idea "cyberpunk detective story with a philosophical twist"
+"""
+
+import argparse
+import os
+import sys
+import json
+import re
+import datetime
+import dotenv
+
+# --- Add project root to path for imports and load .env explicitly ---
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+try:
+    dotenv_path = os.path.join(project_root, '.env')
+    if os.path.exists(dotenv_path):
+        dotenv.load_dotenv(dotenv_path=dotenv_path)
+        print(f"--- Successfully loaded .env file from: {dotenv_path} ---")
+    else:
+        print("--- .env file not found, proceeding with environment variables if available. ---")
+except Exception as e:
+    print(f"--- Error loading .env file: {e} ---")
+
+# --- Standardized Imports from Main Project ---
+from Writer.Interface.Wrapper import Interface
+from Writer.PrintUtils import Logger
+import Writer.Config # Import config to access NVIDIA model list
+
+# --- Model Discovery Functions (copied from Write.py / PromptGenerator.py) ---
+def get_ollama_models(logger):
+    """Queries local Ollama for available models."""
+    try:
+        import ollama
+        logger.Log("Querying Ollama for local models...", 1)
+        models_data = ollama.list().get("models", [])
+        available_models = [f"ollama://{model.get('name') or model.get('model')}" for model in models_data if model.get('name') or model.get('model')]
+        logger.Log(f"Found {len(available_models)} Ollama models.", 3)
+        return available_models
+    except ImportError:
+        logger.Log("'ollama' library not installed. Skipping Ollama provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Could not get Ollama models. (Error: {e})", 6)
+        return []
+
+def get_google_models(logger):
+    """Queries Google for available Gemini models."""
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        print("-> Google: GOOGLE_API_KEY not found in .env file. Skipping.")
+        return []
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        logger.Log("Querying Google for available Gemini models...", 1)
+        available = [f"google://{m.name.replace('models/', '')}" for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        logger.Log(f"Found {len(available)} Google models.", 3)
+        return available
+    except ImportError:
+        logger.Log("'google-generativeai' library not installed. Skipping Google provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Failed to query Google models. (Error: {e})", 6)
+        return []
+
+def get_groq_models(logger):
+    """Queries GroqCloud for available models."""
+    if not os.environ.get("GROQ_API_KEY"):
+        print("-> GroqCloud: GROQ_API_KEY not found in .env file. Skipping.")
+        return []
+    try:
+        from groq import Groq
+        logger.Log("Querying GroqCloud for available models...", 1)
+        client = Groq()
+        models = client.models.list().data
+        logger.Log(f"Found {len(models)} GroqCloud models.", 3)
+        return [f"groq://{model.id}" for model in models]
+    except ImportError:
+        logger.Log("'groq' library not installed. Skipping GroqCloud provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Failed to query GroqCloud models. (Error: {e})", 6)
+        return []
+
+def get_mistral_models(logger):
+    """Queries MistralAI for available models."""
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        print("-> MistralAI: MISTRAL_API_KEY not found in .env file. Skipping.")
+        return []
+    try:
+        from mistralai.client import MistralClient
+        logger.Log("Querying MistralAI for available models...", 1)
+        client = MistralClient(api_key=api_key)
+        models_data = client.list_models().data
+        known_chat_prefixes = ['mistral-large', 'mistral-medium', 'mistral-small', 'open-mistral', 'open-mixtral']
+        available_models = [f"mistralai://{model.id}" for model in models_data if any(model.id.startswith(prefix) for prefix in known_chat_prefixes)]
+        logger.Log(f"Found {len(available_models)} compatible MistralAI models.", 3)
+        return available_models
+    except ImportError:
+        logger.Log("'mistralai' library not installed. Skipping MistralAI provider.", 6)
+        return []
+    except Exception as e:
+        logger.Log(f"Failed to query MistralAI models. (Error: {e})", 6)
+        return []
+
+def get_nvidia_models(logger):
+    """Reads the user-defined NVIDIA models from config.ini."""
+    if not os.environ.get("NVIDIA_API_KEY"):
+        logger.Log("NVIDIA provider skipped: NVIDIA_API_KEY not found in environment.", 6)
+        return []
+    
+    logger.Log("Reading manual NVIDIA model list from config.ini...", 1)
+    model_list_str = Writer.Config.NVIDIA_AVAILABLE_MODELS
+    if not model_list_str:
+        logger.Log("NVIDIA provider skipped: No models listed in config.ini under [NVIDIA_SETTINGS] -> 'available_models'.", 6)
+        return []
+    
+    model_names = [name.strip() for name in model_list_str.split(',') if name.strip()]
+    available_models = [f"nvidia://{name}" for name in model_names]
+    logger.Log(f"Found {len(available_models)} NVIDIA models in config.ini.", 3)
+    return available_models
+
+def get_github_models(logger):
+    """Returns a static list of available GitHub models, checking for required env vars."""
+    if not os.environ.get("GITHUB_ACCESS_TOKEN") or not os.environ.get("AZURE_OPENAI_ENDPOINT"):
+        logger.Log("GitHub provider skipped: GITHUB_ACCESS_TOKEN or AZURE_OPENAI_ENDPOINT not found in environment.", 6)
+        return []
+
+    logger.Log("Loading GitHub model list...", 1)
+    
+    deployment_names = [
+        "openai/o1", "openai/o1-mini", "openai/o1-preview", "openai/gpt-4o-mini", "openai/gpt-4o",
+        "deepseek/DeepSeek-V3-0324", "deepseek/DeepSeek-R1",
+        "ai21-labs/AI21-Jamba-1.5-Large", "ai21-labs/AI21-Jamba-1.5-Mini",
+        "cohere/cohere-command-r", "cohere/cohere-command-r-plus", "cohere/cohere-command-a",
+        "mistral-ai/Mistral-Nemo", "mistral-ai/Mistral-Small",
+        "mistral-ai/Mistral-Large-2411", "mistral-ai/Codestral-22B-v0.1",
+        "meta/Llama-3.2-11B-Vision-Instruct", "meta/Llama-3.2-90B-Vision-Instruct",
+        "meta/Llama-3.3-70B-Instruct", "meta/Llama-3.1-8B-Instruct",
+        "meta/Llama-3.1-70B-Instruct", "meta/Llama-3.1-405B-Instruct",
+        "meta/Llama-3-8B-Instruct", "meta/Llama-3-70B-Instruct",
+        "microsoft/Phi-4", "microsoft/Phi-3.5-MoE-instruct",
+        "microsoft/Phi-3.5-mini-instruct", "microsoft/Phi-3.5-vision-instruct",
+        "microsoft/Phi-3-mini-4k-instruct", "microsoft/Phi-3-mini-128k-instruct",
+        "microsoft/Phi-3-small-8k-instruct", "microsoft/Phi-3-small-128k-instruct",
+        "microsoft/Phi-3-medium-4k-instruct", "microsoft/Phi-3-medium-128k-instruct",
+        "xai/grok-3",
+        "core42/jais-30b-chat"
+    ]
+    
+    available_models = [f"github://{name}" for name in deployment_names]
+    logger.Log(f"Found {len(available_models)} GitHub models.", 3)
+    return available_models
+
+def get_llm_selection_menu_for_tool(logger):
+    """
+    Queries providers, presents a menu to the user, and returns the chosen model URI.
+    """
+    print("\n--- Querying available models from configured providers... ---")
+    all_models = []
+    all_models.extend(get_google_models(logger))
+    all_models.extend(get_groq_models(logger))
+    all_models.extend(get_mistral_models(logger))
+    all_models.extend(get_nvidia_models(logger))
+    all_models.extend(get_github_models(logger))
+    all_models.extend(get_ollama_models(logger))
+    if not all_models:
+        logger.Log("No models found from any provider. Please check API keys in .env and model lists in config.ini.", 7)
+        return None
+
+    print("\n--- Premise Generator LLM Selection ---")
+    print("Please select the model for premise generation:")
+    sorted_models = sorted(all_models)
+    for i, model in enumerate(sorted_models):
+        print(f"[{i+1}] {model}")
+
+    while True:
+        choice = input("> ").strip().lower()
+        if choice.isdigit() and 1 <= int(choice) <= len(sorted_models):
+            selected_model = sorted_models[int(choice) - 1]
+            print(f"Selected: {selected_model}")
+            return selected_model
+        else:
+            print("Invalid choice. Please enter a number from the list.")
+
+# --- Prompts for this script ---
+
+GENERATE_PREMISES_PROMPT_TEMPLATE = """
+You are a creative brainstorming assistant and an expert in storytelling.
+A user has provided a rough theme or genre and wants you to generate 10 distinct, compelling story premises based on it.
+
+User's Theme/Idea: "{idea}"
+
+Your task is to generate 10 unique story premises. Each premise must be a complete, self-contained idea, detailed enough to be used as input for another AI tool that expands on story concepts.
+
+For each premise, you should include:
+- A core conflict.
+- At least two main characters with brief, defining traits.
+- A hint about the setting and its unique elements.
+- The central stakes of the story.
+- A unique twist or a "what if" scenario that makes the premise interesting.
+
+**IMPORTANT:** Your entire output must be a single, valid JSON object.
+The JSON object should have one key, "premises", which is a list of exactly 10 strings. Each string in the list is one of the detailed premises you have created.
+
+Example JSON structure:
+{{
+  "premises": [
+    "Premise 1 as a detailed string...",
+    "Premise 2 as a detailed string...",
+    "Premise 3 as a detailed string...",
+    "Premise 4 as a detailed string...",
+    "Premise 5 as a detailed string...",
+    "Premise 6 as a detailed string...",
+    "Premise 7 as a detailed string...",
+    "Premise 8 as a detailed string...",
+    "Premise 9 as a detailed string...",
+    "Premise 10 as a detailed string..."
+  ]
+}}
+
+Do not include any other text, titles, or explanations outside of this JSON object.
+"""
+
+CRITIQUE_PREMISES_PROMPT_TEMPLATE = """
+You are a professional story editor and creative consultant with a strong aversion to clichés and thematic inconsistency. You have been given a list of story premises based on a user's initial idea. Your task is to provide sharp, constructive criticism to elevate the list.
+
+USER'S ORIGINAL IDEA: "{idea}"
+
+LIST OF PREMISES TO CRITIQUE:
+---
+{premises_json}
+---
+
+Please critique the list based on the following rigorous criteria:
+1.  **Conceptual Originality vs. Cliché:** Do these premises creatively explore the *core* of the user's idea, or do they immediately fall back on the most predictable, overused tropes and clichés for this genre? Identify specific premises that are too generic and suggest pushing for a more unique angle.
+2.  **Thematic Cohesion:** Does every premise remain faithful to the specific tone and concept of the user's original idea? Aggressively flag any premise that introduces elements from unrelated genres or themes that clash with the core concept (e.g., adding a magical spring to a hard sci-fi cyberpunk idea). The goal is *thematically consistent variety*, not random genre-mashing.
+3.  **Depth and Uniqueness:** Beyond just being different, do the premises offer unique perspectives on the core idea? Do they ask interesting "what if" questions or subvert expectations? Or are they just minor variations of the same basic plot?
+
+Provide your critique as a few bullet points of direct, actionable feedback. Your goal is to guide the next AI to create a stronger, more original, and more thematically pure set of premises that avoids lazy, generic tropes. Your output should be a plain string of text.
+"""
+
+REVISE_PREMISES_BASED_ON_CRITIQUE_TEMPLATE = """
+You are a master storyteller and creative writer. Your task is to revise a list of 10 story premises based on an editor's sharp critique. The critique is focused on avoiding clichés and ensuring thematic integrity.
+
+USER'S ORIGINAL IDEA: "{idea}"
+
+ORIGINAL LIST OF PREMISES:
+---
+{original_premises_json}
+---
+
+EDITOR'S CRITIQUE:
+---
+{critique}
+---
+
+YOUR TASK:
+Rewrite the list of 10 premises to directly address the points in the "EDITOR'S CRITIQUE".
+- **Eliminate Clichés:** For any premise the critique flagged as generic, invent a more original concept that still honors the user's idea. Subvert common tropes instead of repeating them.
+- **Enforce Thematic Purity:** Remove any elements that clash with the user's core concept, as pointed out by the critique. Ensure every premise is a unique but *consistent* exploration of the original idea.
+- **Deepen the Concepts:** For any premise noted as shallow, flesh it out with a stronger, more unique conflict, more interesting character dynamics, and higher stakes.
+
+**CRUCIAL:** Your entire output MUST be a single, valid JSON object, identical in format to the original. It must have one key, "premises", which is a list of exactly 10 strings. Do not include any text or explanations outside of the JSON object.
+"""
+
+def main():
+    parser = argparse.ArgumentParser(description="FictionFabricator Self-Contained Premise Generator.")
+    parser.add_argument("-i", "--idea", required=True, help="The user's high-level story theme or genre.")
+    parser.add_argument("--temp", type=float, default=0.8, help="Temperature for LLM generation (default: 0.8).")
+    args = parser.parse_args()
+
+    # Capture the initialization time
+    generation_timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+    print("--- FictionFabricator Premise Generator ---")
+    sys_logger = Logger("PremiseGenLogs")
+
+    # --- Dynamic Model Selection ---
+    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger)
+    if not selected_model_uri:
+        sys_logger.Log("No model was selected or discovered. Exiting.", 7)
+        sys.exit(1)
+
+    # --- Instantiate Interface and load selected model ---
+    interface = Interface()
+    interface.LoadModels([selected_model_uri])
+
+    # --- Generation Logic ---
+
+    # Step 1: Generate Initial Premises
+    print(f"\nStep 1: Brainstorming 10 initial premises for the idea: '{args.idea}'...")
+    generation_prompt = GENERATE_PREMISES_PROMPT_TEMPLATE.format(idea=args.idea)
+    model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=4000"
+
+    messages = [
+        interface.BuildSystemQuery("You are a creative brainstorming assistant specialized in generating story premises in JSON format."),
+        interface.BuildUserQuery(generation_prompt)
+    ]
+    _, initial_response_json = interface.SafeGenerateJSON(
+        sys_logger, messages, model_with_params, _RequiredAttribs=["premises"]
+    )
+
+    if not initial_response_json or "premises" not in initial_response_json or not isinstance(initial_response_json["premises"], list):
+        print("Error: Failed to generate an initial valid list of premises. Aborting.")
+        sys.exit(1)
+    
+    final_premises = initial_response_json['premises']
+    
+    # Step 2: Critique the generated premises
+    print("\nStep 2: Critiquing the initial list of premises...")
+    critique_prompt = CRITIQUE_PREMISES_PROMPT_TEMPLATE.format(
+        idea=args.idea, premises_json=json.dumps(initial_response_json, indent=2)
+    )
+    critique_messages = [
+        interface.BuildSystemQuery("You are a professional story editor with a strong aversion to clichés."),
+        interface.BuildUserQuery(critique_prompt)
+    ]
+    critique_history = interface.SafeGenerateText(
+        sys_logger, critique_messages, model_with_params, min_word_count_target=50
+    )
+    critique = interface.GetLastMessageText(critique_history).strip()
+
+    # Step 3: Revise the premises based on critique
+    if "[ERROR:" in critique or not critique:
+        print("\nWarning: Critique step failed or returned empty. Skipping revision and using initial premises.")
+    else:
+        print("\n--- Critique ---")
+        print(critique)
+        print("----------------")
+        print("\nStep 3: Revising premises based on critique...")
+        revision_prompt = REVISE_PREMISES_BASED_ON_CRITIQUE_TEMPLATE.format(
+            idea=args.idea,
+            original_premises_json=json.dumps(initial_response_json, indent=2),
+            critique=critique
+        )
+        revision_messages = [
+            interface.BuildSystemQuery("You are a master storyteller revising a list of premises in JSON format based on a sharp critique."),
+            interface.BuildUserQuery(revision_prompt)
+        ]
+        _, revised_response_json = interface.SafeGenerateJSON(
+            sys_logger, revision_messages, model_with_params, _RequiredAttribs=["premises"]
+        )
+
+        if revised_response_json and "premises" in revised_response_json and isinstance(revised_response_json["premises"], list):
+            final_premises = revised_response_json['premises']
+            print("Successfully revised premises.")
+        else:
+            print("\nWarning: Revision step failed to produce valid JSON. Using initial premises.")
+
+    if not final_premises:
+        print("Error: The final list of premises is empty. Aborting.")
+        sys.exit(1)
+
+    print("\n--- Final Generated Premises ---")
+    formatted_output = ""
+    for i, premise in enumerate(final_premises):
+        premise_text = f"## Premise {i+1}\n\n{premise}\n\n---\n"
+        print(premise_text)
+        formatted_output += premise_text
+    print("--------------------------")
+
+
+    # --- Save to File ---
+    premises_base_dir = os.path.join(project_root, "Premises")
+    os.makedirs(premises_base_dir, exist_ok=True)
+
+    # Use the timestamp captured at the start of the run for the filename
+    output_filename = f"Premise_List_{generation_timestamp}.txt"
+    output_path = os.path.join(premises_base_dir, output_filename)
+
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(f"# Premises for Idea: {args.idea}\n")
+            f.write(f"# Generated on: {generation_timestamp}\n\n")
+            f.write(formatted_output)
+        print(f"\nSuccessfully saved generated premises to: {output_path}")
+    except OSError as e:
+        print(f"Error creating directory or writing file to '{output_path}': {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred during file saving: {e}")
+        sys.exit(1)
+
+    print("\n--- Premise Generation Complete ---")
+    print("You can now use any of these premises as input for Tools/PromptGenerator.py")
+
+
+if __name__ == "__main__":
+    main()
+
+```
 
 ## File: `Tools/PromptGenerator.py`
 
@@ -831,6 +1560,7 @@ def LLMSummaryCheck(Interface: Interface, _Logger: Logger, _RefSummary: str, _Wo
 ```python
 #!/usr/bin/python3
 
+import re
 import Writer.Config
 import Writer.LLMEditor
 import Writer.PrintUtils
@@ -966,9 +1696,14 @@ def GenerateChapter(
                 _Chapter=current_chapter_text, _Feedback=feedback
             )
             revision_messages = [Interface.BuildUserQuery(revision_prompt)]
+
+            # Use robust word count and a high floor for revisions
+            word_count = len(re.findall(r'\b\w+\b', current_chapter_text))
+            min_word_count_target = max(150, int(word_count * 0.8))
+
             revision_messages = Interface.SafeGenerateText(
                 _Logger, revision_messages, Writer.Config.CHAPTER_REVISION_WRITER_MODEL,
-                min_word_count_target=int(len(current_chapter_text.split()) * 0.8)
+                min_word_count_target=min_word_count_target
             )
             current_chapter_text = Interface.GetLastMessageText(revision_messages)
             _Logger.Log("Done revising chapter.", 2)
@@ -1021,11 +1756,16 @@ def execute_generation_stage(
     prompt = prompt_template.format(**full_format_args)
     messages = [Interface.BuildUserQuery(prompt)]
 
-    min_words = 150
-    if "Stage1Chapter" in format_args:
-        min_words = len(format_args["Stage1Chapter"].split())
-    if "Stage2Chapter" in format_args:
-        min_words = len(format_args["Stage2Chapter"].split())
+    # Set minimum word count with a high floor to prevent cascading failures
+    min_words = 200  # Default for Stage 1 (Plot)
+
+    if "Stage2Chapter" in format_args: # Stage 3 (Dialogue)
+        word_count = len(re.findall(r'\b\w+\b', format_args["Stage2Chapter"]))
+        min_words = max(250, int(word_count * 0.95))
+    elif "Stage1Chapter" in format_args: # Stage 2 (Char Dev)
+        word_count = len(re.findall(r'\b\w+\b', format_args["Stage1Chapter"]))
+        min_words = max(250, int(word_count * 0.95))
+
 
     messages = Interface.SafeGenerateText(
         _Logger, messages, model, min_word_count_target=min_words
@@ -1314,6 +2054,7 @@ import random
 import inspect
 import signal
 import platform
+import re
 from urllib.parse import parse_qs
 
 import Writer.Config
@@ -1427,12 +2168,16 @@ class Interface:
 
     def SafeGenerateText(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, min_word_count_target: int = 50) -> list:
         _Messages = [msg for msg in _Messages if msg.get("content", "").strip()]
-        
+
+        # Dynamically set max_tokens to give the model generous headroom.
+        # Assume ~5 tokens per word for a very safe buffer.
+        max_tokens_override = int(min_word_count_target * 5)
+
         # --- First Attempt ---
-        NewMsgHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format)
-        
+        NewMsgHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format, max_tokens_override=max_tokens_override)
+
         last_response_text = self.GetLastMessageText(NewMsgHistory)
-        word_count = len(last_response_text.split())
+        word_count = len(re.findall(r'\b\w+\b', last_response_text))
 
         # --- Check and Retry Logic ---
         if not last_response_text.strip() or word_count < min_word_count_target:
@@ -1442,19 +2187,19 @@ class Interface:
                 _Logger.Log(f"SafeGenerateText: Generation failed (short response: {word_count} words, target: {min_word_count_target}). Retrying...", 7)
 
             if NewMsgHistory and NewMsgHistory[-1].get("role") == "assistant":
-                NewMsgHistory.pop()
+                NewMsgHistory.pop() # Remove the failed assistant response
 
-            # Append a corrective instruction to the last user message
-            if NewMsgHistory and NewMsgHistory[-1].get("role") == "user":
-                corrective_prompt = f"\n\n---SYSTEM NOTE---\nThe previous response was too short. Please generate a more detailed and comprehensive response that is at least {min_word_count_target} words long. Fulfill the original request completely."
-                NewMsgHistory[-1]["content"] += corrective_prompt
+            forceful_retry_prompt = f"The previous response was too short. It is crucial that you generate a detailed and comprehensive response that is AT LEAST {min_word_count_target} words long. Do not stop writing until you have met this requirement. Fulfill the original request completely and at the required length."
+            NewMsgHistory.append(self.BuildUserQuery(forceful_retry_prompt))
 
-            # --- Second Attempt ---
-            NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format)
-            
+
+            # Increase the max_tokens even more for the retry
+            max_tokens_override_retry = int(min_word_count_target * 8)
+            NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format, max_tokens_override=max_tokens_override_retry)
+
             last_response_text = self.GetLastMessageText(NewMsgHistory)
-            word_count = len(last_response_text.split())
-            
+            word_count = len(re.findall(r'\b\w+\b', last_response_text))
+
             # --- Final Check with User Interaction ---
             if not last_response_text.strip() or word_count < min_word_count_target:
                 _Logger.Log(f"SafeGenerateText: Retry also failed to meet word count (got {word_count}, target {min_word_count_target}).", 6)
@@ -1462,10 +2207,12 @@ class Interface:
                     user_choice = input("Do you want to [c]ontinue with the short response or [t]ry again? (c/t): ").lower()
                     if user_choice == 't':
                         if NewMsgHistory and NewMsgHistory[-1].get("role") == "assistant":
-                            NewMsgHistory.pop()
-                        NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format)
+                            NewMsgHistory.pop() # Remove the second failed response
+
+                        NewMsgHistory.append(self.BuildUserQuery(forceful_retry_prompt))
+                        NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format, max_tokens_override=max_tokens_override_retry)
                         last_response_text = self.GetLastMessageText(NewMsgHistory)
-                        word_count = len(last_response_text.split())
+                        word_count = len(re.findall(r'\b\w+\b', last_response_text))
                         if word_count >= min_word_count_target:
                             _Logger.Log("Success on manual retry.", 5)
                             break
@@ -1480,8 +2227,10 @@ class Interface:
         return NewMsgHistory
 
     def SafeGenerateJSON(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _RequiredAttribs: list = []) -> (list, dict):
+        # For JSON, we can't predict size, so we give it a very large token buffer to prevent cutoffs.
+        max_tokens_override = 8192
         while True:
-            ResponseHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format="json")
+            ResponseHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format="json", max_tokens_override=max_tokens_override)
             try:
                 RawResponse = self.GetLastMessageText(ResponseHistory).replace("```json", "").replace("```", "").strip()
                 JSONResponse = json.loads(RawResponse)
@@ -1495,7 +2244,7 @@ class Interface:
                     ResponseHistory.pop()
                 _SeedOverride = random.randint(0, 99999)
 
-    def ChatAndStreamResponse(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None) -> list:
+    def ChatAndStreamResponse(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, max_tokens_override: int = None) -> list:
         Provider, ProviderModel, ModelHost, ModelOptions = self.GetModelAndProvider(_Model)
         base_model_uri = _Model.split('?')[0]
 
@@ -1510,24 +2259,34 @@ class Interface:
             elif Provider == 'google':
                 ModelOptions['response_mime_type'] = 'application/json'
 
+        # Set max_tokens override if provided. This is the core fix for truncation.
+        if max_tokens_override is not None:
+            if Provider == 'ollama':
+                ModelOptions['num_predict'] = max_tokens_override
+            elif Provider == 'google':
+                ModelOptions['max_output_tokens'] = max_tokens_override
+            else:
+                ModelOptions['max_tokens'] = max_tokens_override
+
+
         client = None
         if Provider == "github":
             try:
                 github_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
                 github_token = os.environ.get("GITHUB_ACCESS_TOKEN")
-                
+
                 if ProviderModel.startswith("mistral-ai/"):
                     _Logger.Log(f"Using MistralAI client for GitHub model: {ProviderModel}", 1)
                     client = ChatMistralAI(endpoint=github_endpoint, api_key=github_token, model=ProviderModel)
                 elif ProviderModel.startswith(("openai/", "cohere/", "xai/", "deepseek/")):
                     _Logger.Log(f"Using OpenAI-compatible client for GitHub model: {ProviderModel}", 1)
                     client = ChatOpenAI(base_url=github_endpoint, api_key=github_token, model=ProviderModel)
-                else: 
+                else:
                     _Logger.Log(f"Using AzureOpenAI client for GitHub model: {ProviderModel}", 1)
                     client = AzureChatOpenAI(azure_endpoint=github_endpoint, api_key=github_token, azure_deployment=ProviderModel, api_version=Writer.Config.GITHUB_API_VERSION)
             except Exception as e:
                 _Logger.Log(f"Failed to create on-demand GitHub client for '{ProviderModel}'. Error: {e}", 7)
-                _Messages.append({"role": "assistant", "content": f"[ERROR: Failed to create GitHub client.]"})
+                _Messages.append({"role": "assistant", "content": "[ERROR: Failed to create GitHub client.]"})
                 return _Messages
         else:
             client = self.Clients.get(base_model_uri)
@@ -1540,10 +2299,12 @@ class Interface:
         provider_safe_params = SAFE_PARAMS.get(Provider, [])
         filtered_options = {k: v for k, v in ModelOptions.items() if k in provider_safe_params}
 
+        # Handle provider-specific parameter name changes if they weren't caught by the override logic
         if Provider == 'ollama' and 'max_tokens' in filtered_options:
             filtered_options['num_predict'] = filtered_options.pop('max_tokens')
         if Provider == 'google' and 'max_tokens' in filtered_options:
             filtered_options['max_output_tokens'] = filtered_options.pop('max_tokens')
+
 
         _Logger.Log(f"Using Model '{ProviderModel}' from '{Provider}'", 4)
         if Writer.Config.DEBUG:
@@ -1555,26 +2316,26 @@ class Interface:
 
         start_time = time.time()
         full_response = ""
-        
+
         # Determine appropriate timeout
         timeout_duration = Writer.Config.OLLAMA_TIMEOUT if Provider == 'ollama' else Writer.Config.DEFAULT_TIMEOUT
-        
+
         # Set up signal handler for timeout, only on non-Windows systems
         if platform.system() != "Windows":
             signal.signal(signal.SIGALRM, timeout_handler)
             signal.alarm(timeout_duration)
-        
+
         try:
             if Provider == 'ollama':
                 stream = client.stream(langchain_messages, options=filtered_options)
             elif Provider == 'google':
                 gen_config_keys = ["temperature", "top_p", "top_k", "max_output_tokens", "response_mime_type"]
                 generation_config = {k: v for k, v in filtered_options.items() if k in gen_config_keys}
-                
+
                 seed_to_bind = {}
                 if 'seed' in filtered_options:
                     seed_to_bind['seed'] = filtered_options['seed']
-                
+
                 bound_client = client.bind(**seed_to_bind) if seed_to_bind else client
                 stream = bound_client.stream(langchain_messages, generation_config=generation_config)
             else:
@@ -2222,6 +2983,7 @@ OPTIONAL_OUTPUT_NAME = ""
 #!/usr/bin/python3
 
 import json
+import re
 import Writer.Config
 import Writer.Prompts
 from Writer.Interface.Wrapper import Interface
@@ -2281,7 +3043,7 @@ def critique_and_revise_creative_content(
         _Logger,
         critique_messages,
         critique_model,
-        min_word_count_target=20
+        min_word_count_target=40 # Critiques should be substantive
     )
     critique = Interface.GetLastMessageText(critique_messages)
     _Logger.Log(f"Critique received:\n---\n{critique}\n---", 4)
@@ -2320,7 +3082,9 @@ def critique_and_revise_creative_content(
         )
         revised_content = Interface.GetLastMessageText(final_messages)
     else:
-        min_words = max(10, int(len(initial_content.split()) * 0.75))
+        # Use robust word count with a high floor to ensure revisions are substantial.
+        word_count = len(re.findall(r'\b\w+\b', initial_content))
+        min_words = max(100, int(word_count * 0.8))
         final_messages = Interface.SafeGenerateText(
             _Logger,
             revision_messages,
@@ -2854,6 +3618,7 @@ def EditNovel(
 ```python
 #!/usr/bin/python3
 
+import re
 import Writer.Config
 import Writer.LLMEditor
 import Writer.PrintUtils
@@ -2900,6 +3665,89 @@ def GenerateStoryElements(
     return revised_elements
 
 
+def _summarize_chapter_ranges_from_outline(
+    Interface: Interface,
+    _Logger: Logger,
+    full_outline: str,
+    chapter_groups: list,
+    current_group_index: int
+) -> str:
+    """
+    Summarizes the chapter ranges for all groups *except* the current one.
+    """
+    summaries = []
+    _Logger.Log(f"Generating context summary for group {current_group_index + 1}...", 3)
+    for i, group in enumerate(chapter_groups):
+        if i == current_group_index:
+            continue # Skip the current group
+
+        start_chap, end_chap = group[0], group[-1]
+        _Logger.Log(f"Summarizing chapters {start_chap}-{end_chap} for context...", 1)
+
+        prompt = Writer.Prompts.SUMMARIZE_OUTLINE_RANGE_PROMPT.format(
+            _Outline=full_outline, _StartChapter=start_chap, _EndChapter=end_chap
+        )
+        messages = [Interface.BuildUserQuery(prompt)]
+        messages = Interface.SafeGenerateText(
+            _Logger, messages, Writer.Config.INFO_MODEL, min_word_count_target=50
+        )
+        summary = Interface.GetLastMessageText(messages)
+        summaries.append(f"Summary for Chapters {start_chap}-{end_chap}:\n{summary}")
+
+    if not summaries:
+        return "This is the first part of the story; there is no preceding context from other parts."
+
+    return "\n\n".join(summaries)
+
+
+def _generate_expanded_outline_for_group(
+    Interface: Interface,
+    _Logger: Logger,
+    group: list,
+    _FullOutline: str,
+    narrative_context: NarrativeContext,
+    _OtherGroupsSummary: str,
+) -> str:
+    """
+    Generates a detailed, scene-by-scene outline for a whole group of chapters
+    and runs a critique/revision cycle on the entire group output.
+    """
+    start_chapter, end_chapter = group[0], group[-1]
+    _Logger.Log(f"Generating detailed outline for group (Chapters {start_chapter}-{end_chapter})", 4)
+
+    # Step 1: Initial Generation for the whole group
+    prompt = Writer.Prompts.GENERATE_CHAPTER_GROUP_OUTLINE_PROMPT.format(
+        _StartChapter=start_chapter,
+        _EndChapter=end_chapter,
+        _Outline=_FullOutline,
+        _OtherGroupsSummary=_OtherGroupsSummary,
+    )
+    # Estimate required word count: 100 words per chapter in the group
+    min_word_target = max(200, len(group) * 100)
+    messages = [Interface.BuildUserQuery(prompt)]
+    messages = Interface.SafeGenerateText(
+        _Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, min_word_count_target=min_word_target
+    )
+    initial_group_outline = Interface.GetLastMessageText(messages)
+
+    # Step 2: Critique and Revise the entire group outline
+    _Logger.Log(f"Critiquing and revising outline for group (Chapters {start_chapter}-{end_chapter})...", 3)
+    task_description = f"Generate a detailed, scene-by-scene outline for Chapters {start_chapter}-{end_chapter}, based on the main story outline and a summary of other story parts. The detailed outline should break down each chapter's events, character beats, and setting for each scene."
+    context_summary = f"Main Story Outline:\n{_FullOutline}\n\nSummary of Other Story Parts:\n{_OtherGroupsSummary}"
+
+    revised_group_outline = Writer.CritiqueRevision.critique_and_revise_creative_content(
+        Interface,
+        _Logger,
+        initial_content=initial_group_outline,
+        task_description=task_description,
+        narrative_context_summary=context_summary,
+        initial_user_prompt=narrative_context.initial_prompt,
+    )
+
+    _Logger.Log(f"Done generating detailed outline for group (Chapters {start_chapter}-{end_chapter}).", 4)
+    return revised_group_outline
+
+
 def GenerateOutline(
     Interface: Interface,
     _Logger: Logger,
@@ -2910,14 +3758,14 @@ def GenerateOutline(
     Generates the complete story outline, including story elements and chapter breakdowns,
     and populates the provided NarrativeContext object.
     """
-
+    # ... (Steps 1-4 remain the same)
     # --- Step 1: Extract Important Base Context ---
     _Logger.Log("Extracting important base context from prompt...", 4)
     base_context_prompt = Writer.Prompts.GET_IMPORTANT_BASE_PROMPT_INFO.format(
         _Prompt=_OutlinePrompt
     )
     messages = [Interface.BuildUserQuery(base_context_prompt)]
-    messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.INFO_MODEL)
+    messages = Interface.SafeGenerateText(_Logger, messages, Writer.Config.INFO_MODEL, min_word_count_target=5)
     base_context = Interface.GetLastMessageText(messages)
     narrative_context.set_base_prompt_important_info(base_context)
     _Logger.Log("Done extracting important base context.", 4)
@@ -2945,20 +3793,15 @@ def GenerateOutline(
     iterations = 0
     while True:
         iterations += 1
-
         is_complete = Writer.LLMEditor.GetOutlineRating(Interface, _Logger, outline)
-
         if iterations > Writer.Config.OUTLINE_MAX_REVISIONS:
             _Logger.Log("Max revisions reached. Exiting revision loop.", 6)
             break
         if iterations > Writer.Config.OUTLINE_MIN_REVISIONS and is_complete:
             _Logger.Log("Outline meets quality standards. Exiting revision loop.", 5)
             break
-
         _Logger.Log(f"Outline Revision Iteration {iterations}", 4)
-
         feedback = Writer.LLMEditor.GetFeedbackOnOutline(Interface, _Logger, outline)
-
         revision_prompt = Writer.Prompts.OUTLINE_REVISION_PROMPT.format(
             _Outline=outline, _Feedback=feedback
         )
@@ -2977,14 +3820,16 @@ def GenerateOutline(
 
     # --- Step 5: Enforce Minimum Chapter Count ---
     num_chapters = Writer.Chapter.ChapterDetector.LLMCountChapters(Interface, _Logger, outline)
-    if num_chapters > 0 and num_chapters < Writer.Config.MINIMUM_CHAPTERS:
+    if 0 < num_chapters < Writer.Config.MINIMUM_CHAPTERS:
         _Logger.Log(f"Outline has {num_chapters} chapters, which is less than the minimum of {Writer.Config.MINIMUM_CHAPTERS}. Expanding...", 6)
         expansion_prompt = Writer.Prompts.EXPAND_OUTLINE_TO_MIN_CHAPTERS_PROMPT.format(
             _Outline=outline, _MinChapters=Writer.Config.MINIMUM_CHAPTERS
         )
         messages = [Interface.BuildUserQuery(expansion_prompt)]
+        word_count = len(re.findall(r'\b\w+\b', outline))
+        min_word_target = max(int(word_count * 1.2), 400)
         messages = Interface.SafeGenerateText(
-            _Logger, messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, min_word_count_target=int(len(outline.split()) * 1.1)
+            _Logger, messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, min_word_count_target=min_word_target
         )
         outline = Interface.GetLastMessageText(messages)
         _Logger.Log("Outline expanded to meet minimum chapter count.", 5)
@@ -2994,64 +3839,43 @@ def GenerateOutline(
     # --- Step 6: Generate Expanded Per-Chapter Outline (if enabled) ---
     if Writer.Config.EXPAND_OUTLINE:
         _Logger.Log("Starting per-chapter outline expansion...", 3)
-        # Recalculate chapter count after potential expansion
         final_num_chapters = Writer.Chapter.ChapterDetector.LLMCountChapters(Interface, _Logger, outline)
 
-        if final_num_chapters > 0 and final_num_chapters < 50:
+        if final_num_chapters <= 0 or final_num_chapters >= 50:
+            _Logger.Log(f"Could not determine valid chapter count ({final_num_chapters}). Skipping expansion.", 6)
+        else:
+            all_chapters = list(range(1, final_num_chapters + 1))
+            
+            # If there are too few chapters, process as a single group.
+            if final_num_chapters < 3:
+                _Logger.Log("Fewer than 3 chapters, processing as a single group.", 3)
+                chapter_groups = [all_chapters]
+            else:
+                _Logger.Log(f"Splitting {final_num_chapters} chapters into 3 groups for processing.", 3)
+                k, m = divmod(final_num_chapters, 3)
+                group1 = all_chapters[0 : k + (1 if m > 0 else 0)]
+                group2 = all_chapters[k + (1 if m > 0 else 0) : 2 * k + (1 if m > 0 else 0) + (1 if m > 1 else 0)]
+                group3 = all_chapters[2 * k + (1 if m > 0 else 0) + (1 if m > 1 else 0) :]
+                chapter_groups = [g for g in [group1, group2, group3] if g]
+
             expanded_outlines = []
-            for i in range(1, final_num_chapters + 1):
-                chapter_outline = GeneratePerChapterOutline(
-                    Interface, _Logger, i, outline, narrative_context
+            for i, group in enumerate(chapter_groups):
+                _Logger.Log(f"Processing chapter group {i+1}/{len(chapter_groups)} (Chapters {group[0]}-{group[-1]})", 2)
+                
+                other_groups_summary = _summarize_chapter_ranges_from_outline(
+                    Interface, _Logger, outline, chapter_groups, i
                 )
-                expanded_outlines.append(chapter_outline)
+                
+                group_outline = _generate_expanded_outline_for_group(
+                    Interface, _Logger, group, outline, narrative_context, other_groups_summary
+                )
+                expanded_outlines.append(group_outline)
 
             full_expanded_outline = "\n\n".join(expanded_outlines)
             narrative_context.set_expanded_novel_outline(full_expanded_outline)
             _Logger.Log("Finished expanding all chapter outlines.", 3)
-        else:
-            _Logger.Log(f"Could not determine valid chapter count ({final_num_chapters}). Skipping expansion.", 6)
 
     return narrative_context
-
-
-def GeneratePerChapterOutline(
-    Interface: Interface,
-    _Logger: Logger,
-    _ChapterNum: int,
-    _FullOutline: str,
-    narrative_context: NarrativeContext,
-) -> str:
-    """
-    Generates a more detailed, scene-by-scene outline for a single chapter.
-    This is a creative task and uses a critique/revision cycle.
-    """
-    _Logger.Log(f"Generating detailed outline for Chapter {_ChapterNum}", 5)
-
-    prompt = Writer.Prompts.CHAPTER_OUTLINE_PROMPT.format(
-        _Chapter=_ChapterNum, _Outline=_FullOutline
-    )
-    messages = [Interface.BuildUserQuery(prompt)]
-    messages = Interface.SafeGenerateText(
-        _Logger, messages, Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, min_word_count_target=50
-    )
-    initial_chapter_outline = Interface.GetLastMessageText(messages)
-
-    _Logger.Log(f"Critiquing and revising outline for Chapter {_ChapterNum}...", 3)
-    task_description = f"Generate a detailed, scene-by-scene outline for Chapter {_ChapterNum}, based on the main story outline. The detailed outline should break down the chapter's events, character beats, and setting for each scene."
-    context_summary = narrative_context.get_full_story_summary_so_far(_ChapterNum)
-    context_summary += f"\n\nMain Story Outline:\n{_FullOutline}"
-
-    revised_chapter_outline = Writer.CritiqueRevision.critique_and_revise_creative_content(
-        Interface,
-        _Logger,
-        initial_content=initial_chapter_outline,
-        task_description=task_description,
-        narrative_context_summary=context_summary,
-        initial_user_prompt=narrative_context.initial_prompt,
-    )
-
-    _Logger.Log(f"Done generating detailed outline for Chapter {_ChapterNum}.", 5)
-    return revised_chapter_outline
 
 ```
 
@@ -3120,18 +3944,6 @@ class Logger:
             self.Log(f"Failed to write Langchain Markdown log for {langchain_debug_title}. Error: {e}", 7)
             
         self.Log(f"Wrote LangChain debug logs for {langchain_debug_title}", 1)
-
-
-    def SaveStory(self, _StoryContent: str):
-        """Saves the given story to disk."""
-        story_path = os.path.join(self.LogDirPrefix, "Story.md")
-        try:
-            with open(story_path, "w", encoding='utf-8') as f:
-                f.write(_StoryContent)
-            self.Log(f"Wrote final story to disk at {story_path}", 5)
-        except Exception as e:
-            self.Log(f"Failed to write final story to disk. Error: {e}", 7)
-
 
     def Log(self, _Item, _Level: int = 1):
         """Logs an item to the console and the log file with appropriate color-coding."""
@@ -3337,8 +4149,8 @@ Please use the below template for formatting your response.
 - Important point 2
 </EXAMPLE>
 
-Do NOT write the outline itself, just the extra context. Keep your responses short and in a bulleted list.
-If no such context exists, respond with "No additional context found."
+Do NOT write the outline itself, **just the extra context**. Keep your responses short and in a bulleted list.
+If the prompt provides no such context, you must respond with "No additional context found."
 """
 
 EXPAND_OUTLINE_TO_MIN_CHAPTERS_PROMPT = """
@@ -3362,27 +4174,49 @@ The goal is a richer, more detailed story that naturally fills the required numb
 Your response should be the new, complete, chapter-by-chapter markdown outline.
 """
 
-CHAPTER_OUTLINE_PROMPT = """
-You are a master storyteller and outliner. Your task is to expand a single chapter from a high-level novel outline into a more detailed, scene-by-scene breakdown.
+SUMMARIZE_OUTLINE_RANGE_PROMPT = """
+You are a story analyst. Your task is to read a full novel outline and summarize a specific range of chapters.
 
 # FULL NOVEL OUTLINE
-Here is the complete outline for the story, providing context for the chapter you are about to detail.
 ---
 {_Outline}
 ---
 
 # YOUR TASK
-Now, focus *only* on **Chapter {_Chapter}** from the outline above.
-Expand this single chapter into a detailed scene-by-scene outline.
+Provide a concise summary of the events, character arcs, and key plot points that occur between **Chapter {_StartChapter} and Chapter {_EndChapter}**, based *only* on the full outline provided above.
 
-For each scene, please provide:
-- A clear heading (e.g., "Scene 1: The Ambush").
-- A list of characters present.
-- A description of the setting.
-- A summary of the key events and actions that take place.
-- Notes on character development or important dialogue beats.
+Your response should be a single, coherent paragraph. Do not include any introductory text or headings.
+"""
 
-Your output should be formatted in markdown and contain *only* the detailed outline for Chapter {_Chapter}. Do not re-state the full outline or add introductory text.
+GENERATE_CHAPTER_GROUP_OUTLINE_PROMPT = """
+You are a master storyteller and outliner. Your task is to expand a group of chapters from a high-level novel outline into a more detailed, scene-by-scene breakdown.
+
+# FULL NOVEL OUTLINE
+This is the complete outline for the entire story. Use it for high-level context.
+---
+{_Outline}
+---
+
+# SUMMARY OF OTHER STORY PARTS
+To ensure your detailed outline is coherent with the rest of the novel, here is a summary of the major events and arcs from the other parts of the story. You must ensure the chapters you are outlining connect logically to these events.
+---
+{_OtherGroupsSummary}
+---
+
+# YOUR TASK
+Your sole focus is to generate detailed, scene-by-scene outlines for the chapters in the following range: **Chapters {_StartChapter} through {_EndChapter}**.
+
+For EACH chapter in this range, provide a markdown block that includes:
+- A main markdown header for the chapter (e.g., `# Chapter X: The Title`).
+- Multiple scene-by-scene breakdowns under that chapter header.
+- For each scene, please provide:
+    - A clear heading (e.g., "## Scene 1: The Ambush").
+    - A list of characters present.
+    - A description of the setting.
+    - A summary of the key events and actions that take place.
+    - Notes on character development or important dialogue beats.
+
+Your output should be a single, continuous markdown document containing the detailed outlines for ALL chapters in the specified range.
 """
 
 # ======================================================================================
@@ -3962,6 +4796,7 @@ def GetWordCount(_Text: str) -> int:
         return 0
     return len(_Text.split())
 
+
 ```
 
 ## File: `Writer/StoryInfo.py`
@@ -3995,7 +4830,7 @@ def GetStoryInfo(Interface: Interface, _Logger: Logger, _Messages: list) -> dict
         _Logger,
         _Messages,
         Writer.Config.INFO_MODEL,
-        _RequiredAttribs=["Title", "Summary", "Tags"]
+        _RequiredAttribs=["Title", "Summary", "Tags", "OverallRating"]
     )
 
     _Logger.Log("Finished getting story info.", 5)
@@ -4409,144 +5244,19 @@ Fiction Fabricator is an advanced, AI-powered framework for generating complete,
 
 ## Acknowledgement of Origin
 
-This project is a significantly modified and enhanced fork of **[AIStoryteller by datacrystals](https://github.com/datacrystals/AIStoryteller)**. I would like to expressing extend my immense gratitude to the original author for providing the foundational concepts and architecture. Fiction Fabricator builds upon that excellent groundwork with new features, a refactored generation pipeline (tailored to my use case of course), and a robust, multi-provider backend to suit a different set of use cases focused on flexibility, quality, and developer control.
-
-## What's New in Fiction Fabricator?
-
-This fork was created to enhance the original project with a focus on provider flexibility, improved narrative coherence, and a more powerful, user-configurable generation process.
-
-### Key Features & Modifications:
-
-- **Unified Multi-Provider Interface**: Seamlessly switch between LLM providers like **Google Gemini, Groq, Mistral, Ollama, and NVIDIA NIM** using a simple URI format (e.g., `groq://llama3-70b-8192`).
-- **Robust & Predictable NVIDIA NIM Integration**: The NVIDIA integration has been specifically hardened to provide full user control. Models are **manually and explicitly listed** in the `config.ini` file, removing the unpredictability of a dynamic discovery function and ensuring that any model you have access to can be used.
-- **Flexible API Configuration**: Easily configure API endpoints, including the crucial `NVIDIA_BASE_URL`, either through a `.env` file for security or directly in `config.ini` for simplicity.
-- **Advanced Scene-by-Scene Generation**: Instead of attempting to generate entire chapters at once, Fiction Fabricator breaks chapter outlines down into individual scenes. It writes each scene with context from the preceding one, dramatically improving narrative flow and short-term coherence.
-- **Iterative Critique & Revision Engine**: At critical stages of generation (outline, scene breakdown, chapter writing), the system uses an LLM to critique its own output and then revise it based on that feedback. This self-correction loop significantly enhances the quality of the final product.
-- **Intelligent Prompt Engineering**: Includes a powerful utility (`Tools/PromptGenerator.py`) that takes a user's simple idea and uses an LLM-driven, multi-step process to expand it into a rich, detailed prompt perfect for generating a complex story.
-- **Comprehensive Logging**: Every run generates a unique, timestamped directory in `Logs/`, containing the final story, run statistics, and detailed debug files for every LLM call, providing complete transparency into the generation process.
-- **Developer & Power-User Utilities**:
-  - **`Tools/Test.py`**: A testing script for quickly running generations with different pre-defined model configurations.
-  - **`Evaluate.py`**: A powerful A/B testing tool that uses an LLM to compare two generated stories on multiple axes, such as plot, style, and dialogue.
+This project is a significantly modified and enhanced fork of **[AIStoryteller by datacrystals](https://github.com/datacrystals/AIStoryteller)**. I would like to expressing extend my immense gratitude to the original author for providing the foundational concepts and architecture. Fiction Fabricator builds upon that excellent groundwork with new features, a refactored generation pipeline, and a robust, multi-provider backend to suit a different set of use cases focused on flexibility, quality, and developer control.
 
 ---
 
-## Exhaustive Guide to Fiction Fabricator
+## Full Documentation
 
-This guide provides everything you need to know to install, configure, and use the project.
+For detailed guides on how to install, configure, and use Fiction Fabricator, please see the full documentation linked below.
 
-### 1. Installation
-
-Get started by cloning the repository and setting up the required environment.
-
-```bash
-# 1. Clone the repository
-git clone <your-repository-url>
-cd REBASE-AIStorywriter
-
-# 2. (Recommended) Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-
-# 3. Install the required packages
-pip install -r requirements.txt
-```
-
-### 2. Configuration
-
-Configuration is handled by two key files: `.env` for secrets and `config.ini` for settings.
-
-#### The `.env` File
-
-This is the **most secure** place for your API keys. Create a file named `.env` in the project's root directory.
-
-```
-# Example .env file
-
-# Provider API Keys
-GOOGLE_API_KEY="your-google-api-key"
-MISTRAL_API_KEY="your-mistral-api-key"
-GROQ_API_KEY="your-groq-api-key"
-
-# For NVIDIA, the API key is required.
-NVIDIA_API_KEY="nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-
-# The NVIDIA Base URL is optional here. If set, it will OVERRIDE the value in config.ini.
-# This is useful for pointing to custom, preview, or self-hosted NIM endpoints.
-# NVIDIA_BASE_URL="https://your-custom-nim-url.com/v1"
-```
-
-#### The `config.ini` File
-
-This file controls the application's behavior and model selection.
-
-- **`[LLM_SELECTION]`**: Set the default models for each step of the generation process. You can override any of these via command-line flags.
-- **`[NVIDIA_SETTINGS]`**:
-  - `base_url`: The API endpoint for NVIDIA models. The default (`https://integrate.api.nvidia.com/v1`) is for standard models.
-  - `available_models`: **This is a crucial, manual list.** Add the specific model IDs you have access to and wish to use, separated by commas.
-    _Example_: `available_models = meta/llama3-70b-instruct, mistralai/mistral-nemotron`
-- **`[WRITER_SETTINGS]`**: Fine-tune the generation process.
-  - `scene_generation_pipeline`: (Default: `true`) Highly recommended. Enables the advanced scene-by-scene workflow.
-  - `enable_final_edit_pass`: (Default: `false`) Performs a final, holistic edit of the entire novel. Can increase cost and time but may improve consistency.
-  - `minimum_chapters`: The minimum number of chapters the final outline should have.
-  - `seed`: A seed for randomization to ensure reproducible results.
-
-### 3. Usage Workflow
-
-Follow these steps to generate your first novel.
-
-#### Step 1: Create a High-Quality Prompt (Recommended)
-
-A detailed prompt produces a better story. Use the `PromptGenerator` tool to expand a simple idea.
-
-```bash
-# Run the tool with your story title and a basic idea
-python Tools/PromptGenerator.py -t "The Last Signal" -i "A lone astronaut on Mars discovers a strange, repeating signal from a polar ice cap, but her mission command on Earth insists it's just a malfunction."
-```
-
-This will guide you through selecting a model for the generation and will save a detailed `prompt.txt` file in `Prompts/The_Last_Signal/prompt.txt`.
-
-#### Step 2: Write the Novel
-
-Use the main `Write.py` script to start the generation process.
-
-**Interactive Mode (Easiest)**:
-Simply provide the prompt file path. The script will present an interactive menu to select the primary writing model from all available providers.
-
-```bash
-python Write.py -Prompt "Prompts/The_Last_Signal/prompt.txt"
-```
-
-**Custom/Headless Mode**:
-You can specify all models and settings via command-line arguments, which override `config.ini`. This is useful for automated runs.
-
-```bash
-python Write.py \
--Prompt "Prompts/The_Last_Signal/prompt.txt" \
--InitialOutlineModel "google://gemini-1.5-pro-latest" \
--ChapterS1Model "groq://llama3-70b-8192" \
--ChapterRevisionModel "nvidia://meta/llama3-70b-instruct" \
--EnableFinalEditPass \
--Seed 42
-```
-
-#### Step 3: Find Your Story
-
-All output is saved to uniquely named directories:
-
-- **`Stories/`**: Contains the final output. For each run, you will get:
-  - `Your_Story_Title.md`: A markdown file with the formatted story and generation statistics.
-  - `Your_Story_Title.json`: A structured JSON file containing the full narrative context, including all outlines, chapter text, and summaries.
-- **`Logs/`**: Contains detailed logs for debugging. A new directory is created for each run, containing:
-  - `Main.log`: A log of all steps taken.
-  - `LangchainDebug/`: A folder with `.json` and `.md` files for every single call made to an LLM, showing the exact prompts and responses.
-
-### 4. Advanced Usage
-
-- **Testing Model Configurations (`Tools/Test.py`)**: Edit this file to define different sets of models for various roles. Running `python Tools/Test.py` allows you to quickly launch a generation with a specific configuration, perfect for testing provider performance.
-- **Evaluating Stories (`Evaluate.py`)**: After generating two stories, use this tool to have an LLM compare them. It provides a detailed, chapter-by-chapter analysis and a final verdict on which story is better according to multiple criteria.
-  ```bash
-  python Evaluate.py -Story1 "Stories/Story_A.json" -Story2 "Stories/Story_B.json" -Output "Comparison_Report.md"
-  ```
+- **[1. Introduction and Features](./.github/documentation/1_introduction_and_features.md)**
+- **[2. Installation Guide](./.github/documentation/2_installation_guide.md)**
+- **[3. Configuration Guide](./.github/documentation/3_configuration_guide.md)**
+- **[4. Usage Workflow](./.github/documentation/4_usage_workflow.md)**
+- **[5. Advanced Tools](./.github/documentation/5_advanced_tools.md)**
 
 ---
 
@@ -4810,7 +5520,7 @@ def main():
     narrative_context = Writer.OutlineGenerator.GenerateOutline(Interface, SysLogger, Prompt, narrative_context)
     SysLogger.Log("Starting Chapter Writing phase...", 2)
     total_chapters = Writer.Chapter.ChapterDetector.LLMCountChapters(Interface, SysLogger, narrative_context.base_novel_outline_markdown)
-    if total_chapters > 0 and total_chapters < 50:
+    if total_chapters > 0 and total_chapters < 100:
         for i in range(1, total_chapters + 1):
             Writer.Chapter.ChapterGenerator.GenerateChapter(Interface, SysLogger, i, total_chapters, narrative_context)
     else:
@@ -4824,7 +5534,10 @@ def main():
         SysLogger.Log("Skipping final scrubbing pass due to config.", 4)
 
     StoryBodyText = "\n\n\n".join([f"### Chapter {chap.chapter_number}\n\n{chap.generated_content}" for chap in narrative_context.chapters if chap.generated_content])
-    Info = Writer.StoryInfo.GetStoryInfo(Interface, SysLogger, [Interface.BuildUserQuery(narrative_context.base_novel_outline_markdown)])
+    
+    # Corrected call to GetStoryInfo with the base outline for concise and reliable context.
+    info_messages = [Interface.BuildUserQuery(narrative_context.base_novel_outline_markdown)]
+    Info = Writer.StoryInfo.GetStoryInfo(Interface, SysLogger, info_messages)
     Title = Info.get("Title", "Untitled Story")
 
     SysLogger.Log(f"Story Title: {Title}", 5)
@@ -4852,15 +5565,30 @@ def main():
     safe_title = "".join(c for c in Title if c.isalnum() or c in (' ', '_')).rstrip()
     file_name_base = f"Stories/{safe_title.replace(' ', '_')}"
     if Writer.Config.OPTIONAL_OUTPUT_NAME:
-        file_name_base = Writer.Config.OPTIONAL_OUTPUT_NAME
-    with open(f"{file_name_base}.md", "w", encoding="utf-8") as f:
+        file_name_base = f"Stories/{Writer.Config.OPTIONAL_OUTPUT_NAME}"
+    
+    md_file_path = f"{file_name_base}.md"
+    json_file_path = f"{file_name_base}.json"
+
+    # Write the Markdown file
+    with open(md_file_path, "w", encoding="utf-8") as f:
         output_content = f"# {Title}\n\n{StoryBodyText}\n\n---\n\n{StatsString}\n\n---\n\n## Full Outline\n```\n{narrative_context.base_novel_outline_markdown}\n```"
         f.write(output_content)
-        SysLogger.SaveStory(output_content)
 
-    with open(f"{file_name_base}.json", "w", encoding="utf-8") as f:
+    # Write the JSON file
+    with open(json_file_path, "w", encoding="utf-8") as f:
         json.dump(narrative_context.to_dict(), f, indent=4)
+    
+    # Log the final, correct output paths
     SysLogger.Log("Generation complete!", 5)
+    final_message = f"""
+--------------------------------------------------
+Output Files Saved:
+- Markdown Story: {os.path.abspath(md_file_path)}
+- JSON Data File: {os.path.abspath(json_file_path)}
+--------------------------------------------------"""
+    print(termcolor.colored(final_message, "green"))
+
 
 if __name__ == "__main__":
     main()
@@ -4940,7 +5668,7 @@ checker_model = google://gemini-1.5-flash-latest
 ; Example:
 ; available_moels = meta/llama3-8b-instruct, mistralai/mistral-large
 
-available_models = mistralai/mistral-medium-3-instruct,mistralai/mistral-nemotron,qwen/qwen3-235b-a22b,nvidia/llama-3.1-nemotron-ultra-253b-v1,nvidia/llama-3.3-nemotron-super-49b-v1,writer/palmyra-creative-122b
+available_models = mistralai/mistral-medium-3-instruct,mistralai/mistral-nemotron,qwen/qwen3-235b-a22b,nvidia/llama-3.1-nemotron-ultra-253b-v1,nvidia/llama-3.3-nemotron-super-49b-v1,writer/palmyra-creative-122b, mistralai/mixtral-8x22b-instruct-v0.1,ai21labs/jamba-1.5-large-instruct,meta/llama-4-maverick-17b-128e-instruct,deepseek-ai/deepseek-r1
 ; The base URL for the NVIDIA API. The default is for NVIDIA's managed endpoints.
 ; This can be overridden by setting NVIDIA_BASE_URL in your .env file.
 base_url = https://integrate.api.nvidia.com/v1
@@ -4990,33 +5718,6 @@ project_name = Fiction Fabricator
 ; for local providers like Ollama that may have long load times.
 default_timeout = 180
 ollama_timeout = 360
-
-```
-
-## File: `requirements.txt`
-
-```text
-# Core Langchain and provider packages for LLM integration
-langchain
-langchain-core
-langchain-community
-langchain-google-genai
-google-generativeai
-# CORRECTED: Pin mistralai to a version compatible with langchain-mistralai
-langchain-mistralai
-mistralai==0.1.8
-langchain-groq
-langchain-nvidia-ai-endpoints
-langchain-openai
-
-# Ollama client library for local model support
-ollama
-
-# Utility packages
-python-dotenv
-termcolor
-requests
-configparser
 
 ```
 

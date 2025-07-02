@@ -122,10 +122,9 @@ class Interface:
     def SafeGenerateText(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _Format: str = None, min_word_count_target: int = 50) -> list:
         _Messages = [msg for msg in _Messages if msg.get("content", "").strip()]
 
-        # Dynamically set max_tokens to give the model enough headroom.
-        # Assume ~2.5 tokens per word for a generous buffer.
-        max_tokens_override = int(min_word_count_target * 2.5)
-
+        # Dynamically set max_tokens to give the model generous headroom.
+        # Assume ~5 tokens per word for a very safe buffer.
+        max_tokens_override = int(min_word_count_target * 5)
 
         # --- First Attempt ---
         NewMsgHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format, max_tokens_override=max_tokens_override)
@@ -143,12 +142,12 @@ class Interface:
             if NewMsgHistory and NewMsgHistory[-1].get("role") == "assistant":
                 NewMsgHistory.pop() # Remove the failed assistant response
 
-            forceful_retry_prompt = f"The previous response was too short. It is crucial that you generate a detailed and comprehensive, multi-paragraph response that is AT LEAST {min_word_count_target} words long. Do not stop writing until you have met this requirement. Fulfill the original request completely and at the required length."
+            forceful_retry_prompt = f"The previous response was too short. It is crucial that you generate a detailed and comprehensive response that is AT LEAST {min_word_count_target} words long. Do not stop writing until you have met this requirement. Fulfill the original request completely and at the required length."
             NewMsgHistory.append(self.BuildUserQuery(forceful_retry_prompt))
 
-            # --- Second Attempt ---
+
             # Increase the max_tokens even more for the retry
-            max_tokens_override_retry = int(min_word_count_target * 4)
+            max_tokens_override_retry = int(min_word_count_target * 8)
             NewMsgHistory = self.ChatAndStreamResponse(_Logger, NewMsgHistory, _Model, random.randint(0, 99999), _Format, max_tokens_override=max_tokens_override_retry)
 
             last_response_text = self.GetLastMessageText(NewMsgHistory)
@@ -181,9 +180,9 @@ class Interface:
         return NewMsgHistory
 
     def SafeGenerateJSON(self, _Logger: Logger, _Messages: list, _Model: str, _SeedOverride: int = -1, _RequiredAttribs: list = []) -> (list, dict):
+        # For JSON, we can't predict size, so we give it a very large token buffer to prevent cutoffs.
+        max_tokens_override = 8192
         while True:
-            # For JSON, we don't need a word count, but we still need a reasonable max_tokens
-            max_tokens_override = 2048
             ResponseHistory = self.ChatAndStreamResponse(_Logger, _Messages, _Model, _SeedOverride, _Format="json", max_tokens_override=max_tokens_override)
             try:
                 RawResponse = self.GetLastMessageText(ResponseHistory).replace("```json", "").replace("```", "").strip()
@@ -213,7 +212,7 @@ class Interface:
             elif Provider == 'google':
                 ModelOptions['response_mime_type'] = 'application/json'
 
-        # Set max_tokens override if provided
+        # Set max_tokens override if provided. This is the core fix for truncation.
         if max_tokens_override is not None:
             if Provider == 'ollama':
                 ModelOptions['num_predict'] = max_tokens_override
@@ -240,7 +239,7 @@ class Interface:
                     client = AzureChatOpenAI(azure_endpoint=github_endpoint, api_key=github_token, azure_deployment=ProviderModel, api_version=Writer.Config.GITHUB_API_VERSION)
             except Exception as e:
                 _Logger.Log(f"Failed to create on-demand GitHub client for '{ProviderModel}'. Error: {e}", 7)
-                _Messages.append({"role": "assistant", "content": f"[ERROR: Failed to create GitHub client.]"})
+                _Messages.append({"role": "assistant", "content": "[ERROR: Failed to create GitHub client.]"})
                 return _Messages
         else:
             client = self.Clients.get(base_model_uri)

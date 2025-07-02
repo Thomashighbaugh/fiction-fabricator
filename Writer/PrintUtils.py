@@ -61,18 +61,6 @@ class Logger:
             
         self.Log(f"Wrote LangChain debug logs for {langchain_debug_title}", 1)
 
-
-    def SaveStory(self, _StoryContent: str):
-        """Saves the given story to disk."""
-        story_path = os.path.join(self.LogDirPrefix, "Story.md")
-        try:
-            with open(story_path, "w", encoding='utf-8') as f:
-                f.write(_StoryContent)
-            self.Log(f"Wrote final story to disk at {story_path}", 5)
-        except Exception as e:
-            self.Log(f"Failed to write final story to disk. Error: {e}", 7)
-
-
     def Log(self, _Item, _Level: int = 1):
         """Logs an item to the console and the log file with appropriate color-coding."""
         # Create Log Entry
