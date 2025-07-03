@@ -231,7 +231,7 @@ class Interface:
                 if ProviderModel.startswith("mistral-ai/"):
                     _Logger.Log(f"Using MistralAI client for GitHub model: {ProviderModel}", 1)
                     client = ChatMistralAI(endpoint=github_endpoint, api_key=github_token, model=ProviderModel)
-                elif ProviderModel.startswith(("openai/", "cohere/", "xai/", "deepseek/")):
+                elif ProviderModel.startswith(("openai/", "cohere/", "xai/", "deepseek/", "ai21-labs/")):
                     _Logger.Log(f"Using OpenAI-compatible client for GitHub model: {ProviderModel}", 1)
                     client = ChatOpenAI(base_url=github_endpoint, api_key=github_token, model=ProviderModel)
                 else:
