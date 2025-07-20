@@ -37,11 +37,11 @@ def ChapterOutlineToScenes(
     initial_prompt = Writer.Prompts.CHAPTER_TO_SCENES.format(
         _ThisChapter=_ThisChapterOutline,
         _Outline=narrative_context.base_novel_outline_markdown,
-        _Prompt=narrative_context.initial_prompt, # Anchor to the original prompt
+        _Prompt=narrative_context.initial_prompt,
     )
 
     messages = [
-        Interface.BuildSystemQuery(Writer.Prompts.DEFAULT_SYSTEM_PROMPT),
+        Interface.BuildSystemQuery(Writer.Prompts.LITERARY_STYLE_GUIDE),
         Interface.BuildUserQuery(initial_prompt),
     ]
 
@@ -54,7 +54,7 @@ def ChapterOutlineToScenes(
     # --- Step 2: Critique and Revise ---
     _Logger.Log("Critiquing and revising scene breakdown for coherence and quality...", 3)
 
-    task_description = f"Break down the provided chapter outline for Chapter {_ChapterNum} into a detailed, scene-by-scene plan. Each scene should have a clear purpose, setting, character list, and a summary of events, contributing to the chapter's overall arc."
+    task_description = f"Break down the provided chapter outline for Chapter {_ChapterNum} into a detailed, scene-by-scene plan. Each scene should have a clear purpose, setting, character list, and a summary of events, contributing to the chapter's overall arc and adhering to the novel's dark, literary style."
 
     context_summary = narrative_context.get_context_for_chapter_generation(_ChapterNum)
     context_summary += f"\n\nThis chapter's specific outline, which you need to expand into scenes, is:\n{_ThisChapterOutline}"
@@ -66,6 +66,7 @@ def ChapterOutlineToScenes(
         task_description=task_description,
         narrative_context_summary=context_summary,
         initial_user_prompt=narrative_context.initial_prompt,
+        style_guide=narrative_context.style_guide,
     )
 
     _Logger.Log(f"Finished splitting Chapter {_ChapterNum} into scenes.", 2)

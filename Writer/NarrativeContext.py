@@ -2,22 +2,57 @@
 
 from typing import Optional, List, Dict, Any
 
+class ScenePiece:
+    """
+    Holds the content and summary for a single, small generated piece of a scene.
+    This is the most granular level of generated text.
+    """
+    def __init__(self, piece_number: int, content: str, summary: str):
+        self.piece_number: int = piece_number
+        self.content: str = content
+        self.summary: str = summary
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "piece_number": self.piece_number,
+            "content": self.content,
+            "summary": self.summary,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ScenePiece':
+        return cls(data["piece_number"], data["content"], data["summary"])
+
+
 class SceneContext:
     """
-    Holds contextual information for a single scene.
+    Holds contextual information for a single scene, including its component pieces.
     """
     def __init__(self, scene_number: int, initial_outline: str):
         self.scene_number: int = scene_number
         self.initial_outline: str = initial_outline # The outline specific to this scene
-        self.generated_content: Optional[str] = None
-        self.summary: Optional[str] = None # Summary of what happened in this scene
+        self.pieces: List[ScenePiece] = [] # A scene is now composed of smaller pieces
+        self.final_summary: Optional[str] = None # A final, holistic summary of the assembled scene
         self.key_points_for_next_scene: List[str] = [] # Key takeaways to carry forward
 
-    def set_generated_content(self, content: str):
-        self.generated_content = content
+    @property
+    def generated_content(self) -> str:
+        """Returns the full, assembled text of the scene from its pieces."""
+        return "\n\n".join(piece.content for piece in sorted(self.pieces, key=lambda p: p.piece_number))
 
-    def set_summary(self, summary: str):
-        self.summary = summary
+    def add_piece(self, piece_content: str, piece_summary: str):
+        """Adds a new generated piece to the scene."""
+        piece_number = len(self.pieces) + 1
+        new_piece = ScenePiece(piece_number=piece_number, content=piece_content, summary=piece_summary)
+        self.pieces.append(new_piece)
+
+    def get_summary_of_all_pieces(self) -> str:
+        """Concatenates the summaries of all pieces to provide running context."""
+        return " ".join(piece.summary for piece in sorted(self.pieces, key=lambda p: p.piece_number))
+
+    def set_final_summary(self, summary: str):
+        """Sets the final, holistic summary after the scene is fully assembled."""
+        self.final_summary = summary
 
     def add_key_point(self, point: str):
         self.key_points_for_next_scene.append(point)
@@ -26,18 +61,19 @@ class SceneContext:
         return {
             "scene_number": self.scene_number,
             "initial_outline": self.initial_outline,
-            "generated_content": self.generated_content,
-            "summary": self.summary,
+            "pieces": [piece.to_dict() for piece in self.pieces],
+            "final_summary": self.final_summary,
             "key_points_for_next_scene": self.key_points_for_next_scene,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'SceneContext':
         scene = cls(data["scene_number"], data["initial_outline"])
-        scene.generated_content = data.get("generated_content")
-        scene.summary = data.get("summary")
+        scene.pieces = [ScenePiece.from_dict(p_data) for p_data in data.get("pieces", [])]
+        scene.final_summary = data.get("final_summary")
         scene.key_points_for_next_scene = data.get("key_points_for_next_scene", [])
         return scene
+
 
 class ChapterContext:
     """
@@ -63,7 +99,7 @@ class ChapterContext:
 
     def get_last_scene_summary(self) -> Optional[str]:
         if self.scenes:
-            return self.scenes[-1].summary
+            return self.scenes[-1].final_summary
         return None
 
     def set_generated_content(self, content: str):
@@ -105,8 +141,9 @@ class NarrativeContext:
     Manages and stores the overall narrative context for the entire novel.
     This includes premise, themes, and records of generated chapters and scenes.
     """
-    def __init__(self, initial_prompt: str, overall_theme: Optional[str] = None):
+    def __init__(self, initial_prompt: str, style_guide: str, overall_theme: Optional[str] = None):
         self.initial_prompt: str = initial_prompt
+        self.style_guide: str = style_guide # The guiding principles for the novel's tone and prose
         self.story_elements_markdown: Optional[str] = None # From StoryElements.py
         self.base_novel_outline_markdown: Optional[str] = None # The rough overall outline
         self.expanded_novel_outline_markdown: Optional[str] = None # Detailed, chapter-by-chapter
@@ -192,6 +229,7 @@ class NarrativeContext:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "initial_prompt": self.initial_prompt,
+            "style_guide": self.style_guide,
             "story_elements_markdown": self.story_elements_markdown,
             "base_novel_outline_markdown": self.base_novel_outline_markdown,
             "expanded_novel_outline_markdown": self.expanded_novel_outline_markdown,
@@ -204,7 +242,11 @@ class NarrativeContext:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'NarrativeContext':
-        context = cls(data["initial_prompt"], data.get("overall_theme"))
+        # Import here to avoid circular dependency with Prompts.py
+        from Writer.Prompts import LITERARY_STYLE_GUIDE
+        # Provide a default style guide if it's missing from older JSON files
+        style_guide = data.get("style_guide", LITERARY_STYLE_GUIDE)
+        context = cls(data["initial_prompt"], style_guide, data.get("overall_theme"))
         context.story_elements_markdown = data.get("story_elements_markdown")
         context.base_novel_outline_markdown = data.get("base_novel_outline_markdown")
         context.expanded_novel_outline_markdown = data.get("expanded_novel_outline_markdown")
@@ -270,8 +312,8 @@ class NarrativeContext:
 
         if scene_number > 1:
             prev_scene = chapter_ctx.get_scene(scene_number - 1)
-            if prev_scene and prev_scene.summary:
-                context_str += f"\nSummary of the previous scene (Scene {prev_scene.scene_number}):\n{prev_scene.summary}\n"
+            if prev_scene and prev_scene.final_summary:
+                context_str += f"\nSummary of the previous scene (Scene {prev_scene.scene_number}):\n{prev_scene.final_summary}\n"
                 if prev_scene.key_points_for_next_scene:
                     context_str += "Key points to address from the previous scene:\n"
                     for point in prev_scene.key_points_for_next_scene:

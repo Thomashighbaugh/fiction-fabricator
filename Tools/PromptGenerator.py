@@ -1,4 +1,4 @@
-# File: Tools/prompt_generator.py
+# File: Tools/PromptGenerator.py
 # Purpose: Generates a refined prompt.txt for FictionFabricator using an LLM.
 # This script is self-contained and should be run from the project's root directory.
 
@@ -10,7 +10,7 @@ detailed and refined `prompt.txt` file. This output file is structured to be an
 effective input for the main Write.py script.
 
 The process involves:
-1. Dynamically selecting an LLM from available providers (Google, Groq, Mistral, Ollama, NVIDIA).
+1. Dynamically selecting an LLM from available providers.
 2. Expanding the user's initial idea using the selected LLM.
 3. Having the LLM critique its own expansion.
 4. Refining the prompt based on this critique.
@@ -28,7 +28,6 @@ python Tools/prompt_generator.py -t "CrashLanded" -i "After the surveying vessel
 import argparse
 import os
 import sys
-import json
 import re
 import dotenv
 
@@ -49,229 +48,56 @@ except Exception as e:
 # --- Standardized Imports from Main Project ---
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
-import Writer.Config # Import config to access NVIDIA model list
+# --- Refactored Import for Centralized LLM Utilities ---
+from Writer.LLMUtils import get_llm_selection_menu_for_tool
 
-# --- Model Discovery Functions (copied from Write.py) ---
-def get_ollama_models(logger):
-    """Queries local Ollama for available models."""
-    try:
-        import ollama
-        logger.Log("Querying Ollama for local models...", 1)
-        models_data = ollama.list().get("models", [])
-        available_models = [f"ollama://{model.get('name') or model.get('model')}" for model in models_data if model.get('name') or model.get('model')]
-        logger.Log(f"Found {len(available_models)} Ollama models.", 3)
-        return available_models
-    except ImportError:
-        logger.Log("'ollama' library not installed. Skipping Ollama provider.", 6)
-        return []
-    except Exception as e:
-        logger.Log(f"Could not get Ollama models. (Error: {e})", 6)
-        return []
 
-def get_google_models(logger):
-    """Queries Google for available Gemini models."""
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        print("-> Google: GOOGLE_API_KEY not found in .env file. Skipping.")
-        return []
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        logger.Log("Querying Google for available Gemini models...", 1)
-        available = [f"google://{m.name.replace('models/', '')}" for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        logger.Log(f"Found {len(available)} Google models.", 3)
-        return available
-    except ImportError:
-        logger.Log("'google-generativeai' library not installed. Skipping Google provider.", 6)
-        return []
-    except Exception as e:
-        logger.Log(f"Failed to query Google models. (Error: {e})", 6)
-        return []
+# --- Prompts for this script (Refactored for Flexibility) ---
 
-def get_groq_models(logger):
-    """Queries GroqCloud for available models."""
-    if not os.environ.get("GROQ_API_KEY"):
-        print("-> GroqCloud: GROQ_API_KEY not found in .env file. Skipping.")
-        return []
-    try:
-        from groq import Groq
-        logger.Log("Querying GroqCloud for available models...", 1)
-        client = Groq()
-        models = client.models.list().data
-        logger.Log(f"Found {len(models)} GroqCloud models.", 3)
-        return [f"groq://{model.id}" for model in models]
-    except ImportError:
-        logger.Log("'groq' library not installed. Skipping GroqCloud provider.", 6)
-        return []
-    except Exception as e:
-        logger.Log(f"Failed to query GroqCloud models. (Error: {e})", 6)
-        return []
-
-def get_mistral_models(logger):
-    """Queries MistralAI for available models."""
-    api_key = os.environ.get("MISTRAL_API_KEY")
-    if not api_key:
-        print("-> MistralAI: MISTRAL_API_KEY not found in .env file. Skipping.")
-        return []
-    try:
-        from mistralai.client import MistralClient
-        logger.Log("Querying MistralAI for available models...", 1)
-        client = MistralClient(api_key=api_key)
-        models_data = client.list_models().data
-        known_chat_prefixes = ['mistral-large', 'mistral-medium', 'mistral-small', 'open-mistral', 'open-mixtral']
-        available_models = [f"mistralai://{model.id}" for model in models_data if any(model.id.startswith(prefix) for prefix in known_chat_prefixes)]
-        logger.Log(f"Found {len(available_models)} compatible MistralAI models.", 3)
-        return available_models
-    except ImportError:
-        logger.Log("'mistralai' library not installed. Skipping MistralAI provider.", 6)
-        return []
-    except Exception as e:
-        logger.Log(f"Failed to query MistralAI models. (Error: {e})", 6)
-        return []
-
-def get_nvidia_models(logger):
-    """Reads the user-defined NVIDIA models from config.ini."""
-    if not os.environ.get("NVIDIA_API_KEY"):
-        logger.Log("NVIDIA provider skipped: NVIDIA_API_KEY not found in environment.", 6)
-        return []
-    
-    logger.Log("Reading manual NVIDIA model list from config.ini...", 1)
-    model_list_str = Writer.Config.NVIDIA_AVAILABLE_MODELS
-    if not model_list_str:
-        logger.Log("NVIDIA provider skipped: No models listed in config.ini under [NVIDIA_SETTINGS] -> 'available_models'.", 6)
-        return []
-    
-    model_names = [name.strip() for name in model_list_str.split(',') if name.strip()]
-    available_models = [f"nvidia://{name}" for name in model_names]
-    logger.Log(f"Found {len(available_models)} NVIDIA models in config.ini.", 3)
-    return available_models
-
-def get_github_models(logger):
-    """Returns a static list of available GitHub models, checking for required env vars."""
-    if not os.environ.get("GITHUB_ACCESS_TOKEN") or not os.environ.get("AZURE_OPENAI_ENDPOINT"):
-        logger.Log("GitHub provider skipped: GITHUB_ACCESS_TOKEN or AZURE_OPENAI_ENDPOINT not found in environment.", 6)
-        return []
-
-    logger.Log("Loading GitHub model list...", 1)
-    
-    # Static list of the exact deployment names for models from the GitHub Marketplace.
-    deployment_names = [
-        "openai/o1", "openai/o1-mini", "openai/o1-preview", "openai/gpt-4o-mini", "openai/gpt-4o",
-        "deepseek/DeepSeek-V3-0324", "deepseek/DeepSeek-R1",
-        "ai21-labs/AI21-Jamba-1.5-Large", "ai21-labs/AI21-Jamba-1.5-Mini",
-        "cohere/cohere-command-r", "cohere/cohere-command-r-plus", "cohere/cohere-command-a",
-        "mistral-ai/Mistral-Nemo", "mistral-ai/Mistral-Small",
-        "mistral-ai/Mistral-Large-2411", "mistral-ai/Codestral-22B-v0.1",
-        "meta/Llama-3.2-11B-Vision-Instruct", "meta/Llama-3.2-90B-Vision-Instruct",
-        "meta/Llama-3.3-70B-Instruct", "meta/Llama-3.1-8B-Instruct",
-        "meta/Llama-3.1-70B-Instruct", "meta/Llama-3.1-405B-Instruct",
-        "meta/Llama-3-8B-Instruct", "meta/Llama-3-70B-Instruct",
-        "microsoft/Phi-4", "microsoft/Phi-3.5-MoE-instruct",
-        "microsoft/Phi-3.5-mini-instruct", "microsoft/Phi-3.5-vision-instruct",
-        "microsoft/Phi-3-mini-4k-instruct", "microsoft/Phi-3-mini-128k-instruct",
-        "microsoft/Phi-3-small-8k-instruct", "microsoft/Phi-3-small-128k-instruct",
-        "microsoft/Phi-3-medium-4k-instruct", "microsoft/Phi-3-medium-128k-instruct",
-        "xai/grok-3",
-        "core42/jais-30b-chat"
-    ]
-    
-    available_models = [f"github://{name}" for name in deployment_names]
-    logger.Log(f"Found {len(available_models)} GitHub models.", 3)
-    return available_models
-
-def get_llm_selection_menu_for_tool(logger):
-    """
-    Queries providers, presents a menu to the user, and returns the chosen model URI.
-    """
-    print("\n--- Querying available models from configured providers... ---")
-    all_models = []
-    all_models.extend(get_google_models(logger))
-    all_models.extend(get_groq_models(logger))
-    all_models.extend(get_mistral_models(logger))
-    all_models.extend(get_nvidia_models(logger))
-    all_models.extend(get_github_models(logger))
-    all_models.extend(get_ollama_models(logger))
-    if not all_models:
-        logger.Log("No models found from any provider. Please check API keys in .env and model lists in config.ini.", 7)
-        return None
-
-    print("\n--- Prompt Generator LLM Selection ---")
-    print("Please select the model for prompt generation:")
-    sorted_models = sorted(all_models)
-    for i, model in enumerate(sorted_models):
-        print(f"[{i+1}] {model}")
-
-    while True:
-        choice = input("> ").strip().lower()
-        if choice.isdigit() and 1 <= int(choice) <= len(sorted_models):
-            selected_model = sorted_models[int(choice) - 1]
-            print(f"Selected: {selected_model}")
-            return selected_model
-        else:
-            print("Invalid choice. Please enter a number from the list.")
-
-# --- Prompts for this script ---
+SYSTEM_PROMPT_STYLE_GUIDE = """
+You are a creative assistant and expert prompt engineer. Your goal is to help a user transform their story idea into a rich, detailed, and effective prompt for an AI story generator.
+"""
 
 EXPAND_IDEA_PROMPT_TEMPLATE = """
-You are a creative assistant helping to flesh out a story idea into a more detailed prompt suitable for an AI story generator like FictionFabricator.
-The user has provided a basic idea and a title.
-Your goal is to expand this into a richer concept that FictionFabricator can effectively use.
+You are a creative assistant helping to flesh out a story idea into a detailed prompt suitable for an AI story generator.
+Your goal is to expand the user's basic idea into a richer concept that is faithful to their original vision.
 
 User's Title: "{title}"
 User's Basic Idea: "{idea}"
 
-Expand this into a more detailed story prompt. Consider including or hinting at:
-- **Genre and Tone:** What kind of story is it (e.g., sci-fi, fantasy, mystery, horror, romance)? What is the desired mood (e.g., dark, humorous, adventurous, introspective)?
-- **Core Conflict:** What is the central problem or challenge the characters will face?
-- **Main Character(s) Sketch:** Briefly introduce 1-2 main characters. What are their key traits or motivations related to the idea?
-- **Setting Snippet:** A brief hint about the world or primary location.
-- **Key Plot Beats (Optional but helpful):** If any specific events or turning points come to mind from the user's idea, mention them.
-- **Specific "Do's" or "Don'ts" (Optional):** Are there any constraints or desired inclusions that would be important for the AI story generator? For example, "The story must include a talking cat," or "Avoid overly graphic violence."
-- **Target Audience/Style (Optional):** E.g., "Young Adult fantasy with a fast pace," or "Literary fiction with deep character exploration."
+Expand this into a more detailed story prompt. You must capture and enhance the following based on the user's idea:
+- **Genre and Tone:** Identify the likely genre and tone from the user's idea (e.g., Sci-Fi Adventure, Psychological Thriller, Fantasy Romance) and write the prompt to reflect it.
+- **Core Conflict:** What is the central problem the characters will face?
+- **Main Character(s) Sketch:** Briefly introduce the main characters as described or implied by the idea.
+- **Setting Snippet:** A brief hint about the world or primary location that establishes its atmosphere.
+- **Potential a Ending Direction:** Hint at a possible conclusion that would be a satisfying and logical outcome of the premise, whether it's happy, tragic, or ambiguous.
 
 Your response should be *only* the expanded story prompt itself.
-Do not include any titles, headings, preambles (e.g., "Here is the expanded idea:"), or other conversational text.
-Begin your response *directly* with the expanded story prompt text.
-Make it engaging and provide enough substance for the AI to build upon.
+Do not include any titles, headings, preambles, or other conversational text.
+Make it engaging and provide enough substance for an AI to build a complex story upon.
 """
 
 CRITIQUE_EXPANDED_PROMPT_TEMPLATE = """
 You are an expert AI prompt engineer evaluating a story prompt intended for an advanced AI story generation system.
-The system will use this prompt to generate story elements, an outline, and then the full narrative.
 
 Here is the expanded story prompt you need to critique:
 ---
 {expanded_prompt}
 ---
 
-Critique this prompt based on the following criteria for its effectiveness as input to FictionFabricator:
-1.  **Clarity and Specificity:**
-    *   Is the core story idea clear?
-    *   Are genre, tone, and style sufficiently indicated or implied?
-    *   Are main characters (if mentioned) distinct enough to start with?
-    *   Is the central conflict understandable?
-    *   Does it provide enough specific detail for the AI to avoid overly generic output, without being overly prescriptive and stifling creativity?
-2.  **Completeness (for FictionFabricator):**
-    *   Does it hint at enough elements for `StoryElements.generate_story_elements` to work well (e.g., potential for themes, setting details, character motivations)?
-    *   Does it provide a good foundation for `OutlineGenerator.generate_outline` to create a multi-chapter plot?
-3.  **Actionability for AI:**
-    *   Are there clear starting points for the AI?
-    *   Are there any ambiguities or contradictions that might confuse the AI?
-4.  **Engagement Factor:**
-    *   Does the prompt itself sound interesting and inspire creative possibilities?
+Critique this prompt based on its effectiveness for generating a compelling narrative that matches the user's apparent intent:
+1.  **Clarity and Specificity:** Is the core story idea clear? Is the central conflict understandable? Are the characters distinct enough to start with?
+2.  **Adherence to Intended Tone:** Does the prompt's tone match the user's idea? (e.g., if the idea is adventurous, is the prompt exciting? If the idea is mysterious, is the prompt intriguing?).
+3.  **Potential for Complexity:** Does the prompt provide enough substance for the AI to generate a multi-chapter plot with interesting characters and meaningful conflict? Or is it a simple, one-note concept?
+4.  **Actionability for AI:** Are there clear starting points for the AI? Are there any ambiguities that might confuse the AI or lead it astray from the user's original idea?
 
-Provide your critique as a list of bullet points (strengths and weaknesses).
-Be constructive. The goal is to identify areas for improvement.
-Example:
-- Strength: Clearly defines the sci-fi genre and a compelling central mystery.
-- Weakness: Main character motivation is vague. Suggest adding a specific goal.
-- Weakness: Setting is too generic. Suggest adding 1-2 unique details about the world.
+Provide your critique as a list of bullet points (strengths and weaknesses). Be constructive. The goal is to identify areas for improvement to make the prompt stronger.
 """
 
 REFINE_PROMPT_BASED_ON_CRITIQUE_TEMPLATE = """
 You are a master creative assistant. You have an expanded story prompt and a critique of that prompt.
 Your task is to revise and improve the original expanded prompt based *only* on the provided critique.
-The goal is to create a final, high-quality prompt.txt file that will be excellent input for an AI story generator like FictionFabricator.
+The goal is to create a final, high-quality `prompt.txt` file that will be excellent input for an AI story generator.
 
 Original Expanded Story Prompt:
 ---
@@ -284,16 +110,12 @@ Critique of the Expanded Story Prompt:
 ---
 
 Based on the critique, revise the "Original Expanded Story Prompt".
-Your entire response MUST be *only* the revised story prompt text itself.
-Do NOT include:
-- Any titles or headings (e.g., "Revised Prompt:", "Final Prompt").
-- Any introductory or leading sentences (e.g., "Here is the revised prompt:", "Okay, I have revised the prompt as follows:").
-- Any concluding remarks or summaries (e.g., "This prompt now addresses all points.", "I hope this is helpful.").
-- Any explanations of the changes made or how you followed instructions.
-- Any text other than the core, revised story prompt.
+- **Clarify and Enhance the Intended Tone:** Double down on the elements that make the prompt reflect the user's original idea. Be more explicit about the desired tone and feeling.
+- **Flesh out Details:** Address any weaknesses noted in the critique regarding character motivation, setting, or plot specificity.
 
+Your entire response MUST be *only* the revised story prompt text itself.
+Do NOT include any titles, headings, introductory sentences, or explanations.
 The output will be saved directly to a file, so it must contain *only* the story prompt.
-Begin your response *directly* with the revised story prompt.
 """
 
 
@@ -316,21 +138,18 @@ def _extract_core_prompt(llm_response: str) -> str:
 
     lines = llm_response.strip().split("\n")
     start_index = 0
+    # Skip any leading blank lines
     while start_index < len(lines) and not lines[start_index].strip():
         start_index += 1
     lines = lines[start_index:]
     if not lines:
         return ""
 
+    # Patterns for common headers to be removed
     header_patterns = [
-        re.compile(r"^\s*(?:OKAY|SURE|CERTAINLY|ALRIGHT|UNDERSTOOD)\s*[,.]?\s*HERE(?:'S| IS)? THE (?:REVISED|FINAL|EXPANDED|REQUESTED)?\s*PROMPT\s*[:.]?\s*$", re.IGNORECASE),
         re.compile(r"^\s*HERE(?:'S| IS)? THE (?:REVISED|FINAL|EXPANDED|REQUESTED)?\s*PROMPT\s*[:.]?\s*$", re.IGNORECASE),
         re.compile(r"^\s*(?:REVISED|FINAL|EXPANDED|STORY)?\s*PROMPT\s*[:]?\s*$", re.IGNORECASE),
-        re.compile(r"^\s*OUTPUT\s*[:]?\s*$", re.IGNORECASE),
-        re.compile(r"^\s*HERE IS THE .* PROMPT TEXT(?:,? CONTAINING ONLY THE PROMPT ITSELF)?\s*[:.]?\s*$", re.IGNORECASE),
-        re.compile(r"^\s*OKAY\s*[,.]?\s*$", re.IGNORECASE),
-        re.compile(r"^\s*SURE\s*[,.]?\s*$", re.IGNORECASE),
-        re.compile(r"^\s*HERE YOU GO\s*[:.]?\s*$", re.IGNORECASE),
+        re.compile(r"^\s*OKAY\s*[,.]?.*$", re.IGNORECASE),
     ]
 
     if lines:
@@ -338,6 +157,7 @@ def _extract_core_prompt(llm_response: str) -> str:
         for pattern in header_patterns:
             if pattern.fullmatch(first_line_content):
                 lines.pop(0)
+                # Also remove any blank lines that followed the header
                 while lines and not lines[0].strip():
                     lines.pop(0)
                 break
@@ -356,7 +176,7 @@ def main():
     sys_logger = Logger("PromptGenLogs")
 
     # --- Dynamic Model Selection ---
-    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger)
+    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger, tool_name="Prompt Generator")
     if not selected_model_uri:
         sys_logger.Log("No model was selected or discovered. Exiting.", 7)
         sys.exit(1)
@@ -368,10 +188,11 @@ def main():
     # --- Generation Logic ---
     print("\nStep 1: Expanding user's idea...")
     expand_user_prompt = EXPAND_IDEA_PROMPT_TEMPLATE.format(title=args.title, idea=args.idea)
-    expand_model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=1500"
+    # Increased max_tokens to prevent cutoff
+    expand_model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=2048"
 
     expand_messages = [
-        interface.BuildSystemQuery("You are a creative assistant helping to flesh out story ideas."),
+        interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
         interface.BuildUserQuery(expand_user_prompt)
     ]
     response_history = interface.SafeGenerateText(sys_logger, expand_messages, expand_model_with_params, min_word_count_target=100)
@@ -395,7 +216,7 @@ def main():
     critique_model_with_params = f"{selected_model_uri}?temperature=0.5&max_tokens=1000"
 
     critique_messages = [
-        interface.BuildSystemQuery("You are an expert AI prompt engineer and literary critic."),
+        interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
         interface.BuildUserQuery(critique_user_prompt)
     ]
     critique_history = interface.SafeGenerateText(sys_logger, critique_messages, critique_model_with_params, min_word_count_target=20)
@@ -412,18 +233,18 @@ def main():
 
         print("\nStep 3: Refining prompt based on critique...")
         refine_user_prompt = REFINE_PROMPT_BASED_ON_CRITIQUE_TEMPLATE.format(expanded_prompt=expanded_prompt, critique=critique)
-        refine_model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=1500"
+        # Increased max_tokens to prevent cutoff
+        refine_model_with_params = f"{selected_model_uri}?temperature={args.temp}&max_tokens=2048"
 
         refine_messages = [
-            interface.BuildSystemQuery("You are a master creative assistant, skilled at revising text based on feedback."),
+            interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
             interface.BuildUserQuery(refine_user_prompt)
         ]
         refine_history = interface.SafeGenerateText(sys_logger, refine_messages, refine_model_with_params, min_word_count_target=100)
         refined_text_raw = interface.GetLastMessageText(refine_history)
 
         if "[ERROR:" in refined_text_raw:
-            print(f"Failed to refine prompt: {refined_text_raw}")
-            print("Warning: Refinement failed. Using the initially expanded prompt.")
+            print(f"Warning: Refinement failed: {refined_text_raw}. Using the initially expanded prompt.")
             final_prompt_text_candidate = expanded_prompt
         else:
             final_prompt_text_candidate = _extract_core_prompt(refined_text_raw)
@@ -431,8 +252,9 @@ def main():
     final_prompt_text = final_prompt_text_candidate
     if not final_prompt_text.strip():
         print("Error: Final prompt is empty after all processing. Exiting.")
+        # Fallback logic to prevent empty file
         if expanded_prompt.strip():
-            print("Fallback to last valid prompt (expanded).")
+            print("Fallback to last valid prompt (the expanded version).")
             final_prompt_text = expanded_prompt
         else:
             sys.exit(1)

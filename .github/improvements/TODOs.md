@@ -7,7 +7,12 @@ My rough list and attempt to keep some order and sanity in my work on this proje
 These are items I am intending to get to sooner rather than later, this list will guide subsequent commits I make to the project repo directly.
 
 - [ ] TODO debug cycle by using project to create at least 3 books and catch any errors during that process.
-- [ ] TODO create documentation for the project and link to it on the README.md
+  - [x] DONE Book 1: Still too short, need to break the scene generation into smaller chunks
+  - [x] DONE Book 2: Still too short, cut off in critique phase and cut offs in the beginning contextual generation, which have been fixed and the generation cycle is now more iterative. Still getting more errors than I would like from the word count minimum checks but we will see how it goes.
+- [ ] TODO Create a tool to write short stories using the project's infrastructure, using the same prompt as a novel but with a shorter length
+- [ ] TODO Create a unified menu the user can use to select if they want to generate a book, short story, generate ideas or generate a novel prompt
+
+- [ ] TODO create a tool to write individual chapters for a web based lightnovel or CYOA style story
 
 ## Intended in Future
 
@@ -25,3 +30,4 @@ These are items that have been completed, obviously. Kept here for posterity and
 - [x] DONE Integrating at least some of the Github Models using the means provided on the model playground pages _vis-a-vis_ GitHub Models
 - [x] DONE timeout for generations, preventing hanging calls from compromising generation pipeline
 - [x] DONE Create tool to generate the ideas to feed into `Tools/PromptGeneration.py`
+- [x] DONE create documentation for the project and link to it on the README.md

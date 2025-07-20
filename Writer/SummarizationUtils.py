@@ -8,6 +8,42 @@ from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
 from Writer.NarrativeContext import NarrativeContext
 
+def summarize_scene_piece(
+    Interface: Interface,
+    _Logger: Logger,
+    scene_piece_text: str
+) -> str:
+    """
+    Creates a very concise summary of a small piece of a scene.
+    This is a fast, non-creative task intended to provide immediate context
+    for the next piece in a scene generation loop. It does not use critique/revision.
+
+    Args:
+        Interface: The LLM interface wrapper.
+        _Logger: The logger instance.
+        scene_piece_text: The text of the scene chunk to summarize.
+
+    Returns:
+        A short, 1-2 sentence summary of the scene piece.
+    """
+    _Logger.Log("Summarizing scene piece for iterative context...", 1)
+    prompt = Writer.Prompts.SUMMARIZE_SCENE_PIECE_PROMPT.format(scene_piece_text=scene_piece_text)
+    messages = [Interface.BuildUserQuery(prompt)]
+
+    # This is a simple, non-creative task. We expect a very short response.
+    # We use SafeGenerateText with a low word count target.
+    response_history = Interface.SafeGenerateText(
+        _Logger, messages, Writer.Config.CHECKER_MODEL, min_word_count_target=10
+    )
+    summary = Interface.GetLastMessageText(response_history)
+
+    if "[ERROR:" in summary:
+        _Logger.Log("Failed to summarize scene piece. Returning empty string.", 7)
+        return ""
+
+    return summary.strip()
+
+
 def summarize_scene_and_extract_key_points(
     Interface: Interface,
     _Logger: Logger,
@@ -17,13 +53,13 @@ def summarize_scene_and_extract_key_points(
     scene_num: int
 ) -> dict:
     """
-    Summarizes a scene's content and extracts key points for the next scene to ensure coherence.
+    Generates a final, holistic summary for a fully assembled scene and extracts key points.
     This is a creative/analytical task and will undergo critique and revision.
 
     Returns:
         A dictionary with "summary" and "key_points_for_next_scene".
     """
-    _Logger.Log(f"Generating summary for Chapter {chapter_num}, Scene {scene_num}", 4)
+    _Logger.Log(f"Generating final summary for Chapter {chapter_num}, Scene {scene_num}", 4)
 
     # Prepare context for the summarization task
     task_description = f"You are summarizing scene {scene_num} of chapter {chapter_num}. The goal is to create a concise summary of the scene's events and to identify key plot points, character changes, or unresolved tensions that must be carried into the next scene to maintain narrative continuity."
@@ -32,11 +68,11 @@ def summarize_scene_and_extract_key_points(
     if chapter_ctx := narrative_context.get_chapter(chapter_num):
         if scene_num > 1:
             if prev_scene := chapter_ctx.get_scene(scene_num - 1):
-                if prev_scene.summary:
-                    context_summary += f"\nImmediately preceding this scene (C{chapter_num} S{scene_num-1}):\n{prev_scene.summary}"
+                if prev_scene.final_summary:
+                    context_summary += f"\nImmediately preceding this scene (C{chapter_num} S{scene_num-1}):\n{prev_scene.final_summary}"
 
     prompt = Writer.Prompts.SUMMARIZE_SCENE_PROMPT.format(scene_text=scene_text)
-    messages = [Interface.BuildUserQuery(prompt)]
+    messages = [Interface.BuildSystemQuery(Writer.Prompts.LITERARY_STYLE_GUIDE), Interface.BuildUserQuery(prompt)]
 
     _Logger.Log("Generating initial summary and key points...", 5)
     _, initial_summary_json = Interface.SafeGenerateJSON(
@@ -53,6 +89,7 @@ def summarize_scene_and_extract_key_points(
         task_description=task_description,
         narrative_context_summary=context_summary,
         initial_user_prompt=narrative_context.initial_prompt,
+        style_guide=narrative_context.style_guide,
         is_json=True
     )
 
@@ -62,7 +99,7 @@ def summarize_scene_and_extract_key_points(
              _Logger.Log("Revised summary JSON is missing required keys. Falling back to initial summary.", 7)
              return initial_summary_json
 
-        _Logger.Log(f"Successfully generated and revised summary for C{chapter_num} S{scene_num}.", 4)
+        _Logger.Log(f"Successfully generated and revised final summary for C{chapter_num} S{scene_num}.", 4)
         return final_summary_data
     except json.JSONDecodeError as e:
         _Logger.Log(f"Failed to parse final revised summary JSON: {e}. Falling back to initial summary.", 7)
@@ -89,7 +126,7 @@ def summarize_chapter(
     context_summary = narrative_context.get_full_story_summary_so_far(chapter_num)
 
     prompt = Writer.Prompts.SUMMARIZE_CHAPTER_PROMPT.format(chapter_text=chapter_text)
-    messages = [Interface.BuildUserQuery(prompt)]
+    messages = [Interface.BuildSystemQuery(Writer.Prompts.LITERARY_STYLE_GUIDE), Interface.BuildUserQuery(prompt)]
 
     _Logger.Log("Generating initial chapter summary...", 5)
     messages = Interface.SafeGenerateText(
@@ -105,6 +142,7 @@ def summarize_chapter(
         task_description=task_description,
         narrative_context_summary=context_summary,
         initial_user_prompt=narrative_context.initial_prompt,
+        style_guide=narrative_context.style_guide,
         is_json=False
     )
 

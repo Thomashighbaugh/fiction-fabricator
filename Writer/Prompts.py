@@ -1,58 +1,65 @@
+# File: Writer/Prompts.py
+# Purpose: A centralized repository for all LLM prompt templates used in the project.
+# Refactored to improve clarity, flexibility, and robustness.
+
 # ======================================================================================
-# Prompts for Outline and Chapter Structure
+# Prompts for Outline and Story Structure
 # ======================================================================================
 
+# A flexible style guide to be used as a system prompt for most creative tasks.
+LITERARY_STYLE_GUIDE = """
+Your writing must be sophisticated, clear, and compelling. Strive for prose that is rich with detail and psychological depth.
+
+**Core Tenets of Your Writing Style:**
+1.  **Show, Don't Tell:** Do not state an emotion; describe the actions and sensory details that reveal it. Let the narrative unfold organically through character actions and dialogue.
+2.  **Psychological Depth:** Delve into the inner workings of your characters' minds. Their motivations should be complex and their reliability questionable. The psychological landscape is as important as the physical one.
+3.  **Avoid AI Tropes:** Do not start sentences with predictable phrases like "Meanwhile," or "As the sun began to set,". Avoid overly simplistic emotional descriptions. The narrative should feel organic and unpredictable.
+"""
+
+# New prompt for generating story elements, focusing on user's prompt.
 GENERATE_STORY_ELEMENTS_PROMPT = """
-I'm working on writing a fictional story, and I'd like your help writing out the story elements.
+You are a master storyteller. Your task is to analyze a user's story prompt and define its core creative elements.
 
-Here's the prompt for my story.
-<PROMPT>
+<USER_PROMPT>
 {_OutlinePrompt}
-</PROMPT>
+</USER_PROMPT>
 
-Please make your response have the following format:
+Adhering to the spirit of the user's prompt, define the following elements in markdown format.
 
 <RESPONSE_TEMPLATE>
 # Story Title
 
 ## Genre
-- **Category**: (e.g., romance, mystery, science fiction, fantasy, horror)
+- **Category**: (e.g., Psychological Thriller, Sci-Fi Adventure, Fantasy Romance)
 
 ## Theme
-- **Central Idea or Message**:
+- **Central Idea or Message**: (The core message or question explored in the story.)
 
 ## Pacing
-- **Speed**: (e.g., slow, fast)
+- **Speed**: (e.g., slow-burn, relentless, feverish)
 
 ## Style
-- **Language Use**: (e.g., sentence structure, vocabulary, tone, figurative language)
+- **Language Use**: (e.g., Sparse and clinical, ornate and literary, stream-of-consciousness.)
 
 ## Plot
 - **Exposition**:
 - **Rising Action**:
 - **Climax**:
 - **Falling Action**:
-- **Resolution**:
+- **Resolution**: (The story's conclusion, which should be a logical outcome of the premise.)
 
 ## Setting
 ### Setting 1
-- **Time**: (e.g., present day, future, past)
-- **Location**: (e.g., city, countryside, another planet)
-- **Culture**: (e.g., modern, medieval, alien)
-- **Mood**: (e.g., gloomy, high-tech, dystopian)
+- **Time**:
+- **Location**:
+- **Culture**:
+- **Mood**:
 
-(Repeat the above structure for additional settings)
+(Repeat for additional settings)
 
 ## Conflict
-- **Type**: (e.g., internal, external)
-- **Description**:
-
-## Symbolism
-### Symbol 1
-- **Symbol**:
-- **Meaning**:
-
-(Repeat the above structure for additional symbols)
+- **Type**: (e.g., internal (man vs. self), external (man vs. society))
+- **Description**: (The central conflict driving the narrative.)
 
 ## Characters
 ### Main Character(s)
@@ -63,23 +70,17 @@ Please make your response have the following format:
 - **Background**:
 - **Motivation**:
 
-(Repeat the above structure for additional main characters)
-
+(Repeat for additional main characters)
 
 ### Supporting Characters
 #### Character 1
 - **Name**:
-- **Physical Description**:
-- **Personality**:
-- **Background**:
 - **Role in the story**:
 
-(Repeat the above structure for additional supporting character)
-
+(Repeat for additional supporting characters)
 </RESPONSE_TEMPLATE>
 
-Of course, don't include the XML tags - those are just to indicate the example.
-Also, the items in parenthesis are just to give you a better idea of what to write about, and should also be omitted from your response.
+Do not include the XML tags in your response. Infuse the spirit of the user's prompt into every element you create.
 """
 
 CHAPTER_COUNT_PROMPT = """
@@ -90,12 +91,19 @@ CHAPTER_COUNT_PROMPT = """
 Please provide a JSON formatted response containing the total number of chapters in the above outline.
 
 Respond with {{"TotalChapters": <total chapter count>}}
-Please do not include any other text, just the JSON as your response will be parsed by a computer.
+Please do not include any other text, just the JSON, as your response will be parsed by a computer.
 """
 
 INITIAL_OUTLINE_PROMPT = """
-Please write a markdown formatted outline based on the following prompt:
+You are a master storyteller tasked with creating a compelling, chapter-by-chapter novel outline.
 
+**Your Style Guide:**
+---
+{style_guide}
+---
+
+**Core Story Concept:**
+Use the user's prompt and the defined story elements to build your outline.
 <PROMPT>
 {_OutlinePrompt}
 </PROMPT>
@@ -104,47 +112,36 @@ Please write a markdown formatted outline based on the following prompt:
 {StoryElements}
 </ELEMENTS>
 
-As you write, remember to ask yourself the following questions:
-    - What is the conflict?
-    - Who are the characters (at least two characters)?
-    - What do the characters mean to each other?
-    - Where are we located?
-    - What are the stakes (is it high, is it low, what is at stake here)?
-    - What is the goal or solution to the conflict?
-
-Don't answer these questions directly; instead, make your outline implicitly answer them. (Show, don't tell)
-
-Please keep your outline clear as to what content is in what chapter.
-Make sure to add lots of detail as you write.
-
-Also, include information about the different characters and how they change over the course of the story.
-We want to have rich and complex character development!"""
+**Your Task:**
+Write a detailed, chapter-by-chapter outline in markdown format.
+- The plot must be coherent, with each chapter building on the last toward a satisfying conclusion.
+- Ensure it is very clear what content belongs in each chapter. Add significant detail to guide the writing process.
+"""
 
 OUTLINE_REVISION_PROMPT = """
-Please revise the following outline:
+You are a master storyteller revising a novel outline based on editorial feedback.
+
+**Your Style Guide:**
+---
+{style_guide}
+---
+
+**Outline to Revise:**
 <OUTLINE>
 {_Outline}
 </OUTLINE>
 
-Based on the following feedback:
+**Editorial Feedback:**
 <FEEDBACK>
 {_Feedback}
 </FEEDBACK>
 
-Remember to expand upon your outline and add content to make it as best as it can be!
-
-As you write, keep the following in mind:
-    - What is the conflict?
-    - Who are the characters (at least two characters)?
-    - What do the characters mean to each other?
-    - Where are we located?
-    - What are the stakes (is it high, is it low, what is at stake here)?
-    - What is the goal or solution to the conflict?
-
-Please keep your outline clear as to what content is in what chapter.
-Make sure to add lots of detail as you write.
-
-Don't answer these questions directly; instead, make your writing implicitly answer them. (Show, don't tell)
+**Your Task:**
+Rewrite the entire outline, incorporating the feedback to improve it.
+- Deepen the plot, character arcs, and thematic complexity.
+- Ensure the revised outline is aligned with the style guide.
+- Add more detail to every chapter, making the sequence of events and character motivations crystal clear.
+- The final outline must be a complete, chapter-by-chapter markdown document.
 """
 
 GET_IMPORTANT_BASE_PROMPT_INFO = """
@@ -169,8 +166,7 @@ If the prompt provides no such context, you must respond with "No additional con
 """
 
 EXPAND_OUTLINE_TO_MIN_CHAPTERS_PROMPT = """
-You are a master story developer and editor. Your task is to revise a novel outline to meet a minimum chapter count.
-The current outline is too short and needs to be expanded thoughtfully.
+You are a master story developer. Your task is to revise a novel outline to meet a minimum chapter count by adding meaningful content.
 
 # CURRENT OUTLINE
 ---
@@ -180,17 +176,17 @@ The current outline is too short and needs to be expanded thoughtfully.
 # TASK
 Revise the outline so that it contains at least **{_MinChapters}** chapters.
 Do NOT just split existing chapters. Instead, expand the story by:
-- Developing subplots.
+- Developing subplots that explore the story's core themes.
 - Giving more space to character arcs.
-- Adding new events or complications that are consistent with the story's theme and plot.
-- Fleshing out the rising action, climax, or falling action with more detail and steps.
+- Adding new events or complications that are consistent with the story's tone and plot.
+- Fleshing out the rising action, climax, or falling action with more detail.
 
-The goal is a richer, more detailed story that naturally fills the required number of chapters, not a stretched-out version of the original.
+The goal is a richer, more detailed story that naturally fills the required number of chapters.
 Your response should be the new, complete, chapter-by-chapter markdown outline.
 """
 
 SUMMARIZE_OUTLINE_RANGE_PROMPT = """
-You are a story analyst. Your task is to read a full novel outline and summarize a specific range of chapters.
+You are a story analyst. Your task is to read a novel outline and summarize a specific range of chapters.
 
 # FULL NOVEL OUTLINE
 ---
@@ -198,13 +194,13 @@ You are a story analyst. Your task is to read a full novel outline and summarize
 ---
 
 # YOUR TASK
-Provide a concise summary of the events, character arcs, and key plot points that occur between **Chapter {_StartChapter} and Chapter {_EndChapter}**, based *only* on the full outline provided above.
+Provide a concise summary of the events, character arcs, and key plot points that occur between **Chapter {_StartChapter} and Chapter {_EndChapter}**, based *only* on the full outline provided.
 
-Your response should be a single, coherent paragraph. Do not include any introductory text or headings.
+Your response should be a single, coherent paragraph.
 """
 
 GENERATE_CHAPTER_GROUP_OUTLINE_PROMPT = """
-You are a master storyteller and outliner. Your task is to expand a group of chapters from a high-level novel outline into a more detailed, scene-by-scene breakdown.
+You are a master storyteller. Your task is to expand a part of a novel outline into a detailed, scene-by-scene breakdown.
 
 # FULL NOVEL OUTLINE
 This is the complete outline for the entire story. Use it for high-level context.
@@ -213,35 +209,28 @@ This is the complete outline for the entire story. Use it for high-level context
 ---
 
 # SUMMARY OF OTHER STORY PARTS
-To ensure your detailed outline is coherent with the rest of the novel, here is a summary of the major events and arcs from the other parts of the story. You must ensure the chapters you are outlining connect logically to these events.
+Here is a summary of the major events from other parts of the story. You must ensure the chapters you are outlining connect logically to these events.
 ---
 {_OtherGroupsSummary}
 ---
 
 # YOUR TASK
-Your sole focus is to generate detailed, scene-by-scene outlines for the chapters in the following range: **Chapters {_StartChapter} through {_EndChapter}**.
+Your sole focus is to generate detailed, scene-by-scene outlines for **Chapters {_StartChapter} through {_EndChapter}**.
 
 For EACH chapter in this range, provide a markdown block that includes:
 - A main markdown header for the chapter (e.g., `# Chapter X: The Title`).
 - Multiple scene-by-scene breakdowns under that chapter header.
-- For each scene, please provide:
-    - A clear heading (e.g., "## Scene 1: The Ambush").
-    - A list of characters present.
-    - A description of the setting.
-    - A summary of the key events and actions that take place.
-    - Notes on character development or important dialogue beats.
+- For each scene, please provide a clear heading, a list of characters, a description of the setting, and a summary of the key events.
 
 Your output should be a single, continuous markdown document containing the detailed outlines for ALL chapters in the specified range.
 """
 
 # ======================================================================================
-# Prompts for Chapter Generation Stages
+# Prompts for Chapter Generation
 # ======================================================================================
 
-CHAPTER_GENERATION_INTRO = """You are a great fiction writer, working on a new novel. You are about to write a chapter based on an outline and the story so far. Pay close attention to the provided context to ensure continuity."""
-
 CHAPTER_GENERATION_PROMPT = """
-Please help me extract the part of this outline that is just for chapter {_ChapterNum}.
+Please extract the part of this outline that is just for chapter {_ChapterNum}.
 
 <OUTLINE>
 {_Outline}
@@ -250,10 +239,9 @@ Please help me extract the part of this outline that is just for chapter {_Chapt
 Do not include anything else in your response except just the content for chapter {_ChapterNum}.
 """
 
-# The following stage prompts are simplified by using a single context block.
 CHAPTER_GENERATION_STAGE1 = """
 # Context
-Here is the context for the novel so far, including themes, motifs, and summaries of previous chapters. Use this to ensure your writing is coherent and flows logically from what has come before.
+Here is the context for the novel so far, including themes, motifs, and summaries of previous chapters. Use this to ensure your writing is coherent.
 ---
 {narrative_context}
 ---
@@ -261,18 +249,14 @@ Here is the context for the novel so far, including themes, motifs, and summarie
 # Your Task
 Write the PLOT for chapter {_ChapterNum} of {_TotalChapters}.
 Base your writing on the following chapter outline. Your main goal is to establish the sequence of events.
-It is imperative that your writing connects well with the previous chapter and flows into the next.
+It is imperative that your writing connects well with the previous chapter.
+
+**Crucial:** You must adhere to the literary style defined in the system prompt.
 
 <CHAPTER_OUTLINE>
 {ThisChapterOutline}
 </CHAPTER_OUTLINE>
-
-As you write, ensure you are implicitly addressing these questions about the plot:
-- Pacing: Are you skipping days at a time? Don't summarize events; add scenes to detail them. Is the story rushing over certain plot points?
-- Flow: Does the plot make logical sense? Does it follow a clear narrative structure?
-- Genre: What is the genre? Does the plot support the genre?
-
-{Feedback}"""
+"""
 
 CHAPTER_GENERATION_STAGE2 = """
 # Context
@@ -283,21 +267,13 @@ Here is the context for the novel so far. Use this to inform your writing.
 
 # Your Task
 Expand upon the provided chapter plot by adding CHARACTER DEVELOPMENT for chapter {_ChapterNum} of {_TotalChapters}.
-Do not remove existing content; instead, enrich it with character thoughts, feelings, and motivations.
+Do not remove existing content; instead, enrich it with character thoughts, feelings, and motivations, adhering to the established literary style.
 
-Here is what I have for the current chapter's plot:
+Here is the current chapter's plot:
 <CHAPTER_PLOT>
 {Stage1Chapter}
 </CHAPTER_PLOT>
-
-Expand on the work above, keeping these criteria in mind:
-- Characters: Who are the characters in this chapter? What is the situation between them? Is there conflict or tension?
-- Development: What are the goals of each character? Do they exhibit growth or change? Do their goals shift?
-- Details: (Show, don't tell) Implicitly answer the questions above by weaving them into the narrative.
-
-Remember, your goal is to enhance the character depth of the chapter.
-
-{Feedback}"""
+"""
 
 CHAPTER_GENERATION_STAGE3 = """
 # Context
@@ -308,47 +284,19 @@ Here is the context for the novel so far. Use this to inform your writing.
 
 # Your Task
 Expand upon the provided chapter content by adding DIALOGUE for chapter {_ChapterNum} of {_TotalChapters}.
-Do not remove existing content; instead, weave natural and purposeful conversations into the scenes.
+Do not remove existing content; instead, weave natural and purposeful conversations into the scenes. Dialogue should reveal character and subtext.
 
 Here's what I have so far for this chapter:
 <CHAPTER_CONTENT>
 {Stage2Chapter}
 </CHAPTER_CONTENT>
 
-As you add dialogue, keep the following in mind:
-- Dialogue: Does the dialogue make sense for the situation and characters? Is its pacing appropriate for the scene (e.g., fast-paced during action, slow during a thoughtful moment)?
-- Disruptions: If dialogue is disrupted, what is the cause? How does it affect the conversation?
-- Purpose: Does the dialogue reveal character, advance the plot, or provide exposition?
-
-Also, please remove any leftover headings or author notes from the text. Your output should be the clean, final chapter text.
-
-{Feedback}"""
-
-CHAPTER_GENERATION_STAGE4 = """
-Please provide a final edit of the following chapter. Your goal is to polish the writing, ensuring it's seamless and ready for publication.
-Do not summarize. Expand where needed to improve flow, but do not add major new plot points.
-
-For your reference, here is the full story outline:
-<OUTLINE>
-{_Outline}
-</OUTLINE>
-
-And here is the chapter to tweak and improve:
-<CHAPTER>
-{Stage3Chapter}
-</CHAPTER>
-
-As you edit, focus on these criteria:
-- Pacing and Flow: Smooth out transitions between scenes.
-- Character Voice: Ensure character thoughts and dialogue are consistent.
-- Description: Refine descriptions. Is the language too flowery or too plain?
-- Consistency: Ensure the chapter aligns with the outline and the tone of the novel.
-
-Remember to remove any author notes or non-chapter text.
+As you add dialogue, please remove any leftover headings or author notes. Your output should be clean, final chapter text.
 """
 
+
 # ======================================================================================
-# Prompts for Summarization and Coherence (NEW)
+# Prompts for Summarization and Coherence
 # ======================================================================================
 
 SUMMARIZE_SCENE_PROMPT = """
@@ -361,17 +309,6 @@ Please analyze the following scene and provide a structured JSON response.
 Your response must be a single JSON object with two keys:
 1. "summary": A concise paragraph summarizing the key events, character interactions, and setting of the scene.
 2. "key_points_for_next_scene": A list of 2-4 bullet points identifying crucial pieces of information (e.g., unresolved conflicts, new character goals, important objects, lingering questions) that must be carried forward to ensure continuity in the next scene.
-
-Example Response Format:
-{{
-  "summary": "In the dimly lit tavern, Kaelan confronts the mysterious informant, learning that the stolen artifact is not a mere trinket but a key to the city's ancient defenses. The informant slips away after a cryptic warning about a traitor in the city guard, leaving Kaelan with more questions than answers.",
-  "key_points_for_next_scene": [
-    "Kaelan now knows the artifact is a key.",
-    "A traitor is suspected within the city guard.",
-    "The informant's warning was cryptic and needs deciphering.",
-    "Kaelan is left alone in the tavern, contemplating his next move."
-  ]
-}}
 
 Provide only the JSON object in your response.
 """
@@ -387,29 +324,45 @@ Focus on the main plot advancements, significant character developments, and the
 Do not include anything in your response except the summary paragraph.
 """
 
+SUMMARIZE_SCENE_PIECE_PROMPT = """
+You are a story coherence assistant. Your task is to read a small chunk of a scene and summarize it very concisely. This summary will be used to prompt the AI to write the *next* chunk of the scene, so it must be accurate and capture the immediate state of things.
+
+# SCENE CHUNK
+---
+{scene_piece_text}
+---
+
+# YOUR TASK
+Provide a 1-2 sentence summary of the chunk above. Focus only on what happened in this specific text. What is the very last thing that happened? Who is present and what is their immediate situation?
+"""
+
 # ======================================================================================
-# Prompts for Critique and Revision (NEW)
+# Prompts for Critique and Revision
 # ======================================================================================
 
 CRITIQUE_CREATIVE_CONTENT_PROMPT = """
 You are a literary editor providing feedback on a piece of writing for a novel.
-Your goal is to provide specific, constructive criticism to help the author improve the piece, ensuring it aligns with the original creative vision.
+Your goal is to provide specific, constructive criticism to help the author improve the piece, ensuring it aligns with the original creative vision and the required literary style.
+
+# STYLE GUIDE (Non-negotiable)
+---
+{style_guide}
+---
 
 # ORIGINAL USER PROMPT (The Source of Truth)
-This is the core idea the author started with. All generated content should serve this vision.
+This is the core idea the author started with.
 ---
 {initial_user_prompt}
 ---
 
 # CONTEXT OF THE STORY SO FAR
-This is a summary of events that have been written so far.
+This is a summary of events written so far.
 ---
 {narrative_context_summary}
 ---
 
 # TASK DESCRIPTION
-The author was trying to accomplish the following with this piece of writing:
-"{task_description}"
+The author was trying to accomplish the following: "{task_description}"
 
 # TEXT TO CRITIQUE
 ---
@@ -417,12 +370,11 @@ The author was trying to accomplish the following with this piece of writing:
 ---
 
 # YOUR INSTRUCTIONS
-Please critique the "TEXT TO CRITIQUE" based on its adherence to the "ORIGINAL USER PROMPT", the task it was supposed to accomplish, and its coherence with the story's context.
-Focus on:
-- **Prompt Adherence:** Does the text honor the core ideas, characters, and constraints from the original user prompt?
-- **Coherence:** Does it logically follow from the story context? Does it maintain character voice and plot continuity?
-- **Task Fulfillment:** Did it successfully achieve the goal described in the "TASK DESCRIPTION"?
-- **Quality:** Is the writing engaging? Is the pacing effective? Is there anything unclear or confusing?
+Critique the "TEXT TO CRITIQUE". Your feedback is crucial.
+1.  **Style Adherence:** Does the text follow the **STYLE GUIDE**? Is it compelling and psychologically complex?
+2.  **Prompt Adherence:** Does it honor the core ideas from the "ORIGINAL USER PROMPT"?
+3.  **Coherence:** Does it logically follow from the "CONTEXT OF THE STORY SO FAR"?
+4.  **Task Fulfillment:** Did it successfully achieve its "TASK DESCRIPTION"?
 
 Provide a few bullet points of direct, actionable feedback.
 {is_json_output}
@@ -431,167 +383,125 @@ Provide a few bullet points of direct, actionable feedback.
 REVISE_CREATIVE_CONTENT_BASED_ON_CRITIQUE_PROMPT = """
 You are a master fiction writer tasked with revising a piece of text based on an editor's critique.
 
+# STYLE GUIDE (Non-negotiable)
+Your revision must embody this style.
+---
+{style_guide}
+---
+
 # ORIGINAL USER PROMPT (The Source of Truth)
 Your revision MUST align with this core idea.
 ---
 {initial_user_prompt}
 ---
 
-# CONTEXT OF THE STORY SO FAR
+# STORY CONTEXT
 This is the background for the story you are working on.
 ---
 {narrative_context_summary}
 ---
 
 # ORIGINAL TEXT
-This was the first draft of the text.
+This was the first draft.
 ---
 {original_text}
 ---
 
 # EDITOR'S CRITIQUE
-Here is the feedback you must address in your revision.
+Here is the feedback you must address.
 ---
 {critique}
 ---
 
 # YOUR TASK
-Your goal is to rewrite the "ORIGINAL TEXT" to address the points raised in the "EDITOR'S CRITIQUE".
+Rewrite the "ORIGINAL TEXT" to address the points in the "EDITOR'S CRITIQUE".
 - You MUST stay true to the original text's purpose, as described here: "{task_description}".
-- You MUST ensure your revision is strongly aligned with the "ORIGINAL USER PROMPT".
-- You MUST incorporate the feedback from the critique.
+- You MUST ensure your revision is strongly aligned with the "STYLE GUIDE" and "ORIGINAL USER PROMPT".
 - You MUST ensure the revised text is coherent with the story's context.
 
 {json_instructions}
 """
 
-# ======================================================================================
-# Prompts for Legacy Revision and Checking
-# ======================================================================================
+CLEAN_REVISED_TEXT_PROMPT = """
+You are a cleanup utility. The following text was generated by an AI that was instructed to revise a piece of creative writing. It may have included extraneous notes or other non-narrative text.
+
+# TEXT TO CLEAN
+---
+{text_to_clean}
+---
+
+# YOUR TASK
+Your sole job is to extract and return ONLY the core, clean, narrative prose from the text above.
+- Remove any headings, author notes, or meta-commentary (e.g., "Here is the revised text:").
+- Return only the story content itself.
+"""
 
 CHAPTER_REVISION = """
-Please revise the following chapter:
+Please revise the following chapter based on the provided feedback, adhering to the literary style defined in the system prompt.
 
 <CHAPTER_CONTENT>
 {_Chapter}
 </CHAPTER_CONTENT>
 
-Based on the following feedback:
 <FEEDBACK>
 {_Feedback}
 </FEEDBACK>
 
-Do not reflect on the revisions; just write the improved chapter that addresses the feedback and prompt criteria.
-Remember not to include any author notes.
+Do not reflect on the revisions; just write the improved chapter.
 """
 
-SUMMARY_CHECK_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
-SUMMARY_CHECK_PROMPT = """
-Please summarize the following chapter:
-
-<CHAPTER>
-{_Work}
-</CHAPTER>
-
-Do not include anything in your response except the summary."""
-SUMMARY_OUTLINE_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
-SUMMARY_OUTLINE_PROMPT = """
-Please summarize the following chapter outline:
-
-<OUTLINE>
-{_RefSummary}
-</OUTLINE>
-
-Do not include anything in your response except the summary."""
-SUMMARY_COMPARE_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
-SUMMARY_COMPARE_PROMPT = """
-Please compare the provided summary of a chapter and the associated outline, and indicate if the provided content roughly follows the outline.
-
-Please write a JSON formatted response with no other content with the following keys.
-Note that a computer is parsing this JSON so it must be correct.
-
-<CHAPTER_SUMMARY>
-{WorkSummary}
-</CHAPTER_SUMMARY>
-
-<OUTLINE>
-{OutlineSummary}
-</OUTLINE>
-
-Please respond with the following JSON fields:
-
-{{
-"Suggestions": "str",
-"DidFollowOutline": "true/false"
-}}
-
-Suggestions should include a string containing detailed markdown formatted feedback that will be used to prompt the writer on the next iteration of generation.
-Specify general things that would help the writer remember what to do in the next iteration.
-The writer is not aware of each iteration - so provide detailed information in the prompt that will help guide it.
-Start your suggestions with 'Important things to keep in mind as you write: \\n'.
-
-It's okay if the summary isn't a perfect match, but it should have roughly the same plot and pacing.
-
-Again, remember to make your response JSON formatted with no extra words. It will be fed directly to a JSON parser.
-"""
-CRITIC_OUTLINE_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
 CRITIC_OUTLINE_PROMPT = """
-Please critique the following outline - make sure to provide constructive criticism on how it can be improved and point out any problems with it.
+Please critique the following outline. Provide constructive criticism on how it can be improved and point out any problems with plot, pacing, or characterization.
 
 <OUTLINE>
 {_Outline}
 </OUTLINE>
+"""
 
-As you revise, consider the following criteria:
-    - Pacing: Is the story rushing over certain plot points and excessively focusing on others?
-    - Details: How are things described? Is it repetitive?
-    - Flow: Does each chapter flow into the next? Does the plot make logical sense?
-    - Genre: What is the genre? Do the scenes and tone support the genre?
-
-Also, please check if the outline is written chapter-by-chapter, not in sections spanning multiple chapters or subsections.
-It should be very clear which chapter is which, and the content in each chapter."""
-
-OUTLINE_COMPLETE_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
 OUTLINE_COMPLETE_PROMPT = """
 <OUTLINE>
 {_Outline}
 </OUTLINE>
 
 Does this outline meet all of the following criteria?
-    - Pacing: The story does not rush over important plot points or excessively focus on minor ones.
-    - Flow: Chapters flow logically into each other with a clear and consistent narrative structure.
-    - Genre: The tone and content of the outline clearly support a specific genre.
+- Pacing: The story does not rush over important plot points or excessively focus on minor ones.
+- Flow: Chapters flow logically into each other with a clear and consistent narrative structure.
+- Completeness: The outline presents a full and coherent story from beginning to end.
 
 Give a JSON formatted response, containing the key \"IsComplete\" with a boolean value (true/false).
-Please do not include any other text, just the JSON as your response will be parsed by a computer.
+Please do not include any other text, just the JSON.
 """
-JSON_PARSE_ERROR = "Please revise your JSON. It encountered the following error during parsing: {_Error}. Remember that your entire response is plugged directly into a JSON parser, so don't write **anything** except pure json."
-CRITIC_CHAPTER_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
+
+# --- NEW: Specific prompt for JSON parsing errors ---
+JSON_PARSE_ERROR = "Your previous response was not valid JSON and could not be parsed. The parser returned the following error: `{_Error}`. It is crucial that your entire response be a single, valid JSON object. Please correct your response and provide only the valid JSON."
+
 CRITIC_CHAPTER_PROMPT = """<CHAPTER>
 {_Chapter}
 </CHAPTER>
 
-Please give feedback on the above chapter based on the following criteria:
-    - Pacing & Flow: Is the pacing effective? Does the chapter connect well with an implied previous chapter?
-    - Characterization: Are the characters believable? Is their dialogue and development effective?
-    - Narrative Quality: Is the writing engaging? Is the plot advanced in a meaningful way?
+Please give feedback on the above chapter based on pacing, flow, characterization, and overall narrative quality.
 """
-CHAPTER_COMPLETE_INTRO = "You are a helpful AI Assistant. Answer the user's prompts to the best of your abilities."
+
 CHAPTER_COMPLETE_PROMPT = """
 <CHAPTER>
 {_Chapter}
 </CHAPTER>
 
 Does this chapter meet the following criteria?
-    - Pacing and Flow: The chapter is well-paced and flows logically.
-    - Quality Writing: The chapter is engaging, detailed, and contributes effectively to the story.
-    - Narrative Cohesion: The chapter feels like a complete and coherent part of a larger novel.
+- Pacing and Flow: The chapter is well-paced and flows logically.
+- Quality Writing: The chapter is engaging, detailed, and written in a sophisticated, human-like style.
+- Narrative Cohesion: The chapter feels like a complete part of a larger novel.
 
-Give a JSON formatted response, containing the key \"IsComplete\", with a boolean value (true/false).
-Please do not include any other text, just the JSON as your response will be parsed by a computer.
+Give a JSON formatted response, with the key \"IsComplete\" and a boolean value (true/false).
+Please do not include any other text, just the JSON.
 """
 CHAPTER_EDIT_PROMPT = """
 You are a developmental editor performing a holistic edit on a chapter to ensure it fits perfectly within the novel.
+
+# STYLE GUIDE
+---
+{style_guide}
+---
 
 # FULL STORY OUTLINE
 For context, here is the master outline for the entire novel.
@@ -600,19 +510,19 @@ For context, here is the master outline for the entire novel.
 ---
 
 # FULL TEXT OF OTHER CHAPTERS
-Here is the text of the surrounding chapters. Use this to ensure seamless transitions, consistent character voice, and coherent plot progression.
+Here is the text of the surrounding chapters. Use this to ensure seamless transitions and consistent character voice.
 ---
 {NovelText}
 ---
 
 # CHAPTER TO EDIT
-Now, please perform a detailed edit of the following chapter, Chapter {i}.
+Now, please perform a detailed edit of Chapter {i}.
 ---
 {_Chapter}
 ---
 
 # YOUR TASK
-Rewrite Chapter {i}. Improve its prose, pacing, dialogue, and character moments. Most importantly, ensure it aligns perfectly with the full story outline and connects seamlessly with the other chapters provided. Do not just summarize; perform a deep, line-by-line developmental edit. Output only the revised chapter text.
+Rewrite Chapter {i}. Improve its prose, pacing, and dialogue. Most importantly, ensure it aligns perfectly with the STYLE GUIDE, the full story outline, and connects seamlessly with the other chapters provided. Output only the revised chapter text.
 """
 CHAPTER_SCRUB_PROMPT = """
 <CHAPTER>
@@ -620,102 +530,142 @@ CHAPTER_SCRUB_PROMPT = """
 </CHAPTER>
 
 Given the above chapter, please clean it up so that it is ready to be published.
-That is, please remove any leftover outlines, author notes, or editorial comments, leaving only the finished story text.
-
-Do not comment on your task, as your output will be the final print version.
+Remove any leftover outlines, author notes, or editorial comments, leaving only the finished story text.
+Do not comment on your task; your output will be the final print version.
 """
 STATS_PROMPT = """
-Please write a JSON formatted response with no other content with the following keys.
-Note that a computer is parsing this JSON so it must be correct.
-
-Base your answers on the story written in previous messages.
+Please write a JSON formatted response based on the story written in previous messages.
 
 {{
-"Title": "a short title that's three to eight words",
-"Summary": "a paragraph or two that summarizes the story from start to finish",
-"Tags": "a string of tags separated by commas that describe the story",
+"Title": "a short, evocative title for the story",
+"Summary": "a paragraph that summarizes the story from start to finish",
+"Tags": "a string of tags separated by commas that describe the story's genre and themes",
 "OverallRating": "your overall score for the story from 0-100"
 }}
 
-Again, remember to make your response JSON formatted with no extra words. It will be fed directly to a JSON parser.
+Remember to make your response valid JSON with no extra words.
 """
 
 # ======================================================================================
-# Prompts for Scene-by-Scene Generation
+# Prompts for Scene-by-Scene Generation (Refactored)
 # ======================================================================================
 
-DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant."""
 CHAPTER_TO_SCENES = """
-# CONTEXT #
-I am writing a story based on the high-level user prompt below. This is the ultimate source of truth for the story's direction.
+# CONTEXT
+I am writing a story based on the high-level user prompt below.
 <USER_PROMPT>
 {_Prompt}
 </USER_PROMPT>
 
-Below is my overall novel outline, which was derived from the user prompt:
+Below is my overall novel outline derived from that prompt:
 <OUTLINE>
 {_Outline}
 </OUTLINE>
 
-# OBJECTIVE #
-Create a scene-by-scene outline for the chapter detailed below.
-This outline will be used to write the chapter, so be detailed. For each scene, describe what happens, its tone, the characters present, and the setting.
-Crucially, ensure the scenes you design are directly inspired by and consistent with the original <USER_PROMPT>.
+# OBJECTIVE
+Create a detailed scene-by-scene outline for the chapter detailed below. For each scene, describe what happens, its tone, the characters present, and the setting.
 
-Here's the specific chapter outline that we need to split up into scenes:
+Here's the specific chapter outline to expand into scenes:
 <CHAPTER_OUTLINE>
 {_ThisChapter}
 </CHAPTER_OUTLINE>
 
-# STYLE #
-Provide a creative response that adds depth and plot to the story while still following the provided chapter outline and, most importantly, the original user prompt.
-Format your response in markdown, with clear headings for each scene.
-
-# RESPONSE #
-Be detailed and well-formatted in your response, yet ensure you have a well-thought-out and creative output.
+# REQUIREMENTS
+- You MUST generate a minimum of 3 scenes. If the chapter outline is simple, expand it with additional character moments or complications that fit the narrative.
+- Format your response in markdown, with clear headings for each scene. Add enough detail to guide the writing of a full scene.
 """
+
 SCENES_TO_JSON = """
-# CONTEXT #
+# CONTEXT
 I need to convert the following scene-by-scene outline into a JSON formatted list of strings.
 <SCENE_OUTLINE>
 {_Scenes}
 </SCENE_OUTLINE>
 
-# OBJECTIVE #
-Create a JSON list where each element in the list is a string containing the full markdown content for that scene.
+# OBJECTIVE
+Create a JSON list where each element is a string containing the full markdown content for one scene.
 Example:
 [
-    "## Scene 1: The Confrontation\\n- **Characters:** Kaelan, Informant\\n- **Setting:** The Rusty Flagon tavern\\n- **Events:** Kaelan meets the informant...",
-    "## Scene 2: The Escape\\n- **Characters:** Kaelan\\n- **Setting:** The city streets\\n- **Events:** Kaelan is pursued by city guards..."
+    "## Scene 1: The Confrontation\\n- **Characters:** Kaelan, Informant\\n- **Setting:** The Rusty Flagon...",
+    "## Scene 2: The Escape\\n- **Characters:** Kaelan\\n- **Setting:** The city streets..."
 ]
 
-Do not include any other json fields; it must be a simple list of strings.
-
-# STYLE #
-Respond in pure, valid JSON.
-
-# RESPONSE #
-Do not lose any information from the original outline; just format it to fit into a JSON list of strings.
+Do not include any other json fields; it must be a simple list of strings. Respond in pure, valid JSON. Do not lose any information from the original outline.
 """
+
 SCENE_OUTLINE_TO_SCENE = """
-# CONTEXT #
+# CONTEXT
 You are a creative writer. I need your help writing a full scene based on the scene outline below.
-For context, here is a summary of the story and relevant events so far:
+Here is a summary of the story and relevant events so far:
 ---
 {narrative_context}
 ---
 
-# OBJECTIVE #
-Write a full, engaging scene based on the following scene outline.
-Include dialogue, character actions, thoughts, and descriptions as appropriate to bring the scene to life.
+# STYLE GUIDE
+---
+{style_guide}
+---
+
+# OBJECTIVE
+Write a full, engaging scene based on the following scene outline. Include dialogue, character actions, thoughts, and descriptions as appropriate.
 
 <SCENE_OUTLINE>
 {_SceneOutline}
 </SCENE_OUTLINE>
 
-# STYLE #
-Your writing style should be creative and match the tone described in the scene outline. If no tone is specified, use your best judgment based on the events and character motivations. (Show, don't tell).
+Your writing style must adhere to the **STYLE GUIDE**. Show, don't tell. Focus on psychological depth and sensory details.
+Output only the scene's text.
+"""
 
-# RESPONSE #
-Ensure your response is a well-thought-out and creative piece of writing that follows the provided scene outline and fits coherently into the larger story based on the context provided. Output only the scene's text.
+CONTINUE_SCENE_PIECE_PROMPT = """
+# CONTEXT
+You are writing a scene for a novel, continuing from where the last writer left off.
+Here is a summary of what has happened in the scene so far:
+---
+{summary_of_previous_pieces}
+---
+
+# SCENE GOALS
+This is the overall outline for the *entire* scene you are writing. Use it to understand the scene's ultimate destination.
+---
+{_SceneOutline}
+---
+
+# STYLE GUIDE
+---
+{style_guide}
+---
+
+# YOUR TASK
+Write the very next part of the scene, picking up *immediately* where the previous part left off.
+- Write approximately 300-400 words.
+- Your writing must flow seamlessly from the summary of the previous pieces.
+- Continue to advance the plot and character development towards the goals in the **SCENE GOALS**.
+- Adhere strictly to the **STYLE GUIDE**.
+
+Do not repeat what has already happened. Do not summarize. Do not add author notes. Write only the next block of prose for the scene.
+"""
+
+IS_SCENE_COMPLETE_PROMPT = """
+You are a story structure analyst. You need to determine if a scene has reached a satisfactory conclusion based on its objectives.
+
+# SCENE OUTLINE / GOALS
+This is what the scene was supposed to accomplish.
+---
+{_SceneOutline}
+---
+
+# GENERATED SCENE TEXT
+This is the full text of the scene that has been written so far.
+---
+{full_scene_text}
+---
+
+# YOUR TASK
+Has the "GENERATED SCENE TEXT" fully and satisfactorily accomplished all the key objectives described in the "SCENE OUTLINE / GOALS"?
+- Consider if the plot points have been addressed and character moments have occurred.
+- Consider if the scene has reached a logical stopping point or a natural transition point.
+
+Respond with a single JSON object with one key, "IsComplete", and a boolean value (true/false).
+Do not include any other text. Example: `{{ "IsComplete": true }}`
 """

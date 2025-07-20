@@ -1,9 +1,9 @@
-import Writer.LLMEditor
-import Writer.PrintUtils
 import Writer.Config
+from Writer.Interface.Wrapper import Interface
+from Writer.PrintUtils import Logger
 
 
-def GenerateStoryElements(Interface, _Logger, _OutlinePrompt):
+def GenerateStoryElements(Interface: Interface, _Logger: Logger, _OutlinePrompt: str):
 
     Prompt: str = f"""
 I'm working on writing a fictional story, and I'd like your help writing out the story elements.

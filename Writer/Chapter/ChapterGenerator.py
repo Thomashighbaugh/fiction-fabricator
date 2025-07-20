@@ -58,9 +58,6 @@ def GenerateChapter(
 
     # --- Step 2: Generate Initial Chapter Draft ---
 
-    # Get the rich context summary from the narrative context object
-    context_for_generation = narrative_context.get_context_for_chapter_generation(_ChapterNum)
-
     if Writer.Config.SCENE_GENERATION_PIPELINE:
         # Use the Scene-by-Scene pipeline for the initial draft
         _Logger.Log(f"Using Scene-by-Scene pipeline for Chapter {_ChapterNum}.", 3)
@@ -76,7 +73,7 @@ def GenerateChapter(
             Interface, _Logger, "Plot Generation",
             Writer.Prompts.CHAPTER_GENERATION_STAGE1,
             {"ThisChapterOutline": chapter_specific_outline, "Feedback": ""},
-            context_for_generation, _ChapterNum, _TotalChapters,
+            _ChapterNum, _TotalChapters,
             Writer.Config.CHAPTER_STAGE1_WRITER_MODEL,
             narrative_context
         )
@@ -86,7 +83,7 @@ def GenerateChapter(
             Interface, _Logger, "Character Development",
             Writer.Prompts.CHAPTER_GENERATION_STAGE2,
             {"ThisChapterOutline": chapter_specific_outline, "Stage1Chapter": plot_text, "Feedback": ""},
-            context_for_generation, _ChapterNum, _TotalChapters,
+            _ChapterNum, _TotalChapters,
             Writer.Config.CHAPTER_STAGE2_WRITER_MODEL,
             narrative_context
         )
@@ -96,7 +93,7 @@ def GenerateChapter(
             Interface, _Logger, "Dialogue Addition",
             Writer.Prompts.CHAPTER_GENERATION_STAGE3,
             {"ThisChapterOutline": chapter_specific_outline, "Stage2Chapter": char_dev_text, "Feedback": ""},
-            context_for_generation, _ChapterNum, _TotalChapters,
+            _ChapterNum, _TotalChapters,
             Writer.Config.CHAPTER_STAGE3_WRITER_MODEL,
             narrative_context
         )
@@ -135,7 +132,10 @@ def GenerateChapter(
             revision_prompt = Writer.Prompts.CHAPTER_REVISION.format(
                 _Chapter=current_chapter_text, _Feedback=feedback
             )
-            revision_messages = [Interface.BuildUserQuery(revision_prompt)]
+            revision_messages = [
+                Interface.BuildSystemQuery(Writer.Prompts.LITERARY_STYLE_GUIDE),
+                Interface.BuildUserQuery(revision_prompt)
+            ]
 
             # Use robust word count and a high floor for revisions
             word_count = len(re.findall(r'\b\w+\b', current_chapter_text))
@@ -172,7 +172,6 @@ def execute_generation_stage(
     stage_name: str,
     prompt_template: str,
     format_args: dict,
-    narrative_context_str: str,
     chapter_num: int,
     total_chapters: int,
     model: str,
@@ -186,6 +185,8 @@ def execute_generation_stage(
 
     # --- Initial Generation ---
     _Logger.Log(f"Generating initial content for {stage_name}...", 3)
+    
+    narrative_context_str = narrative_context.get_context_for_chapter_generation(chapter_num)
 
     full_format_args = {
         "narrative_context": narrative_context_str,
@@ -194,18 +195,19 @@ def execute_generation_stage(
         **format_args
     }
     prompt = prompt_template.format(**full_format_args)
-    messages = [Interface.BuildUserQuery(prompt)]
+    messages = [
+        Interface.BuildSystemQuery(Writer.Prompts.LITERARY_STYLE_GUIDE),
+        Interface.BuildUserQuery(prompt)
+    ]
 
     # Set minimum word count with a high floor to prevent cascading failures
     min_words = 200  # Default for Stage 1 (Plot)
-
     if "Stage2Chapter" in format_args: # Stage 3 (Dialogue)
         word_count = len(re.findall(r'\b\w+\b', format_args["Stage2Chapter"]))
         min_words = max(250, int(word_count * 0.95))
     elif "Stage1Chapter" in format_args: # Stage 2 (Char Dev)
         word_count = len(re.findall(r'\b\w+\b', format_args["Stage1Chapter"]))
         min_words = max(250, int(word_count * 0.95))
-
 
     messages = Interface.SafeGenerateText(
         _Logger, messages, model, min_word_count_target=min_words
@@ -215,7 +217,7 @@ def execute_generation_stage(
     # --- Critique and Revise ---
     _Logger.Log(f"Critiquing and revising content for {stage_name}...", 3)
 
-    task_description = f"You are writing a novel. Your current task is '{stage_name}' for Chapter {chapter_num}. You need to generate content that fulfills this stage's specific goal (e.g., plot, character development, dialogue) while remaining coherent with the overall story."
+    task_description = f"You are writing a novel. Your current task is '{stage_name}' for Chapter {chapter_num}. You need to generate content that fulfills this stage's specific goal (e.g., plot, character development, dialogue) while remaining coherent with the overall story and adhering to a dark, literary style."
 
     revised_content = Writer.CritiqueRevision.critique_and_revise_creative_content(
         Interface,
@@ -224,6 +226,7 @@ def execute_generation_stage(
         task_description=task_description,
         narrative_context_summary=narrative_context_str,
         initial_user_prompt=narrative_context.initial_prompt,
+        style_guide=narrative_context.style_guide,
     )
 
     _Logger.Log(f"Finished stage: {stage_name}", 5)

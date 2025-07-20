@@ -70,3 +70,4 @@ def ScrubNovel(
 
     _Logger.Log("Finished scrubbing all chapters.", 2)
     return narrative_context
+

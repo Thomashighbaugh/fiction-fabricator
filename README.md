@@ -2,17 +2,17 @@
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 
-Fiction Fabricator is an advanced, AI-powered framework for generating complete, multi-chapter novels from a single creative prompt. It leverages a suite of modern Language Learning Models (LLMs) through a unified interface, employing a sophisticated, multi-stage pipeline of outlining, scene-by-scene generation, and iterative revision to produce high-quality, coherent long-form narratives.
+Fiction Fabricator is an advanced, AI-powered framework for generating complete, multi-chapter novels, short stories, and episodic web novel chapters from creative prompts. It leverages a suite of modern Language Learning Models (LLMs) through a unified interface, employing a sophisticated, multi-stage pipeline of outlining, scene-by-scene generation, and iterative revision to produce high-quality, coherent long-form narratives.
 
 ## Acknowledgement of Origin
 
-This project is a significantly modified and enhanced fork of **[AIStoryteller by datacrystals](https://github.com/datacrystals/AIStoryteller)**. I would like to expressing extend my immense gratitude to the original author for providing the foundational concepts and architecture. Fiction Fabricator builds upon that excellent groundwork with new features, a refactored generation pipeline, and a robust, multi-provider backend to suit a different set of use cases focused on flexibility, quality, and developer control.
+This project is a significantly modified and enhanced fork of **[AIStoryteller by datacrystals](httpss://github.com/datacrystals/AIStoryteller)**. I would like to expressing extend my immense gratitude to the original author for providing the foundational concepts and architecture. Fiction Fabricator builds upon that excellent groundwork with new features, a refactored generation pipeline, and a robust, multi-provider backend to suit a different set of use cases focused on flexibility, quality, and developer control.
 
 ---
 
 ## Full Documentation
 
-For detailed guides on how to install, configure, and use Fiction Fabricator, please see the full documentation linked below.
+For detailed guides on how to install, configure, and use Fiction Fabricator—including its new short story and web novel tools—please see the full documentation linked below.
 
 - **[1. Introduction and Features](./.github/documentation/1_introduction_and_features.md)**
 - **[2. Installation Guide](./.github/documentation/2_installation_guide.md)**

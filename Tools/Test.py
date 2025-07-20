@@ -97,6 +97,21 @@ MODEL_CONFIGS = {
             "CritiqueLLM": "ollama://llama3:70b",
         }
     },
+    "7": {
+        "name": "NVIDIA Llama3 70B (Full Stack)",
+        "models": {
+            "InitialOutlineModel": "nvidia://meta/llama3-70b-instruct",
+            "ChapterOutlineModel": "nvidia://meta/llama3-70b-instruct",
+            "ChapterS1Model": "nvidia://meta/llama3-70b-instruct",
+            "ChapterS2Model": "nvidia://meta/llama3-70b-instruct",
+            "ChapterS3Model": "nvidia://meta/llama3-70b-instruct",
+            "ChapterRevisionModel": "nvidia://meta/llama3-70b-instruct",
+            "RevisionModel": "nvidia://meta/llama3-70b-instruct",
+            "EvalModel": "nvidia://meta/llama3-70b-instruct",
+            "InfoModel": "nvidia://meta/llama3-70b-instruct",
+            "CritiqueLLM": "nvidia://meta/llama3-70b-instruct",
+        }
+    },
 }
 
 # --- User Input ---
@@ -118,24 +133,41 @@ if choice not in MODEL_CONFIGS:
 selected_config = MODEL_CONFIGS[choice]
 
 # Get Choice For Prompt
+# --- CORRECTED: Use `Prompts/` directory instead of non-existent `ExamplePrompts/` ---
 print("\nChoose Prompt:")
 print("-------------------------------------------")
-print("1 -> ExamplePrompts/Example1/Prompt.txt (Default)")
-print("2 -> ExamplePrompts/Example2/Prompt.txt")
-print("3 -> Custom Prompt")
+# List available prompt directories dynamically
+prompt_base_dir = "Prompts"
+available_prompts = []
+if os.path.isdir(prompt_base_dir):
+    for item in sorted(os.listdir(prompt_base_dir)):
+        item_path = os.path.join(prompt_base_dir, item)
+        prompt_file = os.path.join(item_path, "prompt.txt")
+        if os.path.isdir(item_path) and os.path.isfile(prompt_file):
+            available_prompts.append(prompt_file)
+
+if not available_prompts:
+    print("No prompts found in the 'Prompts/' directory.")
+    print("Please create one first using Tools/PromptGenerator.py")
+    exit()
+
+for i, p_file in enumerate(available_prompts):
+    print(f"{i+1} -> {p_file}")
 print("-------------------------------------------")
 prompt_choice = input("> ")
 
 prompt_file = ""
-if prompt_choice in ["", "1"]:
-    prompt_file = "ExamplePrompts/Example1/Prompt.txt"
-elif prompt_choice == "2":
-    prompt_file = "ExamplePrompts/Example2/Prompt.txt"
-elif prompt_choice == "3":
-    prompt_file = input("Enter Prompt File Path: ")
-else:
-    print("Invalid prompt choice. Using default.")
-    prompt_file = "ExamplePrompts/Example1/Prompt.txt"
+try:
+    choice_index = int(prompt_choice) - 1
+    if 0 <= choice_index < len(available_prompts):
+        prompt_file = available_prompts[choice_index]
+    else:
+        print("Invalid prompt choice. Exiting.")
+        exit()
+except (ValueError, IndexError):
+    print("Invalid selection. Exiting.")
+    exit()
+
 
 # Get Any Extra Flags
 print("\nExtra Flags (e.g., -Debug -NoScrubChapters):")
@@ -150,14 +182,15 @@ if extra_flags == "":
 # --- Command Construction and Execution ---
 
 # Build the base command
+# Corrected to be run from the project root where Test.py is located
 command_parts = [
-    "cd .. && ./Write.py",
-    f"-Prompt {prompt_file}",
+    "python ./Write.py",
+    f"-Prompt \"{prompt_file}\"", # Use quotes for paths with spaces
     "-Seed 999",  # Use a consistent seed for reproducibility
 ]
 
 # Add model arguments from the selected configuration
-for model_arg, model_name in selected_config["models"].items():
+for model_arg, model_name in selected_config['models'].items():
     command_parts.append(f"-{model_arg} \"{model_name}\"")
 
 # Add extra flags

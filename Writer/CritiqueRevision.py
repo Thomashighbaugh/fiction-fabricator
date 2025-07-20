@@ -8,6 +8,31 @@ from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
 
 
+def _clean_revised_content(
+    Interface: Interface,
+    _Logger: Logger,
+    text_to_clean: str
+) -> str:
+    """
+    Takes text from a revision process and cleans out any non-narrative artifacts.
+    This is a fast, non-creative cleanup step.
+    """
+    if not text_to_clean or "[ERROR:" in text_to_clean:
+        return text_to_clean
+
+    _Logger.Log("Performing final cleanup on revised content...", 1)
+
+    prompt = Writer.Prompts.CLEAN_REVISED_TEXT_PROMPT.format(text_to_clean=text_to_clean)
+    messages = [Interface.BuildUserQuery(prompt)]
+    min_word_target = int(len(text_to_clean.split()) * 0.7)
+
+    response_history = Interface.SafeGenerateText(
+        _Logger, messages, Writer.Config.CHECKER_MODEL, min_word_count_target=max(50, min_word_target)
+    )
+
+    return Interface.GetLastMessageText(response_history)
+
+
 def critique_and_revise_creative_content(
     Interface: Interface,
     _Logger: Logger,
@@ -15,34 +40,23 @@ def critique_and_revise_creative_content(
     task_description: str,
     narrative_context_summary: str,
     initial_user_prompt: str,
+    style_guide: str,
     is_json: bool = False,
 ) -> str:
     """
     Orchestrates the critique and revision process for a piece of generated creative content.
-    This process is a single pass: critique -> revise.
-
-    1. Prompts a critique LLM to generate feedback on the initial_content.
-    2. Prompts a revision LLM to revise the initial_content based on the received critique.
-
-    Args:
-        Interface: The LLM interface wrapper.
-        _Logger: The logger instance.
-        initial_content: The text to be critiqued and revised.
-        task_description: A description of what the content was supposed to achieve.
-        narrative_context_summary: A summary of the story so far to provide context.
-        initial_user_prompt: The original prompt from the user, to ensure alignment.
-        is_json: A flag to indicate if the content is JSON and should be handled accordingly.
-
-    Returns:
-        The revised content as a string.
+    This process is a single pass: critique -> revise -> clean.
     """
+    # --- FIXED: Add robustness check for initial content ---
+    if not initial_content or not initial_content.strip() or "[ERROR:" in initial_content:
+        _Logger.Log("CritiqueRevision called with empty, invalid, or error-containing initial content. Skipping process.", 6)
+        return initial_content
 
     # --- Step 1: Generate Critique ---
     _Logger.Log("Starting critique generation for the latest content.", 5)
 
     json_guidance = (
-        "The content is JSON. Focus your critique on the substance, clarity, and narrative value "
-        "of the data within the JSON structure, not just the format. Respond with your critique as a plain string."
+        "The content is JSON. Focus your critique on the substance, clarity, and narrative value of the data. Respond with your critique as a plain string."
     ) if is_json else "Respond with your critique as a plain string."
 
     critique_prompt = Writer.Prompts.CRITIQUE_CREATIVE_CONTENT_PROMPT.format(
@@ -50,32 +64,30 @@ def critique_and_revise_creative_content(
         task_description=task_description,
         narrative_context_summary=narrative_context_summary,
         initial_user_prompt=initial_user_prompt,
+        style_guide=style_guide,
         is_json_output=json_guidance
     )
-
-    critique_messages = [Interface.BuildUserQuery(critique_prompt)]
-
-    critique_model = Writer.Config.CRITIQUE_LLM if hasattr(Writer.Config, 'CRITIQUE_LLM') else Writer.Config.REVISION_MODEL
-
+    critique_messages = [Interface.BuildSystemQuery(style_guide), Interface.BuildUserQuery(critique_prompt)]
+    critique_model = Writer.Config.CRITIQUE_LLM
+    
     critique_messages = Interface.SafeGenerateText(
-        _Logger,
-        critique_messages,
-        critique_model,
-        min_word_count_target=40 # Critiques should be substantive
+        _Logger, critique_messages, critique_model, min_word_count_target=100
     )
     critique = Interface.GetLastMessageText(critique_messages)
-    _Logger.Log(f"Critique received:\n---\n{critique}\n---", 4)
+    _Logger.Log(f"Critique received:\n---\n{critique}\n---", 1)
+
+    # --- FIXED: Handle critique failure gracefully ---
+    if "[ERROR:" in critique or not critique.strip():
+        _Logger.Log("Critique step failed or returned empty. Skipping revision and returning original content.", 6)
+        return initial_content
 
     # --- Step 2: Generate Revision ---
     _Logger.Log("Starting revision based on the received critique.", 5)
 
     json_instructions = (
-        "Important: Your final output must be a single, valid JSON object, just like the original. "
-        "Revise the *content* within the JSON structure based on the critique. "
-        "Do not add any explanatory text, comments, or markdown outside of the JSON object itself."
+        "Important: Your final output must be a single, valid JSON object. Revise the *content* within the JSON structure based on the critique. Do not add any explanatory text outside of the JSON object itself."
     ) if is_json else (
-        "Ensure your final output is only the revised text. Maintain the original's intent and narrative role, "
-        "but improve it by addressing the points in the critique. Do not write a reflection on the changes."
+        "Ensure your final output is only the revised text. Do not write a reflection on the changes."
     )
 
     revision_prompt = Writer.Prompts.REVISE_CREATIVE_CONTENT_BASED_ON_CRITIQUE_PROMPT.format(
@@ -84,33 +96,40 @@ def critique_and_revise_creative_content(
         task_description=task_description,
         narrative_context_summary=narrative_context_summary,
         initial_user_prompt=initial_user_prompt,
+        style_guide=style_guide,
         json_instructions=json_instructions
     )
-
-    revision_messages = [Interface.BuildUserQuery(revision_prompt)]
-
+    revision_messages = [Interface.BuildSystemQuery(style_guide), Interface.BuildUserQuery(revision_prompt)]
     revision_model = Writer.Config.CHAPTER_REVISION_WRITER_MODEL
-    revision_format = "json" if is_json else None
 
+    revised_content_messy = ""
     if is_json:
-        final_messages, _ = Interface.SafeGenerateJSON(
-            _Logger,
-            revision_messages,
-            revision_model
-        )
-        revised_content = Interface.GetLastMessageText(final_messages)
+        _, revised_json = Interface.SafeGenerateJSON(_Logger, revision_messages, revision_model)
+        if not revised_json:
+             _Logger.Log("Revision step failed to produce valid JSON. Returning original content.", 6)
+             return initial_content
+        revised_content_messy = json.dumps(revised_json, indent=2)
     else:
-        # Use robust word count with a high floor to ensure revisions are substantial.
         word_count = len(re.findall(r'\b\w+\b', initial_content))
         min_words = max(100, int(word_count * 0.8))
         final_messages = Interface.SafeGenerateText(
-            _Logger,
-            revision_messages,
-            revision_model,
-            _Format=revision_format,
-            min_word_count_target=min_words
+            _Logger, revision_messages, revision_model, min_word_count_target=min_words
         )
-        revised_content = Interface.GetLastMessageText(final_messages)
+        revised_content_messy = Interface.GetLastMessageText(final_messages)
+
+    # --- FIXED: Handle revision failure gracefully ---
+    if "[ERROR:" in revised_content_messy or not revised_content_messy.strip():
+        _Logger.Log("Revision step failed or returned empty. Returning original content.", 6)
+        return initial_content
 
     _Logger.Log("Content revision complete.", 4)
-    return revised_content
+
+    # --- Step 3: Clean the revised content ---
+    if is_json:
+        return revised_content_messy
+    else:
+        cleaned_content = _clean_revised_content(Interface, _Logger, revised_content_messy)
+        if "[ERROR:" in cleaned_content or not cleaned_content.strip():
+             _Logger.Log("Final cleaning step failed. Returning the pre-cleaned (but revised) content.", 6)
+             return revised_content_messy
+        return cleaned_content

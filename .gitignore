@@ -165,6 +165,8 @@ Prompts/*
 Premises/*
 PremiseGenLogs/*
 PromptGenLogs/*
+/Short_Story/*
+/Web_Novel_Chapters/*
 Logs/*
 EvalLogs/*
 node_modules/*

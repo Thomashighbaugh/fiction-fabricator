@@ -61,10 +61,14 @@ def EditNovel(
             _Outline=narrative_context.base_novel_outline_markdown,
             NovelText=novel_text_context,
             i=chapter_num,
-            _Chapter=chapter_to_edit_content
+            _Chapter=chapter_to_edit_content,
+            style_guide=narrative_context.style_guide
         )
 
-        messages = [Interface.BuildUserQuery(prompt)]
+        messages = [
+            Interface.BuildSystemQuery(narrative_context.style_guide),
+            Interface.BuildUserQuery(prompt)
+        ]
 
         min_words = int(len(chapter_to_edit_content.split()) * 0.9)
 
@@ -79,7 +83,7 @@ def EditNovel(
         task_description = (
             f"You are performing a final, holistic edit on Chapter {chapter_num}. "
             "Your goal is to refine the chapter to improve its pacing, prose, and consistency, "
-            f"ensuring it flows perfectly with the preceding and succeeding chapters."
+            f"ensuring it flows perfectly with the preceding and succeeding chapters and adheres to the novel's dark, literary style."
         )
 
         context_summary = narrative_context.get_full_story_summary_so_far()
@@ -91,6 +95,7 @@ def EditNovel(
             task_description=task_description,
             narrative_context_summary=context_summary,
             initial_user_prompt=narrative_context.initial_prompt,
+            style_guide=narrative_context.style_guide,
         )
 
         # Update the chapter in the narrative context object
