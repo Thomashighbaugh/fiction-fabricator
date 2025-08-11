@@ -19,6 +19,7 @@ For detailed guides on how to install, configure, and use Fiction Fabricator—i
 - **[3. Configuration Guide](./.github/documentation/3_configuration_guide.md)**
 - **[4. Usage Workflow](./.github/documentation/4_usage_workflow.md)**
 - **[5. Advanced Tools](./.github/documentation/5_advanced_tools.md)**
+- **[6. Maintenance](./.github/documentation/6_maintenance.md)**
 
 ---
 
