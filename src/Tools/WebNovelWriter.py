@@ -16,6 +16,7 @@ import Writer.StoryInfo
 import Writer.Prompts
 from Writer.NarrativeContext import NarrativeContext
 from Writer.LLMUtils import get_llm_selection_menu_for_tool
+from Writer.Scene.SceneFileManager import SceneFileManager
 
 def write_web_novel_chapter(logger: Logger, interface: Interface, prompt_file: str, chapter_number: int, lore_book: str = None):
     """
@@ -36,6 +37,9 @@ def write_web_novel_chapter(logger: Logger, interface: Interface, prompt_file: s
     story_dir = os.path.join("Generated_Content", "Web_Novel_Chapters", story_name)
     os.makedirs(story_dir, exist_ok=True)
     context_file_path = os.path.join(story_dir, f"{story_name}_context.json")
+    
+    # Initialize file manager for error-resilient file output
+    file_manager = SceneFileManager(logger, story_dir, f"{story_name}_Chapter_{chapter_number}")
 
     # --- Load or Initialize Narrative Context ---
     narrative_context = None
@@ -83,7 +87,7 @@ def write_web_novel_chapter(logger: Logger, interface: Interface, prompt_file: s
     
     # The total number of chapters is unknown, so we pass 0.
     # The model is passed directly to the chapter generator.
-    Writer.Chapter.ChapterGenerator.GenerateChapter(interface, logger, chapter_number, 0, narrative_context, selected_model)
+    Writer.Chapter.ChapterGenerator.GenerateChapter(interface, logger, chapter_number, 0, narrative_context, selected_model, file_manager)
 
     # --- Finalization and Saving ---
     if not narrative_context.chapters or narrative_context.chapters[-1].chapter_number != chapter_number:
@@ -122,12 +126,38 @@ def write_web_novel_chapter(logger: Logger, interface: Interface, prompt_file: s
     with open(json_file_path, "w", encoding="utf-8") as f:
         json.dump(new_chapter.to_dict(), f, indent=4)
 
+    # Create a single-chapter book file for this web novel chapter
+    single_chapter_context = NarrativeContext(
+        initial_prompt=narrative_context.initial_prompt,
+        style_guide=narrative_context.style_guide,
+        lore_book_content=narrative_context.lore_book_content
+    )
+    single_chapter_context.story_type = "web_novel"
+    single_chapter_context.add_chapter(new_chapter)
+    
+    # Generate additional files using file manager
+    book_file_path = file_manager.stitch_book_from_chapters(single_chapter_context, f"{story_name} - Chapter {chapter_number}")
+    report_file_path = file_manager.create_generation_report(single_chapter_context)
+    
+    # Get all generated files for final summary
+    all_files = file_manager.get_all_output_files()
+
     logger.Log("Chapter generation complete!", 5)
     final_message = f"""
 --------------------------------------------------
-Output Files Saved:
+Web Novel Chapter Generation Complete!
+
+Traditional Output Files:
 - Markdown Chapter: {os.path.abspath(md_file_path)}
 - JSON Data File: {os.path.abspath(json_file_path)}
 - Story Context File: {os.path.abspath(context_file_path)}
+
+Scene-Based Files Created:
+- Complete Chapter Book: {os.path.abspath(book_file_path) if book_file_path else 'Failed to create'}
+- Generation Report: {os.path.abspath(report_file_path) if report_file_path else 'Failed to create'}
+
+Scene Files: {len(all_files.get('scenes', []))} | Chapter Files: {len(all_files.get('chapters', []))}
+
+All files are preserved individually to prevent data loss!
 --------------------------------------------------"""
     print(termcolor.colored(final_message, "green"))

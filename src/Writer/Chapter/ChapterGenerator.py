@@ -20,6 +20,7 @@ def GenerateChapter(
     _TotalChapters: int,
     narrative_context: NarrativeContext,
     selected_model: str,
+    file_manager=None,
 ) -> str:
     """
     Generates a single chapter of the novel, either through a multi-stage process or
@@ -63,7 +64,7 @@ def GenerateChapter(
         # Use the Scene-by-Scene pipeline for the initial draft
         _Logger.Log(f"Using Scene-by-Scene pipeline for Chapter {_ChapterNum}.", 3)
         initial_chapter_draft = Writer.Scene.ChapterByScene.ChapterByScene(
-            Interface, _Logger, chapter_context, narrative_context, selected_model
+            Interface, _Logger, chapter_context, narrative_context, selected_model, file_manager
         )
     else:
         # Use the multi-stage generation pipeline for the initial draft
@@ -191,6 +192,12 @@ def GenerateChapter(
     _Logger.Log(f"Chapter {chapter_context.chapter_number} Summary: {chapter_context.summary}", 2)
 
     narrative_context.add_chapter(chapter_context)
+    
+    # --- Step 5: Save Chapter File ---
+    if file_manager:
+        chapter_file_path = file_manager.stitch_chapter_from_scenes(chapter_context)
+        if chapter_file_path:
+            _Logger.Log(f"Saved chapter file: {chapter_file_path}", 4)
 
     return final_chapter_text
 

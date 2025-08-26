@@ -19,6 +19,7 @@ import Writer.StoryInfo
 import Writer.NovelEditor
 import Writer.Prompts
 from Writer.NarrativeContext import NarrativeContext
+from Writer.Scene.SceneFileManager import SceneFileManager
 
 def get_ollama_models(logger):
     try:
@@ -249,10 +250,13 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
         if not outline_file:
             return
 
-    # --- Set up file paths ---
+    # --- Set up file paths and scene file manager ---
     outline_filename_base = os.path.splitext(os.path.basename(outline_file))[0]
     stories_dir = os.path.join(os.path.dirname(outline_file), "..", "Stories")
     os.makedirs(stories_dir, exist_ok=True)
+    
+    # Initialize the scene file manager for error-resilient file output
+    file_manager = SceneFileManager(SysLogger, stories_dir, outline_filename_base)
     
     file_name_base = os.path.join(stories_dir, outline_filename_base)
     if Writer.Config.OPTIONAL_OUTPUT_NAME:
@@ -326,7 +330,7 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
     if total_chapters > 0 and total_chapters < 100:
         for i in range(start_chapter, total_chapters + 1):
             SysLogger.Log(f"--- Generating Chapter {i} of {total_chapters} ---", 5)
-            Writer.Chapter.ChapterGenerator.GenerateChapter(Interface, SysLogger, i, total_chapters, narrative_context, Writer.Config.CHAPTER_STAGE1_WRITER_MODEL)
+            Writer.Chapter.ChapterGenerator.GenerateChapter(Interface, SysLogger, i, total_chapters, narrative_context, Writer.Config.CHAPTER_STAGE1_WRITER_MODEL, file_manager)
             
             # --- Progressive Save ---
             try:
@@ -388,12 +392,30 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
     with open(json_file_path, "w", encoding="utf-8") as f:
         json.dump(narrative_context.to_dict(), f, indent=4)
     
+    # --- Create Complete Book and Generation Report ---
+    SysLogger.Log("Creating complete book file and generation report...", 4)
+    
+    book_file_path = file_manager.stitch_book_from_chapters(narrative_context, Title)
+    report_file_path = file_manager.create_generation_report(narrative_context)
+    
+    # Get all generated files for final summary
+    all_files = file_manager.get_all_output_files()
+    
     SysLogger.Log("Generation complete!", 5)
     final_message = f"""
 --------------------------------------------------
-Output Files Saved:
+Novel Generation Complete - Error-Resilient Output Created!
+
+Main Output Files:
 - Markdown Story: {os.path.abspath(md_file_path)}
 - JSON Data File: {os.path.abspath(json_file_path)}
+- Complete Book: {os.path.abspath(book_file_path) if book_file_path else 'Failed to create'}
+- Generation Report: {os.path.abspath(report_file_path) if report_file_path else 'Failed to create'}
+
+Scene Files Generated: {len(all_files.get('scenes', []))} files
+Chapter Files Generated: {len(all_files.get('chapters', []))} files
+
+All files are preserved individually to prevent data loss!
 --------------------------------------------------"""
     print(termcolor.colored(final_message, "green"))
 

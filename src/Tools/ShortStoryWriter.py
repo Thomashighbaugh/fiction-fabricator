@@ -111,6 +111,7 @@ Your task is to continue where the story left off. Write the next section, movin
 
 import json
 from Writer.NarrativeContext import NarrativeContext
+from Writer.Scene.SceneFileManager import SceneFileManager
 
 def sanitize_filename(name: str) -> str:
     """Sanitizes a string for use as a filename."""
@@ -226,12 +227,41 @@ def write_short_story(logger: Logger, interface: Interface, outline_file: str, t
     else:
         logger.Log("Critique and revision disabled. Using original story.", 4)
 
-    # --- Step 5: Finalize and Save ---
+    # --- Step 5: Finalize and Save with Scene-Based File Management ---
 
     output_dir = os.path.join(repo_root, "Generated_Content", "Short_Story")
     os.makedirs(output_dir, exist_ok=True)
 
     safe_title = sanitize_filename(title)
+    
+    # Initialize file manager for error-resilient output
+    file_manager = SceneFileManager(logger, output_dir, safe_title)
+    
+    # Create a mock narrative context for the short story to use file manager
+    short_story_context = NarrativeContext(initial_prompt=premise, style_guide=GUIDELINES, lore_book_content=lore_book_content)
+    short_story_context.story_type = "short_story"
+    
+    # Create a single chapter context for the entire short story
+    from Writer.NarrativeContext import ChapterContext, SceneContext
+    chapter_context = ChapterContext(chapter_number=1, initial_outline=outline)
+    chapter_context.set_generated_content(final_story)
+    chapter_context.set_summary(f"Complete short story: {title}")
+    
+    # Create a single scene context containing the entire story
+    scene_context = SceneContext(scene_number=1, initial_outline=outline)
+    scene_context.add_piece(final_story, f"Complete short story: {title}")
+    scene_context.set_final_summary(f"Complete short story: {title}")
+    
+    chapter_context.add_scene(scene_context)
+    short_story_context.add_chapter(chapter_context)
+    
+    # Save individual files using the file manager
+    scene_file_path = file_manager.save_scene_file(scene_context, 1, len(final_story.split()))
+    chapter_file_path = file_manager.stitch_chapter_from_scenes(chapter_context)
+    book_file_path = file_manager.stitch_book_from_chapters(short_story_context, title)
+    report_file_path = file_manager.create_generation_report(short_story_context)
+
+    # Also save the traditional format
     output_filename = f"{safe_title}_{generation_timestamp}.md"
     output_path = os.path.join(output_dir, output_filename)
 
@@ -250,6 +280,25 @@ def write_short_story(logger: Logger, interface: Interface, outline_file: str, t
     except Exception as e:
         logger.Log(f"Error saving story to file: {e}", 7)
 
-    print(f"\n--- Short Story Generation Complete. Find your story at: {output_path} ---")
+    # Get all generated files for final summary
+    all_files = file_manager.get_all_output_files()
+
+    logger.Log("Short story generation complete!", 5)
+    final_message = f"""
+--- Short Story Generation Complete with Error-Resilient Output ---
+
+Main Story File: {output_path}
+
+Scene-Based Files Created:
+- Scene File: {scene_file_path or 'Failed to create'}
+- Chapter File: {chapter_file_path or 'Failed to create'}  
+- Complete Book: {book_file_path or 'Failed to create'}
+- Generation Report: {report_file_path or 'Failed to create'}
+
+Total Files: Scene({len(all_files.get('scenes', []))}), Chapter({len(all_files.get('chapters', []))}), Book({len(all_files.get('book', []))})
+
+All files are preserved individually to prevent data loss!
+"""
+    print(final_message)
 
 

@@ -8,6 +8,7 @@ import Writer.Scene.SceneOutlineToScene
 from Writer.Interface.Wrapper import Interface
 from Writer.NarrativeContext import NarrativeContext, ChapterContext, SceneContext
 from Writer.PrintUtils import Logger
+from Writer.Scene.SceneFileManager import SceneFileManager
 
 
 def ChapterByScene(
@@ -16,16 +17,18 @@ def ChapterByScene(
     chapter_context: ChapterContext, # Now receives the chapter context object
     narrative_context: NarrativeContext,
     selected_model: str,
+    file_manager: SceneFileManager = None,
 ) -> str:
     """
     Calls all other scene-by-scene generation functions and creates a full chapter
-    based on the new scene pipeline.
+    based on the new scene pipeline. Now saves individual scene files for error resilience.
 
     Args:
         Interface: The LLM interface wrapper.
         _Logger: The logger instance.
         chapter_context: The context object for the chapter to be written.
         narrative_context: The overall context object for the novel.
+        file_manager: Optional SceneFileManager for saving individual files.
 
     Returns:
         The fully generated chapter text, assembled from its scenes.
@@ -73,11 +76,22 @@ def ChapterByScene(
             selected_model,
         )
         
-        # C. Append the fully assembled scene text to the chapter
+        # C. Save the individual scene file immediately for error resilience
+        if file_manager:
+            scene_word_count = len(current_scene_context.generated_content.split())
+            scene_file_path = file_manager.save_scene_file(
+                current_scene_context, 
+                chapter_context.chapter_number, 
+                scene_word_count
+            )
+            if scene_file_path:
+                _Logger.Log(f"Saved scene file: {scene_file_path}", 3)
+        
+        # D. Append the fully assembled scene text to the chapter
         scene_text = current_scene_context.generated_content
         rough_chapter_text += scene_text + "\n\n"
 
-        # D. Generate a final, holistic summary for the completed scene and extract key points for coherence
+        # E. Generate a final, holistic summary for the completed scene and extract key points for coherence
         final_summary_data = Writer.SummarizationUtils.summarize_scene_and_extract_key_points(
             Interface,
             _Logger,
@@ -93,7 +107,7 @@ def ChapterByScene(
         _Logger.Log(f"Scene {scene_num} Final Summary: {current_scene_context.final_summary}", 1)
         _Logger.Log(f"Scene {scene_num} Key Points for Next Scene: {current_scene_context.key_points_for_next_scene}", 1)
 
-        # E. Add the completed scene context (now full of pieces and a final summary) to the chapter context
+        # F. Add the completed scene context (now full of pieces and a final summary) to the chapter context
         chapter_context.add_scene(current_scene_context)
         _Logger.Log(f"--- Finished processing Scene {scene_num} ---", 3)
 
