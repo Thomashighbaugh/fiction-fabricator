@@ -50,17 +50,23 @@ def get_google_models(logger):
 
 def get_groq_models(logger):
     if not os.environ.get("GROQ_API_KEY"):
-        print("-> GroqCloud: GROQ_API_KEY not found in .env file. Skipping.")
+        print("-> Groq: GROQ_API_KEY not found in .env file. Skipping.")
         return []
     try:
         from groq import Groq
-        logger.Log("Querying GroqCloud for available models...", 1)
+        logger.Log("Querying Groq for available models...", 1)
         client = Groq()
         models = client.models.list().data
-        print(f"-> GroqCloud: Found {len(models)} models.")
-        return [f"groq://{model.id}" for model in models]
+        print(f"-> Groq: Found {len(models)} models.")
+        base_override = os.environ.get("GROQ_API_BASE") or os.environ.get("GROQ_API_BASE_URL")
+        if base_override:
+            logger.Log(f"GROQ_API_BASE override detected: {base_override}", 2)
+        uris = []
+        for m in models:
+            uris.append(f"groq://{m.id}")
+        return uris
     except Exception as e:
-        logger.Log(f"Failed to query GroqCloud models. (Error: {e})", 6)
+        logger.Log(f"Failed to query Groq models. (Error: {e})", 6)
         return []
 
 def get_mistral_models(logger):
@@ -98,16 +104,14 @@ def get_nvidia_models(logger):
     logger.Log(f"Found {len(available_models)} NVIDIA models in config.ini.", 3)
     return available_models
 
-# GitHub provider removed
-
-    """Returns a static list of available GitHub models, checking for required env vars."""
+def get_github_models(logger):
+    """Returns a static list of available GitHub Marketplace/Azure OpenAI aggregator models (includes Grok)."""
     if not os.environ.get("GITHUB_ACCESS_TOKEN") or not os.environ.get("AZURE_OPENAI_ENDPOINT"):
         logger.Log("GitHub provider skipped: GITHUB_ACCESS_TOKEN or AZURE_OPENAI_ENDPOINT not found in environment.", 6)
         return []
 
     logger.Log("Loading GitHub model list...", 1)
     
-    # Static list of the exact deployment names for models from the GitHub Marketplace.
     deployment_names = [
         "openai/o1", "openai/o1-mini", "openai/o1-preview", "openai/gpt-4o-mini", "openai/gpt-4o",
         "deepseek/DeepSeek-V3-0324", "deepseek/DeepSeek-R1",
@@ -139,6 +143,15 @@ def get_llm_selection_menu_dynamic(logger):
     all_models.extend(get_groq_models(logger))
     all_models.extend(get_mistral_models(logger))
     all_models.extend(get_nvidia_models(logger))
+    # Additional providers
+    try:
+        from Writer.LLMUtils import get_cohere_models, get_together_models, get_cerebras_models
+        all_models.extend(get_cohere_models(logger))
+        all_models.extend(get_together_models(logger))
+        all_models.extend(get_cerebras_models(logger))
+    except Exception:
+        pass
+    all_models.extend(get_github_models(logger))
     all_models.extend(get_ollama_models(logger))
     if not all_models:
         logger.Log("No models found from any provider. Please check API keys in .env and model lists in config.ini.", 7)
@@ -173,8 +186,11 @@ def select_outline_file(logger):
     """
     Lets the user select an outline file from the Generated_Content/Outlines directory.
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    outlines_dir = os.path.join(project_root, "Generated_Content", "Outlines")
+    # Correctly determine the project root relative to the current script location
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))  # src root
+    repo_root = os.path.dirname(project_root)
+    outlines_dir = os.path.join(repo_root, "Generated_Content", "Outlines")
+
     if not os.path.exists(outlines_dir) or not os.listdir(outlines_dir):
         logger.Log("No outlines found in Generated_Content/Outlines. Please generate an outline first.", 6)
         return None
@@ -188,12 +204,15 @@ def select_outline_file(logger):
     for i, outline_file in enumerate(outlines):
         print(f"[{i+1}] {outline_file}")
 
-    choice = input("> ").strip()
-    if choice.isdigit() and 1 <= int(choice) <= len(outlines):
-        return os.path.join(outlines_dir, outlines[int(choice) - 1])
-    else:
-        logger.Log("Invalid selection.", 6)
-        return None
+    while True:
+        try:
+            choice = input(f"> Enter your choice (1-{len(outlines)}): ").strip()
+            if choice.isdigit() and 1 <= int(choice) <= len(outlines):
+                return os.path.join(outlines_dir, outlines[int(choice) - 1])
+            else:
+                logger.Log("Invalid selection. Please enter a number from the list.", 6)
+        except ValueError:
+            logger.Log("Invalid input. Please enter a number.", 6)
 
 def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.SEED, debug: bool = Writer.Config.DEBUG,
                       chapter_outline_model: str = Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL,
@@ -230,6 +249,18 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
         if not outline_file:
             return
 
+    # --- Set up file paths ---
+    outline_filename_base = os.path.splitext(os.path.basename(outline_file))[0]
+    stories_dir = os.path.join(os.path.dirname(outline_file), "..", "Stories")
+    os.makedirs(stories_dir, exist_ok=True)
+    
+    file_name_base = os.path.join(stories_dir, outline_filename_base)
+    if Writer.Config.OPTIONAL_OUTPUT_NAME:
+        file_name_base = os.path.join(stories_dir, Writer.Config.OPTIONAL_OUTPUT_NAME)
+
+    json_file_path = f"{file_name_base}.json"
+    md_file_path = f"{file_name_base}.md"
+
     # Set the config from the function arguments
     Writer.Config.OPTIONAL_OUTPUT_NAME = output
     Writer.Config.SEED = seed
@@ -257,25 +288,59 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
     models_to_load = list(set([Writer.Config.CHAPTER_OUTLINE_WRITER_MODEL, Writer.Config.CHAPTER_STAGE1_WRITER_MODEL, Writer.Config.CHAPTER_STAGE2_WRITER_MODEL, Writer.Config.CHAPTER_STAGE3_WRITER_MODEL, Writer.Config.CHAPTER_STAGE4_WRITER_MODEL, Writer.Config.CHAPTER_REVISION_WRITER_MODEL, Writer.Config.CRITIQUE_LLM, Writer.Config.REVISION_MODEL, Writer.Config.EVAL_MODEL, Writer.Config.INFO_MODEL, Writer.Config.SCRUB_MODEL, Writer.Config.CHECKER_MODEL]))
     Interface = Writer.Interface.Wrapper.Interface(models_to_load)
 
-    try:
-        with open(outline_file, "r", encoding='utf-8') as f:
-            narrative_context_dict = json.load(f)
-            narrative_context = NarrativeContext.from_dict(narrative_context_dict)
-    except FileNotFoundError:
-        SysLogger.Log(f"Error: Outline file not found at {outline_file}", 7)
-        return
-    except json.JSONDecodeError:
-        SysLogger.Log(f"Error: Could not decode JSON from {outline_file}", 7)
-        return
+    # --- Resume Logic ---
+    narrative_context = None
+    start_chapter = 1
+    if os.path.exists(json_file_path):
+        resume_choice = input(f"Found an existing file for this novel at '{os.path.basename(json_file_path)}'.\nDo you want to resume from the last completed chapter? (y/n): ").strip().lower()
+        if resume_choice == 'y':
+            try:
+                with open(json_file_path, "r", encoding='utf-8') as f:
+                    narrative_context_dict = json.load(f)
+                    narrative_context = NarrativeContext.from_dict(narrative_context_dict)
+                    start_chapter = len(narrative_context.chapters) + 1
+                SysLogger.Log(f"Resuming generation from Chapter {start_chapter}.", 5)
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                SysLogger.Log(f"Error loading resume file: {e}. Starting a new novel.", 6)
+                narrative_context = None
+        else:
+            SysLogger.Log("User chose not to resume. Starting a new novel.", 3)
 
+    if narrative_context is None:
+        try:
+            with open(outline_file, "r", encoding='utf-8') as f:
+                narrative_context_dict = json.load(f)
+                narrative_context = NarrativeContext.from_dict(narrative_context_dict)
+            SysLogger.Log("Starting a new novel from outline.", 3)
+        except FileNotFoundError:
+            SysLogger.Log(f"Error: Outline file not found at {outline_file}", 7)
+            return
+        except json.JSONDecodeError:
+            SysLogger.Log(f"Error: Could not decode JSON from {outline_file}", 7)
+            return
+
+    # --- Chapter Generation ---
     SysLogger.Log("Starting Chapter Writing phase...", 2)
     total_chapters = Writer.Chapter.ChapterDetector.LLMCountChapters(Interface, SysLogger, narrative_context.base_novel_outline_markdown, Writer.Config.EVAL_MODEL)
+    
     if total_chapters > 0 and total_chapters < 100:
-        for i in range(1, total_chapters + 1):
+        for i in range(start_chapter, total_chapters + 1):
+            SysLogger.Log(f"--- Generating Chapter {i} of {total_chapters} ---", 5)
             Writer.Chapter.ChapterGenerator.GenerateChapter(Interface, SysLogger, i, total_chapters, narrative_context, Writer.Config.CHAPTER_STAGE1_WRITER_MODEL)
+            
+            # --- Progressive Save ---
+            try:
+                with open(json_file_path, "w", encoding="utf-8") as f:
+                    json.dump(narrative_context.to_dict(), f, indent=4)
+                SysLogger.Log(f"Progress for Chapter {i} saved to {os.path.basename(json_file_path)}", 2)
+            except Exception as e:
+                SysLogger.Log(f"Error saving progress after chapter {i}: {e}", 7)
+
     else:
         SysLogger.Log(f"Invalid chapter count ({total_chapters}) detected. Aborting chapter generation.", 7)
 
+    # --- Finalization ---
+    SysLogger.Log("Novel generation process finished. Proceeding to finalization.", 5)
 
     if Writer.Config.ENABLE_FINAL_EDIT_PASS:
         narrative_context = Writer.NovelEditor.EditNovel(Interface, SysLogger, narrative_context, Writer.Config.REVISION_MODEL)
@@ -286,9 +351,14 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
 
     StoryBodyText = "\n\n\n".join([f"### Chapter {chap.chapter_number}\n\n{chap.generated_content}" for chap in narrative_context.chapters if chap.generated_content])
     
+    # Use a default prompt if initial_prompt is missing
+    base_prompt_summary = getattr(narrative_context, 'initial_prompt', 'Prompt not available')
+    if len(base_prompt_summary) > 150:
+        base_prompt_summary = base_prompt_summary[:150] + "..."
+
     info_messages = [Interface.BuildUserQuery(narrative_context.base_novel_outline_markdown)]
     Info = Writer.StoryInfo.GetStoryInfo(Interface, SysLogger, info_messages, Writer.Config.INFO_MODEL)
-    Title = Info.get("Title", "Untitled Story")
+    Title = Info.get("Title", outline_filename_base.replace('_', ' ')) # Use outline name as fallback title
 
     SysLogger.Log(f"Story Title: {Title}", 5)
     SysLogger.Log(f"Summary: {Info.get('Summary', 'N/A')}", 3)
@@ -306,30 +376,18 @@ def write_novel(outline_file: str, output: str = "", seed: int = Writer.Config.S
 - **Generator**: {Writer.Config.PROJECT_NAME}
 
 ## Generation Settings
-- **Base Prompt**: {Prompt[:150]}...
+- **Base Prompt**: {base_prompt_summary}
 - **Seed**: {Writer.Config.SEED}
 - **Primary Model Used**: {Writer.Config.INITIAL_OUTLINE_WRITER_MODEL} (and others if set by args)
 """
-
-    os.makedirs(os.path.join("Generated_Content", "Stories"), exist_ok=True)
-    safe_title = "".join(c for c in Title if c.isalnum() or c in (' ', '_')).rstrip()
-    file_name_base = f"Generated_Content/Stories/{safe_title.replace(' ', '_')}"
-    if Writer.Config.OPTIONAL_OUTPUT_NAME:
-        file_name_base = f"Generated_Content/Stories/{Writer.Config.OPTIONAL_OUTPUT_NAME}"
-    
-    md_file_path = f"{file_name_base}.md"
-    json_file_path = f"{file_name_base}.json"
-
-    # Write the Markdown file
+    # Final save of MD and JSON
     with open(md_file_path, "w", encoding="utf-8") as f:
         output_content = f"# {Title}\n\n{StoryBodyText}\n\n---\n\n{StatsString}\n\n---\n\n## Full Outline\n```\n{narrative_context.base_novel_outline_markdown}\n```"
         f.write(output_content)
 
-    # Write the JSON file
     with open(json_file_path, "w", encoding="utf-8") as f:
         json.dump(narrative_context.to_dict(), f, indent=4)
     
-    # Log the final, correct output paths
     SysLogger.Log("Generation complete!", 5)
     final_message = f"""
 --------------------------------------------------
@@ -342,7 +400,7 @@ Output Files Saved:
 
 if __name__ == "__main__":
     Parser = argparse.ArgumentParser(description=f"Run the {Writer.Config.PROJECT_NAME} novel generation pipeline.")
-    Parser.add_argument("-Outline", required=False, help="Path to the outline file.")
+    Parser.add_argument("-Outline", help="Path to the outline file.")
     Parser.add_argument("-Output", default="", type=str)
     Parser.add_argument("-Seed", default=Writer.Config.SEED, type=int)
     Parser.add_argument("-Debug", action="store_true", default=Writer.Config.DEBUG)

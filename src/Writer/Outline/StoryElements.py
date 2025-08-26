@@ -3,7 +3,7 @@ from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
 
 
-def GenerateStoryElements(Interface: Interface, _Logger: Logger, _OutlinePrompt: str):
+def GenerateStoryElements(Interface: Interface, _Logger: Logger, _OutlinePrompt: str, selected_model: str = None):
 
     Prompt: str = f"""
 I'm working on writing a fictional story, and I'd like your help writing out the story elements.
@@ -138,8 +138,10 @@ Also, the items in parenthesis are just to give you a better idea of what to wri
     # Generate Initial Story Elements
     _Logger.Log("Generating Main Story Elements", 4)
     Messages = [Interface.BuildUserQuery(Prompt)]
+    # Use passed-in selected model if provided; otherwise fallback to config default.
+    model_to_use = selected_model or Writer.Config.INITIAL_OUTLINE_WRITER_MODEL
     Messages = Interface.SafeGenerateText(
-        _Logger, Messages, Writer.Config.INITIAL_OUTLINE_WRITER_MODEL, min_word_count_target=150
+        _Logger, Messages, model_to_use, min_word_count_target=150
     )
     Elements: str = Interface.GetLastMessageText(Messages)
     _Logger.Log("Done Generating Main Story Elements", 4)

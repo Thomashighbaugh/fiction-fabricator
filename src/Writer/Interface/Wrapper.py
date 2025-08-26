@@ -18,10 +18,26 @@ from Writer.PrintUtils import Logger
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_community.chat_models import ChatOllama
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_mistralai.chat_models import ChatMistralAI
-from langchain_groq import ChatGroq
+
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
+# Optional provider integrations (installed conditionally)
+try:
+    from langchain_cohere import ChatCohere
+except Exception:
+    ChatCohere = None
+try:
+    from langchain_together import ChatTogether
+except Exception:
+    ChatTogether = None
+try:
+    from langchain_cerebras import ChatCerebras
+except Exception:
+    ChatCerebras = None
+try:
+    from langchain_llm7 import ChatLLM7
+except Exception:
+    ChatLLM7 = None
 
 # --- Custom Provider Imports ---
 
@@ -29,11 +45,11 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 # Whitelist of supported bindable parameters for each provider to prevent 422 errors.
 SAFE_PARAMS = {
     "google": ["temperature", "top_p", "top_k", "max_output_tokens", "response_mime_type"],
-    "groq": ["temperature", "top_p", "max_tokens", "seed"],
     "nvidia": ["temperature", "top_p", "max_tokens", "seed"],
-    "github": ["temperature", "top_p", "max_tokens"],
-    "ollama": ["temperature", "top_p", "top_k", "seed", "format", "num_predict"],
-    "mistralai": ["temperature", "top_p", "max_tokens"]
+    "cohere": ["temperature", "top_p", "max_tokens"],
+    "together": ["temperature", "top_p", "max_tokens"],
+    "cerebras": ["temperature", "top_p", "max_tokens"],
+    "llm7": ["temperature", "top_p", "max_tokens"]
 }
 
 
@@ -101,12 +117,27 @@ class Interface:
                     self.Clients[base_model_uri] = ChatOllama(model=ProviderModel, base_url=f"http://{ModelHost}" if ModelHost else "http://localhost:11434")
                 elif Provider == "google":
                     self.Clients[base_model_uri] = ChatGoogleGenerativeAI(model=ProviderModel, convert_system_message_to_human=True)
-                elif Provider == "mistralai":
-                    self.Clients[base_model_uri] = ChatMistralAI(model=ProviderModel)
-                elif Provider == "groq":
-                    self.Clients[base_model_uri] = ChatGroq(model_name=ProviderModel)
+                
+
                 elif Provider == "nvidia":
                      self.Clients[base_model_uri] = ChatNVIDIA(model=ProviderModel, base_url=os.environ.get("NVIDIA_BASE_URL") or Writer.Config.NVIDIA_BASE_URL)
+                elif Provider == "cohere":
+                    if ChatCohere is None:
+                        raise ImportError("langchain-cohere not installed. Install with 'pip install langchain-cohere'.")
+                    self.Clients[base_model_uri] = ChatCohere(model=ProviderModel)
+                elif Provider == "together":
+                    if ChatTogether is None:
+                        raise ImportError("langchain-together not installed. Install with 'pip install langchain-together'.")
+                    self.Clients[base_model_uri] = ChatTogether(model=ProviderModel)
+                elif Provider == "cerebras":
+                    if ChatCerebras is None:
+                        raise ImportError("langchain-cerebras not installed. Install with 'pip install langchain-cerebras'.")
+                    self.Clients[base_model_uri] = ChatCerebras(model=ProviderModel)
+                elif Provider == "llm7":
+                    if ChatLLM7 is None:
+                        raise ImportError("langchain-llm7 not installed. Install with 'pip install langchain-llm7'.")
+                    # Use the official langchain-llm7 package
+                    self.Clients[base_model_uri] = ChatLLM7(model=ProviderModel)
                 else:
                     raise ValueError(f"Model Provider '{Provider}' for '{Model}' is not supported.")
 

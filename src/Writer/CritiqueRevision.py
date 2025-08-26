@@ -161,6 +161,40 @@ def _run_revision_cycle(
     return current_content
 
 
+def run_outline_structure_revision(
+    Interface: Interface,
+    _Logger: Logger,
+    initial_outline: str,
+    critique_prompt: str,
+    revision_prompt_template: str,
+    selected_model: str,
+) -> str:
+    """
+    Runs a single critique/revision cycle focused on outline structure.
+    """
+    if not initial_outline or not initial_outline.strip() or "[ERROR:" in initial_outline:
+        _Logger.Log("run_outline_structure_revision called with empty or invalid outline. Skipping.", 6)
+        return initial_outline
+
+    # Step 1: Critique
+    critique_messages = [Interface.BuildUserQuery(critique_prompt)]
+    critique_messages = Interface.SafeGenerateText(
+        _Logger, critique_messages, selected_model, min_word_count_target=30
+    )
+    critique = Interface.GetLastMessageText(critique_messages)
+
+    # Step 2: Revision
+    revision_prompt = revision_prompt_template.format(
+        original_outline=initial_outline,
+        critique=critique
+    )
+    revision_messages = [Interface.BuildUserQuery(revision_prompt)]
+    revision_messages = Interface.SafeGenerateText(
+        _Logger, revision_messages, selected_model, min_word_count_target=100
+    )
+    revised_outline = Interface.GetLastMessageText(revision_messages)
+    return revised_outline
+
 def critique_and_revise_creative_content(
     Interface: Interface,
     _Logger: Logger,

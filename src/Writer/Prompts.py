@@ -6,6 +6,31 @@
 # Prompts for Outline and Story Structure
 # ======================================================================================
 
+SHORT_STORY_OUTLINE_PROMPT = """
+You are a master storyteller tasked with creating a compelling outline for a short story.
+
+**Your Style Guide:**
+---
+{style_guide}
+---
+
+**Core Story Concept:**
+Use the user's prompt and the defined story elements to build your outline.
+<PROMPT>
+{_OutlinePrompt}
+</PROMPT>
+
+<ELEMENTS>
+{StoryElements}
+</ELEMENTS>
+
+**Your Task:**
+Write a detailed, scene-by-scene outline for a short story of approximately {word_count} words.
+- The plot must be coherent and self-contained, suitable for a short story format.
+- Ensure it is very clear what content belongs in each scene.
+- For each scene, provide a detailed list of plot items that will occur. This should be a list of events, not prose.
+"""
+
 # A flexible style guide to be used as a system prompt for most creative tasks.
 LITERARY_STYLE_GUIDE = """
 Your writing must be sophisticated, clear, and compelling. Strive for prose that is rich with detail and psychological depth.
@@ -43,11 +68,11 @@ Adhering to the spirit of the user's prompt, define the following elements in ma
 - **Language Use**: (e.g., Sparse and clinical, ornate and literary, stream-of-consciousness.)
 
 ## Plot
-- **Exposition**:
-- **Rising Action**:
-- **Climax**:
-- **Falling Action**:
-- **Resolution**: (The story's conclusion, which should be a logical outcome of the premise.)
+- **Exposition**: A list of events that will occur in the exposition.
+- **Rising Action**: A list of events that will occur in the rising action.
+- **Climax**: A list of events that will occur in the climax.
+- **Falling Action**: A list of events that will occur in the falling action.
+- **Resolution**: A list of events that will occur in the resolution.
 
 ## Setting
 ### Setting 1
@@ -116,7 +141,10 @@ Use the user's prompt and the defined story elements to build your outline.
 **Your Task:**
 Write a detailed, chapter-by-chapter outline in markdown format.
 - The plot must be coherent, with each chapter building on the last toward a satisfying conclusion.
-- Ensure it is very clear what content belongs in each chapter. Add significant detail to guide the writing process.
+- For each chapter, provide a clear markdown header (e.g., # Chapter 1: Title) and a numbered or bulleted list of critical plot points/events.
+- Each plot point must directly reference the premise and story elements above.
+- Do NOT write any prose, summaries, or scene text—only bullet points or numbered lists of events.
+- If you write prose, your output will be rejected.
 """
 
 OUTLINE_REVISION_PROMPT = """
@@ -139,6 +167,10 @@ You are a master storyteller revising a novel outline based on editorial feedbac
 
 **Your Task:**
 Rewrite the entire outline, incorporating the feedback to improve it.
+- For each chapter, provide a clear markdown header and a numbered or bulleted list of critical plot points/events.
+- Each plot point must directly reference the premise and story elements above.
+- Do NOT write any prose, summaries, or scene text—only bullet points or numbered lists of events.
+- If you write prose, your output will be rejected.
 - Deepen the plot, character arcs, and thematic complexity.
 - Ensure the revised outline is aligned with the style guide.
 - Add more detail to every chapter, making the sequence of events and character motivations crystal clear.
@@ -186,6 +218,31 @@ The goal is a richer, more detailed story that naturally fills the required numb
 Your response should be the new, complete, chapter-by-chapter markdown outline.
 """
 
+APPEND_OUTLINE_MISSING_CHAPTERS_PROMPT = """
+You are a master story developer. The existing outline currently stops at Chapter {_CurrentChapterCount}.
+Your task is to write ONLY the missing chapters needed to reach a total of {_DesiredTotal} chapters.
+
+# EXISTING OUTLINE (LAST CHAPTERS FOR CONTEXT)
+---
+{_LastChapters}
+---
+
+# TASK
+Write Chapters {_NextChapterStart} through {_NextChapterEnd}.
+
+Requirements:
+- Do NOT rewrite, alter, or repeat any earlier chapters.
+- Begin directly with "# Chapter {_NextChapterStart}:" (or the original heading style) and continue sequentially.
+- For EACH new chapter:
+  - Provide a markdown header (e.g., `# Chapter X: Title` — a short, evocative title is encouraged).
+  - Follow with a numbered or bulleted list of plot points/events (not prose paragraphs) that advance character arcs, conflicts, and themes.
+- Maintain continuity with prior events and character motivations.
+- Build escalating tension toward a satisfying resolution by the final chapter.
+- If a detail is missing, infer something plausible and keep going—do not stall or ask questions.
+
+Output ONLY the new chapters you are adding. Do not include commentary, summaries, or earlier chapters.
+"""
+
 SUMMARIZE_OUTLINE_RANGE_PROMPT = """
 You are a story analyst. Your task is to read a novel outline and summarize a specific range of chapters.
 
@@ -221,7 +278,7 @@ Your sole focus is to generate detailed, scene-by-scene outlines for **Chapters 
 For EACH chapter in this range, provide a markdown block that includes:
 - A main markdown header for the chapter (e.g., `# Chapter X: The Title`).
 - Multiple scene-by-scene breakdowns under that chapter header.
-- For each scene, please provide a clear heading, a list of characters, a description of the setting, and a summary of the key events.
+- For each scene, please provide a clear heading, a list of characters, a description of the setting, and a DETAILED LIST OF PLOT ITEMS that will occur in the scene. This should be a list of events, not prose.
 
 Your output should be a single, continuous markdown document containing the detailed outlines for ALL chapters in the specified range.
 """
@@ -344,6 +401,44 @@ Provide a 1-2 sentence summary of the chunk above. Focus only on what happened i
 # ======================================================================================
 # Prompts for Critique and Revision
 # ======================================================================================
+
+# --- OUTLINE-SPECIFIC CRITIQUE AND REVISION PROMPTS ---
+
+OUTLINE_STRUCTURE_CRITIQUE_PROMPT = """
+You are a master story structure editor. Your sole focus is on the clarity, organization, and completeness of the outline below.
+
+# OUTLINE TO CRITIQUE
+---
+{outline_text}
+---
+
+# YOUR TASK
+- Critique the outline ONLY as a chapter-by-chapter list of plot points.
+- Do NOT comment on prose, style, or tone.
+- Ensure each chapter has a clear header and a numbered list of critical plot points/events (not prose).
+- Point out any chapters that are missing, unclear, or have plot points that are vague, redundant, or written as prose.
+- Provide actionable feedback in bullet points for improving the outline structure.
+"""
+
+REVISE_OUTLINE_STRUCTURE_PROMPT = """
+You are a master story developer. Your task is to revise the outline below based on editorial feedback, ensuring it remains a chapter-by-chapter list of plot points.
+
+# ORIGINAL OUTLINE
+---
+{original_outline}
+---
+
+# EDITORIAL FEEDBACK
+---
+{critique}
+---
+
+# YOUR TASK
+- Rewrite the outline so that each chapter has a clear header and a numbered list of critical plot points/events (not prose).
+- Do NOT write any prose, summaries, or scene text.
+- Incorporate all feedback to improve clarity, organization, and completeness.
+- Output only the revised outline as a markdown document.
+"""
 
 # --- NEW: Prompts for the 3-Step Critique and Revision Process ---
 
@@ -974,4 +1069,43 @@ Has the "GENERATED SCENE TEXT" fully and satisfactorily accomplished all the key
 
 Respond with a single JSON object with one key, "IsComplete", and a boolean value (true/false).
 Do not include any other text. Example: {{ "IsComplete": true }}
+"""
+
+# ======================================================================================
+# Generic Content Completion Verification
+# ======================================================================================
+
+VERIFY_CONTENT_COMPLETION_PROMPT = """
+You are a content completion analyst. Your task is to determine if generated content appears to have been cut off mid-generation or is complete.
+
+# CONTENT TYPE AND PURPOSE
+Content Type: {content_type}
+Expected Purpose: {expected_purpose}
+
+# CONTENT TO ANALYZE
+---
+{content}
+---
+
+# YOUR TASK
+Analyze the provided content to determine if it appears complete or was cut off mid-generation.
+
+Consider these indicators of incomplete content:
+- Ends mid-sentence or mid-paragraph without logical conclusion
+- Missing expected sections based on the content type and purpose
+- Abrupt termination that doesn't feel intentional
+- Incomplete lists, outlines, or structured content
+- Missing closing elements (conclusions, resolutions, etc.)
+
+Consider these indicators of complete content:
+- Ends at a natural stopping point
+- Fulfills the expected purpose for this content type
+- Has logical flow from beginning to end
+- Contains all expected structural elements
+
+Respond with a JSON object containing:
+- "is_complete": boolean (true if complete, false if appears cut off)
+- "analysis": string (brief explanation of your assessment)
+
+Example: {{ "is_complete": false, "analysis": "The content ends abruptly mid-sentence in what appears to be the middle of describing a character, suggesting generation was cut off." }}
 """

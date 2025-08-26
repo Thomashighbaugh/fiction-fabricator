@@ -1,58 +1,20 @@
 # File: Tools/PromptGenerator.py
 # Purpose: Generates a refined prompt.txt for FictionFabricator using an LLM.
-# This script is self-contained and should be run from the project's root directory.
 
-"""
-FictionFabricator Prompt Generator Utility.
-
-This script takes a basic user idea and a desired story title to generate a more
-detailed and refined `prompt.txt` file. This output file is structured to be an
-effective input for the main Write.py script.
-
-The process involves:
-1. Dynamically selecting an LLM from available providers.
-2. Expanding the user's initial idea using the selected LLM.
-3. Having the LLM critique its own expansion.
-4. Refining the prompt based on this critique.
-5. Saving the final prompt to `Prompts/<SanitizedTitle>/prompt.txt`.
-
-Requirements:
-- All packages from the main project's `requirements.txt`.
-- A configured `.env` file with API keys for desired providers.
-- An accessible Ollama server if using local models.
-
-Usage:
-python Tools/prompt_generator.py -t "CrashLanded" -i "After the surveying vessel crashed on the planet it was sent to determine viability for human colonization, the spunky 23 year old mechanic Jade and the hardened 31 year old security officer Charles find the planet is not uninhabited but teeming with humans living in primitive tribal conditions and covered in the ruins of an extinct human society which had advanced technologies beyond what are known to Earth. Now they must navigate the politics of these tribes while trying to repair their communication equipment to call for rescue, while learning to work together despite their initial skepticism about the other."
-"""
-
-import argparse
 import os
 import sys
 import re
-import dotenv
 
-# --- Add project root to path for imports and load .env explicitly ---
+# --- Add project root to path for imports ---
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
-
-try:
-    dotenv_path = os.path.join(project_root, '.env')
-    if os.path.exists(dotenv_path):
-        dotenv.load_dotenv(dotenv_path=dotenv_path)
-        print(f"--- Successfully loaded .env file from: {dotenv_path} ---")
-    else:
-        print("--- .env file not found, proceeding with environment variables if available. ---")
-except Exception as e:
-    print(f"--- Error loading .env file: {e} ---")
 
 # --- Standardized Imports from Main Project ---
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
-# --- Refactored Import for Centralized LLM Utilities ---
 from Writer.LLMUtils import get_llm_selection_menu_for_tool
 
-
-# --- Prompts for this script (Refactored for Flexibility) ---
+# --- Prompts for this script ---
 
 SYSTEM_PROMPT_STYLE_GUIDE = """
 You are a creative assistant and expert prompt engineer. Your goal is to help a user transform their story idea into a rich, detailed, and effective prompt for an AI story generator.
@@ -61,9 +23,6 @@ You are a creative assistant and expert prompt engineer. Your goal is to help a 
 EXPAND_IDEA_PROMPT_TEMPLATE = """
 You are a creative assistant helping to flesh out a story idea into a detailed prompt suitable for an AI story generator.
 Your goal is to expand the user's basic idea into a richer concept that is faithful to their original vision.
-
-User's Title: "{title}"
-User's Basic Idea: "{idea}"
 
 User's Title: "{title}"
 User's Basic Idea: "{idea}"
@@ -143,15 +102,11 @@ Do NOT include any titles, headings, introductory sentences, or explanations.
 The output will be saved directly to a file, so it must contain *only* the story prompt.
 """
 
-
 def sanitize_filename(name: str) -> str:
     """Sanitizes a string to be suitable for a filename or directory name."""
-    name = re.sub(
-        r"[^\w\s-]", "", name
-    ).strip()  # Remove non-alphanumeric (except underscore, hyphen, space)
-    name = re.sub(r"[-\s]+", "_", name)  # Replace spaces and hyphens with underscores
+    name = re.sub(r"[^\\w\\s-]", "", name).strip()
+    name = re.sub(r"[-\\s]+", "_", name)
     return name if name else "Untitled_Prompt"
-
 
 def _extract_core_prompt(llm_response: str) -> str:
     """
@@ -163,13 +118,11 @@ def _extract_core_prompt(llm_response: str) -> str:
 
     lines = llm_response.strip().split("\n")
 
-    # Remove leading/trailing markdown code block fences if they exist
-    if len(lines) >= 1 and re.fullmatch(r"^\s*```(?:markdown)?\s*$", lines[0], re.IGNORECASE):
+    if len(lines) >= 1 and re.fullmatch(r"^\\s*```(?:markdown)?\\s*$", lines[0], re.IGNORECASE):
         lines.pop(0)
-    if len(lines) >= 1 and re.fullmatch(r"^\s*```\s*$", lines[-1], re.IGNORECASE):
+    if len(lines) >= 1 and re.fullmatch(r"^\\s*```\\s*$", lines[-1], re.IGNORECASE):
         lines.pop(-1)
 
-    # Remove any remaining leading/trailing blank lines
     while lines and not lines[0].strip():
         lines.pop(0)
     while lines and not lines[-1].strip():
@@ -177,56 +130,51 @@ def _extract_core_prompt(llm_response: str) -> str:
 
     return "\n".join(lines).strip()
 
+def generate_prompt(logger: Logger, interface: Interface, title: str, idea: str):
+    """
+    Generates a refined prompt.txt for FictionFabricator using an LLM.
+    """
+    logger.Log("--- FictionFabricator Prompt Generator ---", 2)
 
-def generate_prompt(title: str, idea: str):
-
-    print("--- FictionFabricator Prompt Generator ---")
-    sys_logger = Logger(os.path.join(project_root, "Logs", "PromptGenLogs"))
-
-    # --- Dynamic Model Selection ---
-    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger, tool_name="Prompt Generator")
+    selected_model_uri = get_llm_selection_menu_for_tool(logger, tool_name="Prompt Generator")
     if not selected_model_uri:
-        sys_logger.Log("No model was selected or discovered. Exiting.", 7)
-        sys.exit(1)
+        logger.Log("No model was selected or discovered. Exiting.", 7)
+        return
 
-    # --- Instantiate Interface and load selected model ---
-    interface = Interface()
     interface.LoadModels([selected_model_uri])
 
-    temp_str = input("Enter the temperature for the LLM (0.0-2.0, default: 0.7): ")
     try:
+        temp_str = input("Enter the temperature for the LLM (0.0-2.0, default: 0.7): ")
         temp = float(temp_str) if temp_str else 0.7
     except ValueError:
-        print("Invalid temperature format. Using default value 0.7.")
+        logger.Log("Invalid temperature format. Using default value 0.7.", 6)
         temp = 0.7
 
-    # --- Generation Logic ---
-    print("\nStep 1: Expanding user's idea...")
+    logger.Log("\nStep 1: Expanding user's idea...", 2)
     expand_user_prompt = EXPAND_IDEA_PROMPT_TEMPLATE.format(title=title, idea=idea)
-    # Increased max_tokens to prevent cutoff
     expand_model_with_params = f"{selected_model_uri}?temperature={temp}&max_tokens=2048"
 
     expand_messages = [
         interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
         interface.BuildUserQuery(expand_user_prompt)
     ]
-    response_history = interface.SafeGenerateText(sys_logger, expand_messages, expand_model_with_params, min_word_count_target=100)
+    response_history = interface.SafeGenerateText(logger, expand_messages, expand_model_with_params, min_word_count_target=100)
     expanded_prompt_raw = interface.GetLastMessageText(response_history)
 
     if "[ERROR:" in expanded_prompt_raw:
-        print(f"Failed to expand prompt: {expanded_prompt_raw}")
-        sys.exit(1)
+        logger.Log(f"Failed to expand prompt: {expanded_prompt_raw}", 7)
+        return
 
     expanded_prompt = _extract_core_prompt(expanded_prompt_raw)
-    print("\n--- Expanded Prompt (Post-Cleaning) ---")
-    print(expanded_prompt)
-    print("-------------------------------------")
+    logger.Log("\n--- Expanded Prompt (Post-Cleaning) ---", 3)
+    logger.Log(expanded_prompt, 3)
+    logger.Log("-------------------------------------", 3)
 
     if not expanded_prompt.strip():
-        print("Error: Expanded prompt is empty after cleaning. Exiting.")
-        sys.exit(1)
+        logger.Log("Error: Expanded prompt is empty after cleaning. Exiting.", 7)
+        return
 
-    print("\nStep 2: Critiquing the expanded prompt...")
+    logger.Log("\nStep 2: Critiquing the expanded prompt...", 2)
     critique_user_prompt = CRITIQUE_EXPANDED_PROMPT_TEMPLATE.format(expanded_prompt=expanded_prompt)
     critique_model_with_params = f"{selected_model_uri}?temperature=0.5&max_tokens=1000"
 
@@ -234,49 +182,47 @@ def generate_prompt(title: str, idea: str):
         interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
         interface.BuildUserQuery(critique_user_prompt)
     ]
-    critique_history = interface.SafeGenerateText(sys_logger, critique_messages, critique_model_with_params, min_word_count_target=20)
+    critique_history = interface.SafeGenerateText(logger, critique_messages, critique_model_with_params, min_word_count_target=20)
     critique = interface.GetLastMessageText(critique_history).strip()
 
     final_prompt_text_candidate: str
     if "[ERROR:" in critique or not critique.strip():
-        print("Warning: Critique failed or was empty. Proceeding with the initially expanded prompt.")
+        logger.Log("Warning: Critique failed or was empty. Proceeding with the initially expanded prompt.", 6)
         final_prompt_text_candidate = expanded_prompt
     else:
-        print("\n--- Critique ---")
-        print(critique)
-        print("----------------")
+        logger.Log("\n--- Critique ---", 3)
+        logger.Log(critique, 3)
+        logger.Log("----------------", 3)
 
-        print("\nStep 3: Refining prompt based on critique...")
+        logger.Log("\nStep 3: Refining prompt based on critique...", 2)
         refine_user_prompt = REFINE_PROMPT_BASED_ON_CRITIQUE_TEMPLATE.format(expanded_prompt=expanded_prompt, critique=critique)
-        # Increased max_tokens to prevent cutoff
         refine_model_with_params = f"{selected_model_uri}?temperature={temp}&max_tokens=2048"
 
         refine_messages = [
             interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
             interface.BuildUserQuery(refine_user_prompt)
         ]
-        refine_history = interface.SafeGenerateText(sys_logger, refine_messages, refine_model_with_params, min_word_count_target=100)
+        refine_history = interface.SafeGenerateText(logger, refine_messages, refine_model_with_params, min_word_count_target=100)
         refined_text_raw = interface.GetLastMessageText(refine_history)
 
         if "[ERROR:" in refined_text_raw:
-            print(f"Warning: Refinement failed: {refined_text_raw}. Using the initially expanded prompt.")
+            logger.Log(f"Warning: Refinement failed: {refined_text_raw}. Using the initially expanded prompt.", 6)
             final_prompt_text_candidate = expanded_prompt
         else:
             final_prompt_text_candidate = _extract_core_prompt(refined_text_raw)
 
     final_prompt_text = final_prompt_text_candidate
     if not final_prompt_text.strip():
-        print("Error: Final prompt is empty after all processing. Exiting.")
-        # Fallback logic to prevent empty file
+        logger.Log("Error: Final prompt is empty after all processing. Exiting.", 7)
         if expanded_prompt.strip():
-            print("Fallback to last valid prompt (the expanded version).")
+            logger.Log("Fallback to last valid prompt (the expanded version).", 4)
             final_prompt_text = expanded_prompt
         else:
-            sys.exit(1)
+            return
 
-    print("\n--- Final Prompt Content for prompt.txt ---")
+    logger.Log("\n--- Final Prompt Content for prompt.txt ---", 5)
     print(final_prompt_text)
-    print("-------------------------------------------")
+    logger.Log("-------------------------------------------", 5)
 
     prompts_base_dir = os.path.join(project_root, "Generated_Content", "Prompts")
     os.makedirs(prompts_base_dir, exist_ok=True)
@@ -289,15 +235,13 @@ def generate_prompt(title: str, idea: str):
         output_path = os.path.join(prompt_subdir, "prompt.txt")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(final_prompt_text)
-        print(f"\nSuccessfully generated and saved prompt to: {output_path}")
+        logger.Log(f"\nSuccessfully generated and saved prompt to: {output_path}", 5)
     except OSError as e:
-        print(f"Error creating directory or writing file to '{prompt_subdir}': {e}")
-        sys.exit(1)
+        logger.Log(f"Error creating directory or writing file to '{prompt_subdir}': {e}", 7)
     except Exception as e:
-        print(f"An unexpected error occurred during file saving: {e}")
-        sys.exit(1)
+        logger.Log(f"An unexpected error occurred during file saving: {e}", 7)
 
-    print("\n--- Prompt Generation Complete ---")
+    logger.Log("\n--- Prompt Generation Complete ---", 5)
 
 
 

@@ -1,22 +1,14 @@
-# Core Langchain and provider packages for LLM integration
+# Working configuration without LLM7 (install LLM7 separately if needed)
 langchain
 langchain-core
 langchain-community
+langchain-text-splitters
 langchain-google-genai
-google-generativeai
-# CORRECTED: Pin mistralai to a version compatible with langchain-mistralai
-langchain-mistralai
-mistralai==0.1.8
-langchain-groq
-langchain-nvidia-ai-endpoints
-azure-ai-inference
 langchain-openai
+langchain-nvidia-ai-endpoints
 
-# Ollama client library for local model support
-ollama
-
-# Utility packages
-python-dotenv
-termcolor
-requests
-configparser
+google-generativeai==0.8.3
+openai==1.86.0
+python-dotenv==1.0.1
+termcolor==2.4.0
+requests==2.32.3

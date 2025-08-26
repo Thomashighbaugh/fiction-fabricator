@@ -1,4 +1,3 @@
-import argparse
 import json
 import os
 import sys
@@ -9,12 +8,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
 
-def evaluate_stories(story1_path, story2_path, output_path, model):
+def evaluate_stories(logger: Logger, interface: Interface, story1_path: str, story2_path: str, output_path: str, model: str):
     """
     Evaluates two stories using an LLM.
     """
-    logger = Logger("Evaluate")
-
     try:
         with open(story1_path, 'r', encoding='utf-8') as f:
             story1_data = json.load(f)
@@ -36,7 +33,7 @@ def evaluate_stories(story1_path, story2_path, output_path, model):
 
     logger.Log(f"Evaluating stories using model: {model}", 4)
 
-    llm_interface = Interface(Models=[model])
+    interface.LoadModels([model])
 
     prompt = f"""
     You are a literary critic. You will be given two short stories. Your task is to evaluate them based on the following criteria:
@@ -64,8 +61,8 @@ def evaluate_stories(story1_path, story2_path, output_path, model):
         {"role": "user", "content": prompt}
     ]
 
-    response_history = llm_interface.ChatAndStreamResponse(logger, messages, model)
-    evaluation_text = llm_interface.GetLastMessageText(response_history)
+    response_history = interface.ChatAndStreamResponse(logger, messages, model)
+    evaluation_text = interface.GetLastMessageText(response_history)
 
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -73,13 +70,3 @@ def evaluate_stories(story1_path, story2_path, output_path, model):
         logger.Log(f"Evaluation report saved to {output_path}", 5)
     except IOError as e:
         logger.Log(f"Error writing evaluation report to file: {e}", 7)
-
-if __name__ == "__main__":
-    # Setup Argparser
-    Parser = argparse.ArgumentParser(description="Evaluate and compare two generated stories.")
-    Parser.add_argument("-Story1", required=True, help="Path to JSON file for story 1")
-    Parser.add_argument("-Story2", required=True, help="Path to JSON file for story 2")
-    Parser.add_argument("-Output", default="Report.md", type=str, help="Optional file output path for the report.")
-    Parser.add_argument("-Model", default="google://gemini-1.5-pro-latest", type=str, help="Model to use for the evaluation.")
-    Args = Parser.parse_args()
-    evaluate_stories(Args.Story1, Args.Story2, Args.Output, Args.Model)

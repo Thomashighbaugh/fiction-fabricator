@@ -74,13 +74,23 @@ class LoreBookManager:
                 return os.path.abspath(os.path.join(self.lorebooks_dir, lorebooks[int(choice) - 1]))
             self.logger.Log("Invalid selection.", 6)
 
-    def add_entry(self):
+    def _select_and_load_lorebook(self):
         lorebook_file_path = self.select_lorebook()
         if not lorebook_file_path:
-            return
+            return None, None
 
-        with open(lorebook_file_path, 'r', encoding='utf-8') as f:
-            entries = json.load(f)
+        try:
+            with open(lorebook_file_path, 'r', encoding='utf-8') as f:
+                entries = json.load(f)
+            return lorebook_file_path, entries
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.logger.Log(f"Error loading lorebook: {e}", 7)
+            return None, None
+
+    def add_entry(self):
+        lorebook_file_path, entries = self._select_and_load_lorebook()
+        if not lorebook_file_path:
+            return
 
         entry_name = input("Enter the name for the new entry: ").strip()
         if not entry_name:
@@ -133,18 +143,14 @@ class LoreBookManager:
         }
         entries.append(new_entry)
 
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(lorebook_file_path, 'w', encoding='utf-8') as f:
             json.dump(entries, f, indent=4)
-        self.logger.Log(f"Successfully added entry '{entry_name}' to '{lorebook_file}'.", 5)
-
+        self.logger.Log(f"Successfully added entry '{entry_name}' to '{os.path.basename(lorebook_file_path)}'.", 5)
 
     def edit_entry(self):
-        lorebook_file_path = self.select_lorebook()
+        lorebook_file_path, entries = self._select_and_load_lorebook()
         if not lorebook_file_path:
             return
-
-        with open(lorebook_file_path, 'r', encoding='utf-8') as f:
-            entries = json.load(f)
 
         if not entries:
             self.logger.Log("This lorebook has no entries to edit.", 6)
@@ -174,30 +180,21 @@ class LoreBookManager:
                     self.interface.BuildSystemQuery(Writer.Prompts.LOREBOOK_ENTRY_EDITING),
                     self.interface.BuildUserQuery(f"Edit the following lorebook entry for '{selected_entry['name']}' based on the prompt: '{edit_prompt}'.\n\nOriginal Content:\n{selected_entry['content']}")
                 ]
-                response_history, _ = self.interface.SafeGenerateJSON(self.logger, messages, model, _RequiredAttribs=["content"])
-                edited_content_text = self.interface.GetLastMessageText(response_history)
-                try:
-                    edited_content_json = json.loads(edited_content_text)
-                    entries[entry_index]['content'] = edited_content_json.get("content", selected_entry['content'])
-                except json.JSONDecodeError:
-                    self.logger.Log("Failed to decode LLM response, keeping original content.", 7)
+                _, edited_json = self.interface.SafeGenerateJSON(self.logger, messages, model, _RequiredAttribs=["content"])
+                entries[entry_index]['content'] = edited_json.get("content", selected_entry['content'])
             else:
                 self.logger.Log("Edit prompt cannot be empty.", 6)
 
-
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(lorebook_file_path, 'w', encoding='utf-8') as f:
                 json.dump(entries, f, indent=4)
             self.logger.Log(f"Successfully updated entry '{selected_entry['name']}'.", 5)
         else:
             self.logger.Log("Invalid selection.", 6)
 
     def remove_entry(self):
-        lorebook_file_path = self.select_lorebook()
+        lorebook_file_path, entries = self._select_and_load_lorebook()
         if not lorebook_file_path:
             return
-
-        with open(lorebook_file_path, 'r', encoding='utf-8') as f:
-            entries = json.load(f)
 
         if not entries:
             self.logger.Log("This lorebook has no entries to remove.", 6)
@@ -212,7 +209,7 @@ class LoreBookManager:
             entry_index = int(choice) - 1
             removed_entry = entries.pop(entry_index)
             
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(lorebook_file_path, 'w', encoding='utf-8') as f:
                 json.dump(entries, f, indent=4)
             self.logger.Log(f"Successfully removed entry '{removed_entry['name']}'.", 5)
         else:

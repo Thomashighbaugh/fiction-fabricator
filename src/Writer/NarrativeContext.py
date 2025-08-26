@@ -181,6 +181,11 @@ class NarrativeContext:
         self.chapters: List[ChapterContext] = []
         self.generation_log: List[str] = [] # Log of significant generation events or decisions
 
+        # New attributes for story type and length
+        self.story_type: Optional[str] = None # 'short_story' or 'novel'
+        self.word_count: int = 0
+        self.chapter_count: int = 0
+
     def set_story_elements(self, elements_md: str):
         self.story_elements_markdown = elements_md
 
@@ -266,6 +271,9 @@ class NarrativeContext:
             "motifs": self.motifs,
             "chapters": [chapter.to_dict() for chapter in self.chapters],
             "generation_log": self.generation_log,
+            "story_type": self.story_type,
+            "word_count": self.word_count,
+            "chapter_count": self.chapter_count,
         }
 
     @classmethod
@@ -283,6 +291,9 @@ class NarrativeContext:
         context.motifs = data.get("motifs", [])
         context.chapters = [ChapterContext.from_dict(ch_data) for ch_data in data.get("chapters", [])]
         context.generation_log = data.get("generation_log", [])
+        context.story_type = data.get("story_type")
+        context.word_count = data.get("word_count", 0)
+        context.chapter_count = data.get("chapter_count", 0)
         return context
 
     def get_context_for_chapter_generation(self, chapter_number: int) -> str:

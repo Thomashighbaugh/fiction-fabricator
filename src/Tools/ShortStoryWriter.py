@@ -1,55 +1,24 @@
 # File: Tools/ShortStoryWriter.py
 # Purpose: Generates a complete short story using an iterative process.
-# This script is self-contained and should be run from the project's root directory.
 
-"""
-FictionFabricator Short Story Writer.
-
-This tool takes a single premise and uses an LLM to generate a complete,
-self-contained short story. It follows an iterative generation process.
-
-The process involves:
-1. Dynamically selecting an LLM from available providers.
-2. Generating a title and a structured 5-point outline from the user's premise.
-3. Writing the beginning of the story.
-4. Iteratively generating the rest of the story in chunks until the LLM
-   signals completion by outputting 'IAMDONE'.
-5. Saving the final story to the `Short_Story/` directory.
-
-Usage:
-python Tools/ShortStoryWriter.py --premise "A librarian discovers that every book is a portal to the world it describes, but can only enter a book once."
-"""
-
-import argparse
 import os
 import sys
 import datetime
 import re
 
-# --- Add project root to path for imports and load .env explicitly ---
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# --- Add src root to path for imports and determine repository root ---
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # This is the 'src' directory
+repo_root = os.path.dirname(project_root)  # One level above 'src' is the repository root
 sys.path.insert(0, project_root)
-
-# dotenv is loaded by the centralized utilities, but we'll try here too for robustness.
-try:
-    from dotenv import load_dotenv
-    dotenv_path = os.path.join(project_root, '.env')
-    if os.path.exists(dotenv_path):
-        load_dotenv(dotenv_path=dotenv_path)
-        print(f"--- Successfully loaded .env file from: {dotenv_path} ---")
-    else:
-        print("--- .env file not found, proceeding with environment variables if available. ---")
-except (ImportError, Exception) as e:
-    print(f"--- Info: Could not load .env file: {e} ---")
 
 # --- Standardized Imports from Main Project ---
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
-# --- Refactored Import for Centralized LLM Utilities ---
 from Writer.LLMUtils import get_llm_selection_menu_for_tool
+import Writer.CritiqueRevision
+import Writer.Config
 
-
-# --- Short Story Prompts (Refactored for Better Structure) ---
+# --- Short Story Prompts ---
 
 PERSONA = """
 You are a celebrated author of short stories, known for crafting concise yet deeply impactful narratives that linger in the reader's mind. Your goal is to write a complete, compelling short story from beginning to end, following a clear narrative structure.
@@ -57,7 +26,6 @@ You are a celebrated author of short stories, known for crafting concise yet dee
 
 GUIDELINES = """
 ## Writing Guidelines
-
 - **Focus on Brevity and Impact:** Every sentence must count. Focus on a single, compelling narrative arc.
 - **Show, Don't Tell:** Use vivid descriptions and character actions to convey emotion and plot.
 - **Complete Arc:** The story must have a clear beginning, rising action, climax, falling action, and a definitive resolution, as defined in your outline.
@@ -141,85 +109,126 @@ Your task is to continue where the story left off. Write the next section, movin
 **IMPORTANT:** Once the story's conclusion (the **Resolution**) is fully written and the narrative is complete based on your outline, and only then, write the exact phrase `IAMDONE` on a new line at the very end of your response. Do NOT write `IAMDONE` if you are only writing the rising action or climax.
 """
 
+import json
+from Writer.NarrativeContext import NarrativeContext
+
 def sanitize_filename(name: str) -> str:
     """Sanitizes a string for use as a filename."""
     name = re.sub(r'[^\w\s-]', '', name).strip()
     name = re.sub(r'[-\s]+', '_', name)
     return name if name else "Untitled_Story"
 
-def write_short_story(premise: str, temp: float = 0.75, max_iterations: int = 10, lore_book: str = None):
-
+def write_short_story(logger: Logger, interface: Interface, outline_file: str, temp: float = 0.75, max_iterations: int = 10, enable_critique_revision: bool = True):
+    """
+    Generates a complete short story from a pre-generated outline file using an iterative process.
+    """
     generation_timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    sys_logger = Logger("ShortStoryLogs")
 
-    lore_book_content = None
-    if lore_book:
-        try:
-            with open(lore_book, "r", encoding='utf-8') as f:
-                lore_book_content = f.read()
-            sys_logger.Log(f"Successfully loaded lore book: {lore_book}", 3)
-        except FileNotFoundError:
-            sys_logger.Log(f"Error: Lore book file not found at {lore_book}", 7)
-            return
+    # --- Step 1: Load NarrativeContext from Outline ---
+    logger.Log(f"Loading outline from: {outline_file}", 3)
+    try:
+        with open(outline_file, "r", encoding='utf-8') as f:
+            narrative_context_dict = json.load(f)
+        narrative_context = NarrativeContext.from_dict(narrative_context_dict)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.Log(f"Error loading or parsing outline file: {e}", 7)
+        return
+
+    premise = narrative_context.initial_prompt
+    outline = narrative_context.base_novel_outline_markdown
+    lore_book_content = narrative_context.lore_book_content
+
+    if not outline:
+        logger.Log("The selected outline file does not contain a valid outline. Exiting.", 7)
+        return
 
     lore_book_section = LORE_BOOK_PROMPT_SECTION.format(lore_book_content=lore_book_content) if lore_book_content else ""
 
-    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger, "Short Story Writer")
+    selected_model_uri = get_llm_selection_menu_for_tool(logger, "Short Story Writer")
     if not selected_model_uri:
-        sys.exit(1)
+        return
 
-    interface = Interface()
-    interface.LoadModels([selected_model_uri])
+    # Get critique/revision model selection
+    critique_model_uri = None
+    if enable_critique_revision:
+        print("\nSelect model for critique and revision (can be same as writing model):")
+        critique_model_uri = get_llm_selection_menu_for_tool(logger, "Short Story Critique & Revision")
+        if not critique_model_uri:
+            logger.Log("No critique model selected. Disabling critique/revision cycle.", 6)
+            enable_critique_revision = False
+
+    interface.LoadModels([selected_model_uri] + ([critique_model_uri] if critique_model_uri and critique_model_uri != selected_model_uri else []))
     model_with_params = f"{selected_model_uri}?temperature={temp}&max_tokens=2000"
 
-    # --- Step 1: Generate Title and Outline ---
-    sys_logger.Log("Generating title and a structured 5-point outline...", 2)
-    title_prompt = TITLE_AND_OUTLINE_PROMPT_TEMPLATE.format(persona=PERSONA, premise=premise, lore_book_section=lore_book_section)
-    response_history = interface.SafeGenerateText(sys_logger, [interface.BuildUserQuery(title_prompt)], model_with_params, min_word_count_target=50)
-    title_and_outline_text = interface.GetLastMessageText(response_history)
+    # --- Step 2: Generate Title (if needed) and Start of Story ---
+    # The title is now derived from the outline file name or generated if needed
+    base_filename = os.path.basename(outline_file).rsplit('.', 1)[0]
+    # Clean up timestamp if present
+    title = base_filename.replace('_', ' ')
+    
+    logger.Log(f"Title: {title}", 5)
+    logger.Log(f"Outline:\n{outline}", 4)
 
-    try:
-        title = re.search(r"Title:\s*(.*)", title_and_outline_text, re.IGNORECASE).group(1).strip()
-        outline = title_and_outline_text.split("Outline:")[1].strip()
-    except (AttributeError, IndexError):
-        sys_logger.Log("Failed to parse title and outline from the LLM response. Exiting.", 7)
-        print("--- LLM Response ---")
-        print(title_and_outline_text)
-        print("--------------------")
-        sys.exit(1)
-
-    sys_logger.Log(f"Title: {title}", 5)
-    sys_logger.Log(f"Outline:\n{outline}", 4)
-
-    # --- Step 2: Generate Start of Story ---
-    sys_logger.Log("Generating the beginning of the story...", 2)
+    logger.Log("Generating the beginning of the story...", 2)
     start_prompt = STARTING_PROMPT_TEMPLATE.format(persona=PERSONA, premise=premise, title=title, outline=outline, guidelines=GUIDELINES, lore_book_section=lore_book_section)
-    response_history = interface.SafeGenerateText(sys_logger, [interface.BuildUserQuery(start_prompt)], model_with_params, min_word_count_target=500)
+    response_history = interface.SafeGenerateText(logger, [interface.BuildUserQuery(start_prompt)], model_with_params, min_word_count_target=500)
     story_draft = interface.GetLastMessageText(response_history)
 
-
     # --- Step 3: Iteratively Continue Story ---
-    sys_logger.Log("Continuing story generation iteratively...", 2)
+    logger.Log("Continuing story generation iteratively...", 2)
     iteration_count = 1
     while 'IAMDONE' not in story_draft and iteration_count <= max_iterations:
-        sys_logger.Log(f"--- Continuing generation (Iteration {iteration_count}) ---", 3)
+        logger.Log(f"--- Continuing generation (Iteration {iteration_count}) ---", 3)
         continuation_prompt = CONTINUATION_PROMPT_TEMPLATE.format(
             persona=PERSONA, premise=premise, title=title, outline=outline, story_text=story_draft, guidelines=GUIDELINES, lore_book_section=lore_book_section
         )
-        response_history = interface.SafeGenerateText(sys_logger, [interface.BuildUserQuery(continuation_prompt)], model_with_params, min_word_count_target=500)
+        response_history = interface.SafeGenerateText(logger, [interface.BuildUserQuery(continuation_prompt)], model_with_params, min_word_count_target=500)
         continuation = interface.GetLastMessageText(response_history)
         story_draft += '\n\n' + continuation
         iteration_count += 1
 
     if iteration_count > max_iterations:
-        sys_logger.Log(f"Reached max iterations ({max_iterations}). Story may be incomplete.", 6)
+        logger.Log(f"Reached max iterations ({max_iterations}). Story may be incomplete.", 6)
 
-    sys_logger.Log("Story generation complete.", 5)
+    logger.Log("Story generation complete.", 5)
 
-    # --- Step 4: Finalize and Save ---
+    # --- Step 4: Critique and Revision Cycle ---
     final_story = story_draft.replace('IAMDONE', '').strip()
+    
+    if enable_critique_revision and critique_model_uri:
+        logger.Log("Starting critique and revision cycle for short story...", 2)
+        
+        task_description = f"You are reviewing a complete short story titled '{title}'. The story should be a compelling, well-structured narrative that follows the provided outline and maintains consistent style, pacing, and character development throughout."
+        
+        narrative_context_summary = f"Title: {title}\nPremise: {premise}\nOutline:\n{outline}"
+        if lore_book_content:
+            narrative_context_summary += f"\nLore Book Context: {lore_book_content[:500]}..."  # Truncate for summary
+            
+        revised_story = Writer.CritiqueRevision.critique_and_revise_creative_content(
+            interface,
+            logger,
+            initial_content=final_story,
+            task_description=task_description,
+            narrative_context_summary=narrative_context_summary,
+            initial_user_prompt=premise,
+            style_guide=GUIDELINES,  # Use the short story guidelines as style guide
+            selected_model=critique_model_uri,
+            justification="Short story critique and revision cycle"
+        )
+        
+        if revised_story and not "[ERROR:" in revised_story:
+            final_story = revised_story
+            logger.Log("Critique and revision cycle completed successfully.", 5)
+        else:
+            logger.Log("Critique and revision cycle failed. Using original story.", 6)
+    elif enable_critique_revision:
+        logger.Log("Critique and revision was enabled but no model was selected. Skipping.", 6)
+    else:
+        logger.Log("Critique and revision disabled. Using original story.", 4)
 
-    output_dir = os.path.join(project_root, "Generated_Content", "Short_Story")
+    # --- Step 5: Finalize and Save ---
+
+    output_dir = os.path.join(repo_root, "Generated_Content", "Short_Story")
     os.makedirs(output_dir, exist_ok=True)
 
     safe_title = sanitize_filename(title)
@@ -231,15 +240,15 @@ def write_short_story(premise: str, temp: float = 0.75, max_iterations: int = 10
             f.write(f"# {title}\n\n")
             f.write(f"**Premise:** {premise}\n\n")
             if lore_book_content:
-                f.write(f"**Lore Book:** {os.path.basename(lore_book)}\n\n")
+                f.write(f"**Lore Book:** Used from outline\n\n")
             f.write(f"**Generated on:** {generation_timestamp}\n\n")
             f.write("---\n\n")
             f.write(f"## Outline\n\n{outline}\n\n")
             f.write("---\n\n")
             f.write(final_story)
-        sys_logger.Log(f"Successfully saved short story to: {output_path}", 5)
+        logger.Log(f"Successfully saved short story to: {output_path}", 5)
     except Exception as e:
-        sys_logger.Log(f"Error saving story to file: {e}", 7)
+        logger.Log(f"Error saving story to file: {e}", 7)
 
     print(f"\n--- Short Story Generation Complete. Find your story at: {output_path} ---")
 

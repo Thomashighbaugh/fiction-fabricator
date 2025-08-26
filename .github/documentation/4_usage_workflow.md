@@ -63,7 +63,22 @@ Enter your choice (1-3):
 
 The content of the selected Lorebook will be provided to the LLM as additional context during relevant generation steps, helping to ensure consistency with your established lore.
 
-## Step 4: Write the Novel
+## Step 4: Generate an Outline (Short Story or Novel)
+
+Outlines are now a required prerequisite for both novels and short stories. The workflow differs slightly:
+
+- Short Story: Generates a single, scene-by-scene structured outline (stored under `Generated_Content/Outlines/Short_Stories/`). You then use this outline to iteratively write the full short story.
+- Novel: Generates a multi-chapter outline (stored under `Generated_Content/Outlines/Novels/`). If you request more chapters than the model initially provides, only the missing chapters are appended (see below).
+
+From the main menu (option 3), select a previously generated prompt, optionally attach a Lorebook, then choose:
+1. Short Story – provide desired target word count (default 15,000). Chapter count is fixed to 1 internally.
+2. Novel – provide the desired number of chapters.
+
+After generation, the system automatically titles and saves the outline to the appropriate directory. You must then select that outline for downstream writing (short story or full novel generation).
+
+If the outlines directory for a type does not yet exist, it will be created automatically the first time you attempt to select an outline.
+
+## Step 5: Write the Story (Novel or Short Story)
 
 Use the main `main.py` script to start the full generation process, using the prompt file you just created.
 
@@ -92,7 +107,29 @@ python main.py \
 -Lorebook "LoreBooks/MyFantasyWorld.txt"
 ```
 
-## Step 5: Find Your Story
+### New Outline Behavior (Chapter Count Enforcement)
+
+If you specify a desired chapter count and the initial outline produces fewer chapters, the system now APPENDS ONLY the missing chapters instead of regenerating the entire outline:
+
+- It detects the current number of chapters.
+- If below target, it prompts the model to create Chapters N+1 through Target, using only the last one or two chapters for context.
+- It does NOT rewrite or alter earlier chapters, preserving stability.
+- A second append attempt may run if the first does not reach the target count.
+
+This approach reduces prompt size, speeds up iteration, and prevents accidental drift in early chapters.
+
+## Groq Endpoint Override
+
+Groq models are referenced using the groq:// scheme, e.g.:
+- groq://llama-3.1-8b-instant
+
+Environment variables:
+- GROQ_API_KEY: (required) your Groq key
+- GROQ_API_BASE (or GROQ_API_BASE_URL): (optional) custom base URL (defaults to the official Groq endpoint). Useful for proxies or gateways.
+
+Safe params (via URI query) include temperature, top_p, max_tokens, seed, max_retries, request_timeout.
+
+## Step 6: Find Your Story
 
 All output is saved to uniquely named directories to prevent overwriting your work.
 

@@ -14,7 +14,7 @@ class Logger:
         Initializes the logger, creating a unique directory for each run.
         """
         # Make Paths For Log
-        log_dir_name = f"{Writer.Config.PROJECT_NAME}_" + datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        log_dir_name = f"{Writer.Config.PROJECT_NAME}_".replace("_", "__") + datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         log_dir_path = os.path.join(_LogfilePrefix, log_dir_name)
         
         self.LangchainDebugPath = os.path.join(log_dir_path, "LangchainDebug")
@@ -25,6 +25,12 @@ class Logger:
         self.LogPath = os.path.join(log_dir_path, "Main.log")
         self.File = open(self.LogPath, "a", encoding='utf-8')
         self.LangchainID = 0
+
+    def _create_log_entry(self, _Item, _Level: int = 1):
+        """
+        Creates a log entry with a timestamp and level.
+        """
+        return f"[{str(_Level).ljust(2)}] [{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}] {_Item}"
 
     def SaveLangchain(self, _LangChainID: str, _LangChain: list):
         """
@@ -64,7 +70,7 @@ class Logger:
     def Log(self, _Item, _Level: int = 1):
         """Logs an item to the console and the log file with appropriate color-coding."""
         # Create Log Entry
-        log_entry = f"[{str(_Level).ljust(2)}] [{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}] {_Item}"
+        log_entry = self._create_log_entry(_Item, _Level)
 
         # Write it to file
         self.File.write(log_entry + "\n")

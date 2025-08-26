@@ -1,66 +1,27 @@
 # File: Tools/PremiseGenerator.py
 # Purpose: Generates 10 story premises from a rough theme or idea using an LLM.
-# This script is self-contained and should be run from the project's root directory.
 
-"""
-FictionFabricator Premise Generator Utility.
-
-This script takes a basic user idea and a desired story title to generate a more
-detailed and refined `prompt.txt` file. This output file is structured to be an
-effective input for the main Write.py script.
-
-The process involves:
-1. Dynamically selecting an LLM from available providers.
-2. Expanding the user's initial idea using the selected LLM.
-3. Having the LLM critique its own expansion.
-4. Refining the prompt based on this critique.
-5. Saving the final prompt to `Prompts/<SanitizedTitle>/prompt.txt`.
-
-Requirements:
-- All packages from the main project's `requirements.txt`.
-- A configured `.env` file with API keys for desired providers.
-- An accessible Ollama server if using local models.
-
-Usage:
-python Tools/prompt_generator.py -t "CrashLanded" -i "After the surveying vessel crashed on the planet it was sent to determine viability for human colonization, the spunky 23 year old mechanic Jade and the hardened 31 year old security officer Charles find the planet is not uninhabited but teeming with humans living in primitive tribal conditions and covered in the ruins of an extinct human society which had advanced technologies beyond what are known to Earth. Now they must navigate the politics of these tribes while trying to repair their communication equipment to call for rescue, while learning to work together despite their initial skepticism about the other."
-"""
-
-import argparse
 import os
 import sys
 import json
-import datetime # <<< IMPORT ADDED HERE
-import dotenv
-import re # Import re for potential future use or robustness
+import datetime
+import re
 
-# --- Add project root to path for imports and load .env explicitly ---
+# --- Add project root to path for imports ---
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
-
-try:
-    dotenv_path = os.path.join(project_root, '.env')
-    if os.path.exists(dotenv_path):
-        dotenv.load_dotenv(dotenv_path=dotenv_path)
-        print(f"--- Successfully loaded .env file from: {dotenv_path} ---")
-    else:
-        print("--- .env file not found, proceeding with environment variables if available. ---")
-except Exception as e:
-    print(f"--- Error loading .env file: {e} ---")
 
 # --- Standardized Imports from Main Project ---
 from Writer.Interface.Wrapper import Interface
 from Writer.PrintUtils import Logger
-# --- Refactored Import for Centralized LLM Utilities ---
 from Writer.LLMUtils import get_llm_selection_menu_for_tool
 
-
-# --- Prompts for this script (Refactored for Better Structure and Stylistic Guidance) ---
+# --- Prompts for this script ---
 
 SYSTEM_PROMPT_STYLE_GUIDE = """
 You are a creative brainstorming assistant and an expert in crafting compelling story premises. Your goal is to generate ideas that are fresh, intriguing, and rich with narrative potential, tailored to the user's request and adhering to specific stylistic guidelines.
 """
 
-# --- REVISED Prompt Template ---
 GENERATE_PREMISES_PROMPT_TEMPLATE = """
 A user has provided a rough theme or idea and wants you to generate 10 distinct, compelling story premises based on it.
 
@@ -139,35 +100,24 @@ Rewrite the list of 10 premises to directly address the points in the "EDITOR'S 
 **CRUCIAL:** Your entire output MUST be a single, valid JSON object, identical in format to the original. It must have one key, "premises", which is a list of exactly 10 strings. Do not include any text or explanations outside of the JSON object.
 """
 
-def sanitize_filename(name: str) -> str:
-    """Sanitizes a string to be suitable for a filename or directory name."""
-    name = re.sub(
-        r"[^\w\s-]", "", name
-    ).strip()  # Remove non-alphanumeric (except underscore, hyphen, space)
-    name = re.sub(r"[-\s]+", "_", name)  # Replace spaces and hyphens with underscores
-    return name if name else "Untitled_Prompt"
-
-
-def generate_premises(idea: str, temp: float = 0.8):
-
-    generation_timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') # This line now has datetime available.
-
-    print("--- FictionFabricator Premise Generator ---")
-    sys_logger = Logger(os.path.join("Logs", "PremiseGenLogs"))
+def generate_premises(logger: Logger, interface: Interface, idea: str, temp: float = 0.8):
+    """
+    Generates 10 story premises from a rough theme or idea using an LLM.
+    """
+    generation_timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    logger.Log("--- FictionFabricator Premise Generator ---", 2)
 
     # --- Dynamic Model Selection ---
-    selected_model_uri = get_llm_selection_menu_for_tool(sys_logger, tool_name="Premise Generator")
+    selected_model_uri = get_llm_selection_menu_for_tool(logger, tool_name="Premise Generator")
     if not selected_model_uri:
-        sys_logger.Log("No model was selected or discovered. Exiting.", 7)
-        sys.exit(1)
+        logger.Log("No model was selected or discovered. Exiting.", 7)
+        return
 
-    interface = Interface()
     interface.LoadModels([selected_model_uri])
 
     # Step 1: Generate Initial Premises
-    print(f"\nStep 1: Brainstorming 10 initial premises for the idea: '{idea}'...")
+    logger.Log(f"\nStep 1: Brainstorming 10 initial premises for the idea: '{idea}'...", 2)
     generation_prompt = GENERATE_PREMISES_PROMPT_TEMPLATE.format(idea=idea)
-    # Increased max_tokens for potentially more detailed premises due to style blending
     model_with_params = f"{selected_model_uri}?temperature={temp}&max_tokens=4000"
 
     messages = [
@@ -175,18 +125,17 @@ def generate_premises(idea: str, temp: float = 0.8):
         interface.BuildUserQuery(generation_prompt)
     ]
     _, initial_response_json = interface.SafeGenerateJSON(
-        sys_logger, messages, model_with_params, _RequiredAttribs=["premises"]
+        logger, messages, model_with_params, _RequiredAttribs=["premises"]
     )
 
     if not initial_response_json or "premises" not in initial_response_json or not isinstance(initial_response_json["premises"], list) or len(initial_response_json["premises"]) != 10:
-        print("Error: Failed to generate an initial valid list of 10 premises. Aborting.")
-        sys_logger.Log("Initial premise generation failed to return 10 valid premises.", 7)
-        sys.exit(1)
+        logger.Log("Error: Failed to generate an initial valid list of 10 premises. Aborting.", 7)
+        return
 
     final_premises = initial_response_json['premises']
 
     # Step 2: Critique the generated premises
-    print("\nStep 2: Critiquing the initial list of premises...")
+    logger.Log("\nStep 2: Critiquing the initial list of premises...", 2)
     critique_prompt = CRITIQUE_PREMISES_PROMPT_TEMPLATE.format(
         idea=idea, premises_json=json.dumps(initial_response_json, indent=2)
     )
@@ -194,22 +143,20 @@ def generate_premises(idea: str, temp: float = 0.8):
         interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
         interface.BuildUserQuery(critique_prompt)
     ]
-    # Use a slightly lower temperature for critique for more focused feedback
     critique_model_with_params = f"{selected_model_uri}?temperature=0.5&max_tokens=2000"
     critique_history = interface.SafeGenerateText(
-        sys_logger, critique_messages, critique_model_with_params, min_word_count_target=50
+        logger, critique_messages, critique_model_with_params, min_word_count_target=50
     )
     critique = interface.GetLastMessageText(critique_history).strip()
 
     # Step 3: Revise the premises based on critique
     if "[ERROR:" in critique or not critique:
-        print("\nWarning: Critique step failed or returned empty. Skipping revision and using initial premises.")
-        sys_logger.Log("Critique step failed or was empty, skipping revision.", 6)
+        logger.Log("\nWarning: Critique step failed or returned empty. Skipping revision and using initial premises.", 6)
     else:
-        print("\n--- Critique ---")
-        print(critique)
-        print("----------------")
-        print("\nStep 3: Revising premises based on critique...")
+        logger.Log("\n--- Critique ---", 3)
+        logger.Log(critique, 3)
+        logger.Log("----------------", 3)
+        logger.Log("\nStep 3: Revising premises based on critique...", 2)
         revision_prompt = REVISE_PREMISES_BASED_ON_CRITIQUE_TEMPLATE.format(
             idea=idea,
             original_premises_json=json.dumps(initial_response_json, indent=2),
@@ -219,36 +166,28 @@ def generate_premises(idea: str, temp: float = 0.8):
             interface.BuildSystemQuery(SYSTEM_PROMPT_STYLE_GUIDE),
             interface.BuildUserQuery(revision_prompt)
         ]
-        # Use similar temperature for revision as generation, to maintain creativity under guidance
         revision_model_with_params = f"{selected_model_uri}?temperature={temp}&max_tokens=4000"
-        revision_history = interface.SafeGenerateText(
-            sys_logger, revision_messages, revision_model_with_params, min_word_count_target=100
-        )
-        # Use SafeGenerateJSON for the revision step as it expects a JSON output
-        revised_response_json = interface.SafeGenerateJSON(
-             sys_logger, revision_messages, revision_model_with_params, _RequiredAttribs=["premises"]
+        _, revised_response_json = interface.SafeGenerateJSON(
+             logger, revision_messages, revision_model_with_params, _RequiredAttribs=["premises"]
         )
 
         if revised_response_json and "premises" in revised_response_json and isinstance(revised_response_json["premises"], list) and len(revised_response_json["premises"]) == 10:
             final_premises = revised_response_json['premises']
-            print("Successfully revised premises.")
-            sys_logger.Log("Successfully revised premises based on critique.", 5)
+            logger.Log("Successfully revised premises.", 5)
         else:
-            print("\nWarning: Revision step failed to produce a valid list of 10 premises. Using initial premises.")
-            sys_logger.Log("Revision step failed to produce 10 valid premises, reverting to initial set.", 6)
+            logger.Log("\nWarning: Revision step failed to produce a valid list of 10 premises. Using initial premises.", 6)
 
     if not final_premises:
-        print("Error: The final list of premises is empty. Aborting.")
-        sys_logger.Log("Final premise list is empty after all steps. Aborting.", 7)
-        sys.exit(1)
+        logger.Log("Error: The final list of premises is empty. Aborting.", 7)
+        return
 
-    print("\n--- Final Generated Premises ---")
+    logger.Log("\n--- Final Generated Premises ---", 5)
     formatted_output = ""
     for i, premise in enumerate(final_premises):
         premise_text = f"## Premise {i+1}\n\n{premise}\n\n---\n"
         print(premise_text)
         formatted_output += premise_text
-    print("--------------------------")
+    logger.Log("--------------------------", 5)
 
     premises_base_dir = os.path.join(project_root, "Logs", "Premises")
     os.makedirs(premises_base_dir, exist_ok=True)
@@ -261,15 +200,12 @@ def generate_premises(idea: str, temp: float = 0.8):
             f.write(f"# Premises for Idea: {idea}\n")
             f.write(f"# Generated on: {generation_timestamp}\n\n")
             f.write(formatted_output)
-        print(f"\nSuccessfully saved generated premises to: {output_path}")
-        sys_logger.Log(f"Saved generated premises to {output_path}", 5)
+        logger.Log(f"\nSuccessfully saved generated premises to: {output_path}", 5)
     except OSError as e:
-        print(f"Error creating directory or writing file to '{output_path}': {e}")
-        sys_logger.Log(f"Error saving premises to file: {e}", 7)
-        sys.exit(1)
+        logger.Log(f"Error creating directory or writing file to '{output_path}': {e}", 7)
 
-    print("\n--- Premise Generation Complete ---")
-    print("You can now use any of these premises as input for Tools/PromptGenerator.py")
+    logger.Log("\n--- Premise Generation Complete ---", 5)
+    logger.Log("You can now use any of these premises as input for Tools/PromptGenerator.py", 3)
 
 
 

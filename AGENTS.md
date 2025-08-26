@@ -1,32 +1,32 @@
 # Fiction Fabricator - Agents Guide
 
-## Build/Test Commands
-- **Run application**: `python main.py`
-- **Install dependencies**: `pip install -r requirements.txt`
-- **No formal test framework** - manual testing via application usage
+## Build/Lint/Test Commands
+- **Run application:** `python main.py`
+- **Install dependencies:** `pip install -r requirements.txt`
+- **Test LLM7 integration:** `python test_llm7.py`
+- **Linting:** No formal linter configured; follow style guidelines below.
+- **Testing:** No automated test framework. To test, run the application and verify output manually.
+- **Single test:** Isolate functionality in main.py or relevant module, run `python main.py` and check results.
 
-## Code Structure & Entry Points
-- Main entry: `main.py` - CLI interface for all functionality
-- Core modules: `src/Tools/` (generators), `src/Writer/` (writing pipeline)
-- Configuration: `config.ini` (model selection, settings)
-- LLM Providers: `src/Writer/Interface/` (OpenRouter, Wrapper)
+## Code Style Guidelines
+- **Imports:** Standard library first, then third-party, then local imports.
+- **Formatting:** 4 spaces per indent, max 120 chars/line, no trailing whitespace.
+- **Naming:**
+  - Functions/variables: snake_case
+  - Classes: PascalCase
+  - Constants: UPPER_SNAKE_CASE (see Config.py)
+- **Types:** Use type hints where possible, especially for public APIs.
+- **Functions:** Descriptive docstrings required.
+- **Error Handling:** Use try/except with specific exceptions; fallback to defaults gracefully.
+- **Logging:** Use the custom Logger class for all logs; prefer termcolor for console output.
 
-## Python Code Style
-- **Imports**: Standard library first, then third-party, then local imports
-- **Functions**: snake_case naming, descriptive docstrings
-- **Classes**: PascalCase, clear type hints where used
-- **Variables**: snake_case, descriptive names
-- **Constants**: UPPER_SNAKE_CASE in Config.py
+## Agentic Conventions
+- Access config via `get_config_or_default()`.
+- Use `os.path.join()` for file paths.
+- Environment variables loaded via python-dotenv.
+- LLM models use provider prefixes (e.g., `google://`, `mistralai://`, `llm7://`).
+- LLM7 models: Use `llm7://model-name` format (e.g., `llm7://gpt-4.1-nano-2025-04-14`).
+- Lorebook management via main menu.
 
-## Error Handling
-- Use try/except with specific exceptions
-- Graceful fallbacks with default values
-- Termcolor for colored console output
-- Extensive logging via custom Logger class
-
-## Key Conventions
-- Config values accessed via `get_config_or_default()` helper
-- LLM models specified with provider prefixes (e.g., "google://", "mistralai://")
-- File paths use `os.path.join()` for cross-platform compatibility
-- Environment variables loaded via python-dotenv
-- Lorebook management via the main menu for creating, editing, and generating lorebooks.
+---
+For questions, consult documentation/ or ask a maintainer.

@@ -72,6 +72,7 @@ EVAL_MODEL = get_config_or_default('LLM_SELECTION', 'eval_model', "google://gemi
 INFO_MODEL = get_config_or_default('LLM_SELECTION', 'info_model', "google://gemini-1.5-flash-latest")
 SCRUB_MODEL = get_config_or_default('LLM_SELECTION', 'scrub_model', "google://gemini-1.5-flash-latest")
 CHECKER_MODEL = get_config_or_default('LLM_SELECTION', 'checker_model', "google://gemini-1.5-flash-latest")
+AZURE_DEPLOYMENT_NAME = get_config_or_default('LLM_SELECTION', 'azure_deployment_name', '')
 
 
 # --- NVIDIA Specific Settings (if used) ---
@@ -117,6 +118,9 @@ OPTIONAL_OUTPUT_NAME = ""
 # "mistralai://mistral-large-latest"
 # "groq://mixtral-8x7b-32768"
 # "nvidia://meta/llama3-8b-instruct"
-
+# "azure://<your-deployment-name>"
 # "ollama://llama3:70b"
 # "ollama://command-r-plus@10.1.65.4:11434"
+# "llm7://gpt-4.1-nano-2025-04-14"
+# "llm7://deepseek-r1-0528"
+# "llm7://mistral-large-2411"
