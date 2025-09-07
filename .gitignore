@@ -1,9 +1,42 @@
+# Fiction Fabricator - Generated Content and User Data
+# Ignore all project directories (generated novels/stories)
+202*-*/
+*-*/
+
+# Ignore prompt files
+*.txt
+prompt.txt
+idea.txt
+
+# Ignore generated content exports
+*.md
+*.epub
+
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 .env
 .venv
 env/
@@ -12,6 +45,22 @@ ENV/
 env.bak/
 venv.bak/
 
-# Generated content
-Generated_Content/
-Logs/
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/

@@ -1,32 +1,23 @@
-# Fiction Fabricator - Agents Guide
+# AGENTS.md - Development Guide for Fiction Fabricator
 
-## Build/Lint/Test Commands
-- **Run application:** `python main.py`
-- **Install dependencies:** `pip install -r requirements.txt`
-- **Test LLM7 integration:** `python test_llm7.py`
-- **Linting:** No formal linter configured; follow style guidelines below.
-- **Testing:** No automated test framework. To test, run the application and verify output manually.
-- **Single test:** Isolate functionality in main.py or relevant module, run `python main.py` and check results.
+## Build & Run Commands
+- **Install dependencies**: `uv sync`
+- **Run application**: `uv run python main.py`
+- **Run with prompt file**: `uv run python main.py --prompt idea.txt`
+- **Resume project**: `uv run python main.py --resume project-folder`
+- **No test framework configured** - check src/ for manual testing
 
-## Code Style Guidelines
-- **Imports:** Standard library first, then third-party, then local imports.
-- **Formatting:** 4 spaces per indent, max 120 chars/line, no trailing whitespace.
-- **Naming:**
-  - Functions/variables: snake_case
-  - Classes: PascalCase
-  - Constants: UPPER_SNAKE_CASE (see Config.py)
-- **Types:** Use type hints where possible, especially for public APIs.
-- **Functions:** Descriptive docstrings required.
-- **Error Handling:** Use try/except with specific exceptions; fallback to defaults gracefully.
-- **Logging:** Use the custom Logger class for all logs; prefer termcolor for console output.
+## Code Style & Conventions
+- **Python**: Use UTF-8 encoding header `# -*- coding: utf-8 -*-`
+- **Imports**: Standard library first, third-party, then local (src.module)
+- **Type hints**: Use modern syntax (`str | None`, not `Optional[str]`)
+- **Error handling**: Catch specific exceptions, use rich console for user messages
+- **Classes**: PascalCase, methods snake_case, constants UPPER_CASE
+- **Docstrings**: Use triple quotes with brief description
+- **Rich UI**: Use rich.console for all user output, panels for status messages
 
-## Agentic Conventions
-- Access config via `get_config_or_default()`.
-- Use `os.path.join()` for file paths.
-- Environment variables loaded via python-dotenv.
-- LLM models use provider prefixes (e.g., `google://`, `mistralai://`, `llm7://`).
-- LLM7 models: Use `llm7://model-name` format (e.g., `llm7://gpt-4.1-nano-2025-04-14`).
-- Lorebook management via main menu.
-
----
-For questions, consult documentation/ or ask a maintainer.
+## Project Structure
+- `src/` - Main package with config, LLM client, orchestrator, project management
+- `main.py` - Entry point with argparse CLI
+- Dependencies: google-generativeai, rich, lxml, ebooklib, python-dotenv
+- Requires Python 3.13+ and GEMINI_API_KEY in .env file
