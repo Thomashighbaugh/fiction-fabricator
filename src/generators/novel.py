@@ -9,7 +9,7 @@ from src.llm_client import LLMClient
 from src.project import Project
 from src import ui
 
-def generate_outline(llm_client: LLMClient, project: Project):
+def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: str = ""):
     """
     Guides the LLM to generate a full book outline with characters and chapter summaries.
     Returns a new book_root ElementTree object or None on failure.
@@ -27,6 +27,8 @@ The current state of the book is:
 ```xml
 {current_book_xml_for_prompt}
 ```
+
+{lorebook_context}
 
 Based on the title, synopsis, and initial idea, please generate a full outline:
 1. Keep the existing title and synopsis exactly as provided

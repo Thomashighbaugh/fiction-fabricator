@@ -1,0 +1,28 @@
+{
+  "entries": [
+    {
+      "keys": [
+        "magic",
+        "spells",
+        "arcane"
+      ],
+      "content": "The magic system is based on elemental manipulation through precise gestures and ancient words.",
+      "comment": "Magic System",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": [
+        "dragon",
+        "Pyraxis",
+        "fire"
+      ],
+      "content": "Pyraxis the Ancient is a massive red dragon who guards the Crimson Mountains.",
+      "comment": "Pyraxis the Dragon",
+      "enable": true,
+      "disable": false
+    }
+  ],
+  "name": "test_lorebook",
+  "description": "Fiction Fabricator Test Lorebook"
+}

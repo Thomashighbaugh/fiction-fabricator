@@ -3,12 +3,13 @@
 short_story.py - Contains the specific logic for generating a short story outline.
 """
 import xml.etree.ElementTree as ET
+from rich.panel import Panel
 
 from src.llm_client import LLMClient
 from src.project import Project
 from src import ui
 
-def generate_outline(llm_client: LLMClient, project: Project):
+def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: str = ""):
     """
     Guides the LLM to generate a short story outline with characters and scene summaries.
     Returns a new book_root ElementTree object or None on failure.
@@ -26,6 +27,8 @@ The current state of the project is:
 ```xml
 {current_book_xml_for_prompt}
 ```
+
+{lorebook_context}
 
 Based on the title, synopsis, and initial idea, please generate a complete outline for a short story:
 1. Keep the existing title and synopsis exactly as provided

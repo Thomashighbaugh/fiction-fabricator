@@ -49,6 +49,9 @@ uv run python main.py [OPTIONS]
 
 - `--resume FOLDER_PATH`: Point to an existing project folder (e.g., `20240315-space-opera-saga-f3a4b1c9`) to continue a previously started job.
 - `--prompt FILE_PATH`: Provide the path to a `.txt` file containing your book idea. This is only used when starting a _new_ project (ignored if `--resume` is used).
+- `--lorebook JSON_FILE`: Load a Tavern AI format lorebook to provide world-building context during story generation.
+- `--create-lorebook JSON_FILE`: Launch the interactive lorebook manager to create or edit lorebooks with LLM assistance.
+- `--create-prompt`: Transform a basic story idea into a comprehensive, detailed prompt using LLM assistance.
 
 ## Project Files
 
@@ -58,6 +61,46 @@ uv run python main.py [OPTIONS]
 - **`outline.xml`:** The initial blueprint. Contains metadata (title, synopsis, your idea), character profiles, and chapter/scene summaries generated in Phase 1. This is the starting map.
 - **`patch-NN.xml`:** Sequential dispatch logs. Each patch records a chunk of generated chapter content (Phase 2) or the results of an editing action (Phase 3). When resuming, `fiction fabricator` replays these patches to reconstruct the story's current state.
 - **Exported Files:** The `Export Menu` in the editing phase allows you to create various output files, such as `my-story.epub`, `my-story-full.md`, and individual chapter markdown files.
+
+## Lorebook Features
+
+`fiction fabricator` includes comprehensive lorebook support for consistent world-building:
+
+- **Automatic Context Injection:** Lorebook entries are automatically included in story generation when their keywords match the content being created
+- **Interactive Lorebook Manager:** Create and edit lorebooks with the `--create-lorebook` flag  
+- **LLM-Assisted Creation:** AI helps expand basic entries into rich, detailed world-building content
+- **Tavern AI Compatible:** Uses standard Tavern AI lorebook format for compatibility with existing tools
+
+**Quick Examples:**
+```bash
+# Create a new lorebook
+uv run python main.py --create-lorebook fantasy_world.json
+
+# Use lorebook with story generation  
+uv run python main.py --lorebook fantasy_world.json --prompt story_idea.txt
+```
+
+For complete lorebook documentation, see [LOREBOOK.md](LOREBOOK.md) or [LOREBOOK_QUICK.md](LOREBOOK_QUICK.md) for a quick reference.
+
+## Prompt Enhancement Features
+
+Transform your basic story ideas into comprehensive, detailed prompts with AI assistance:
+
+- **Interactive Enhancement:** The `--create-prompt` flag launches an interactive session to expand your ideas
+- **Smart Expansion:** AI transforms simple concepts into rich prompts with character development, world-building, and thematic depth
+- **Story Type Selection:** Choose between novel, short story, or let AI decide the best format
+- **Genre Integration:** Specify genre preferences or let AI determine the best fit
+- **Lorebook Integration:** Automatically incorporates relevant world-building context when available
+- **Multiple Output Options:** Save enhanced prompts to files, copy for manual use, or immediately start story generation
+
+**Quick Examples:**
+```bash
+# Create an enhanced prompt interactively
+uv run python main.py --create-prompt
+
+# Use with existing lorebook for richer context
+uv run python main.py --create-prompt --lorebook world.json
+```
 
 ## Content Pipeline
 

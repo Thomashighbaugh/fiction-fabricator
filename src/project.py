@@ -146,6 +146,11 @@ class Project:
 
                 new_content = chapter_patch.find("content")
                 if new_content is not None:
+                    # Clean paragraph text to remove unwanted line breaks
+                    for paragraph in new_content.findall("paragraph"):
+                        if paragraph.text:
+                            paragraph.text = utils.clean_paragraph_text(paragraph.text)
+                    
                     old_content = target_chapter.find("content")
                     if old_content is not None:
                         target_chapter.remove(old_content)

@@ -64,3 +64,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
+prompts/
+prompt.txt 
+prompts/*.txt

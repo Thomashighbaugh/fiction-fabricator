@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "keys": ["magic", "spell", "wizard"],
+      "content": "Magic in this world is channeled through crystals that glow when touched by those with the gift. Spells require both verbal incantations and precise hand gestures.",
+      "comment": "Magic System",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": ["Eldoria", "kingdom", "capital"],
+      "content": "Eldoria is the great kingdom ruled by Queen Lysandra. The capital city is built on seven hills, with the Royal Palace at the highest point overlooking the harbor.",
+      "comment": "Kingdom of Eldoria",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": ["dragon", "Shadowfyre"],
+      "content": "Shadowfyre is an ancient black dragon who has slumbered in the Whispering Mountains for three centuries. Legends say its awakening will herald the end of an age.",
+      "comment": "The Dragon Shadowfyre",
+      "enable": true,
+      "disable": false
+    }
+  ]
+}

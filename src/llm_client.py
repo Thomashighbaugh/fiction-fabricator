@@ -89,7 +89,15 @@ class LLMClient:
                                 reason = chunk.prompt_feedback.block_reason.name
                                 raise types.BlockedPromptException(f"Content generation blocked during streaming. Reason: {reason}")
                             
-                            if hasattr(chunk, 'text'):
+                            # Check for safety issues in candidates
+                            if hasattr(chunk, 'candidates') and chunk.candidates:
+                                candidate = chunk.candidates[0]
+                                if hasattr(candidate, 'finish_reason'):
+                                    finish_reason = candidate.finish_reason.name if hasattr(candidate.finish_reason, 'name') else str(candidate.finish_reason)
+                                    if finish_reason in ['SAFETY', 'RECITATION', 'OTHER']:
+                                        raise types.BlockedPromptException(f"Content generation blocked during streaming due to {finish_reason}")
+                            
+                            if hasattr(chunk, 'text') and chunk.text:
                                 print(chunk.text, end="", flush=True)
                                 full_response += chunk.text
                         
@@ -102,16 +110,22 @@ class LLMClient:
                         progress.add_task(description="[cyan]Gemini is thinking...", total=None)
                         response = self.client.generate_content(contents=prompt_content)
                     
-                    if hasattr(response, 'text'):
-                        full_response = response.text
-                        self.console.print(f"[cyan]>>> Gemini Response ({task_description}):[/cyan]")
-                        self.console.print(f"[dim]{full_response[:1000]}{'...' if len(full_response) > 1000 else ''}[/dim]")
-                    else:
-                        # Check for blocking even if there's no text
-                        if hasattr(response, 'prompt_feedback') and response.prompt_feedback.block_reason:
-                            reason = response.prompt_feedback.block_reason.name
-                            raise types.BlockedPromptException(f"Content generation blocked. Reason: {reason}")
-                        raise ValueError("Response object does not contain 'text' attribute and was not blocked.")
+                    # Safely try to access response.text
+                    try:
+                        if hasattr(response, 'text') and response.text:
+                            full_response = response.text
+                            self.console.print(f"[cyan]>>> Gemini Response ({task_description}):[/cyan]")
+                            self.console.print(f"[dim]{full_response[:1000]}{'...' if len(full_response) > 1000 else ''}[/dim]")
+                        else:
+                            # No text available, check why
+                            self._handle_empty_response(response, task_description)
+                    except ValueError as ve:
+                        # Handle specific "response.text requires valid Part" error
+                        if "response.text" in str(ve) and "valid `Part`" in str(ve):
+                            self.console.print(f"[yellow]Response contains no valid content parts. Checking finish reason...[/yellow]")
+                            self._handle_empty_response(response, task_description)
+                        else:
+                            raise ve
 
                 # For streaming responses, final response feedback check is handled per chunk
                 # For non-streaming responses, check the response object
@@ -127,6 +141,11 @@ class LLMClient:
                 is_safety_error = isinstance(e, types.BlockedPromptException)
                 if is_safety_error:
                     self.console.print("[yellow]Safety errors often require prompt changes, but you can retry.[/yellow]")
+                    self.console.print("[yellow]Consider simplifying the content or removing potentially problematic text.[/yellow]")
+                    if "OTHER" in str(e):
+                        self.console.print("[yellow]Note: 'OTHER' finish reason may indicate content policy issues not caught by standard filters.[/yellow]")
+                elif "finish_reason" in str(e).lower():
+                    self.console.print("[yellow]The model stopped generation early, likely due to content policies.[/yellow]")
 
             except Exception as e:
                 self.console.print(f"[bold red]An unexpected error occurred: {type(e).__name__} - {e}[/bold red]")
@@ -146,3 +165,40 @@ class LLMClient:
                 return None
         
         return None
+
+    def _handle_empty_response(self, response, task_description: str):
+        """Handle cases where response exists but contains no accessible text."""
+        # Check for various blocking reasons
+        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and hasattr(response.prompt_feedback, 'block_reason') and response.prompt_feedback.block_reason:
+            reason = response.prompt_feedback.block_reason.name if hasattr(response.prompt_feedback.block_reason, 'name') else str(response.prompt_feedback.block_reason)
+            raise types.BlockedPromptException(f"Content generation blocked. Reason: {reason}")
+        
+        # Check candidates for safety blocks or other finish reasons
+        if hasattr(response, 'candidates') and response.candidates:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'finish_reason') and candidate.finish_reason:
+                finish_reason = candidate.finish_reason.name if hasattr(candidate.finish_reason, 'name') else str(candidate.finish_reason)
+                
+                if finish_reason in ['SAFETY', 'RECITATION']:
+                    raise types.BlockedPromptException(f"Content generation blocked due to {finish_reason}")
+                elif finish_reason == 'OTHER':
+                    # Check safety ratings for more details
+                    safety_info = ""
+                    if hasattr(candidate, 'safety_ratings') and candidate.safety_ratings:
+                        blocked_categories = []
+                        for rating in candidate.safety_ratings:
+                            if hasattr(rating, 'blocked') and rating.blocked:
+                                category = rating.category.name if hasattr(rating.category, 'name') else str(rating.category)
+                                blocked_categories.append(category)
+                        if blocked_categories:
+                            safety_info = f" (blocked categories: {', '.join(blocked_categories)})"
+                    raise types.BlockedPromptException(f"Content generation stopped for unspecified reasons{safety_info}")
+                elif finish_reason == 'STOP':
+                    # Normal completion but no text - this can happen with API issues
+                    self.console.print(f"[yellow]Response completed normally but contains no text. This may be an API issue.[/yellow]")
+                    raise ValueError(f"Response finished with STOP but contains no accessible text content")
+                else:
+                    raise ValueError(f"Response finished with reason {finish_reason} but contains no text")
+        
+        # If we get here, we don't know why there's no text
+        raise ValueError("Response object exists but does not contain accessible text content")

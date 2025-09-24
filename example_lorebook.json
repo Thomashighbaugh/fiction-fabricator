@@ -1,0 +1,41 @@
+{
+  "entries": [
+    {
+      "keys": ["Aethermoor", "kingdom", "floating islands"],
+      "content": "The Kingdom of Aethermoor consists of seven massive floating islands suspended in the clouds by ancient magic. Each island specializes in different crafts: Skyforge for metallurgy, Nimbusgarden for agriculture, Stormwatch for weather magic, and the capital Crownpeak for governance. The islands are connected by magical bridges of hardened air that shimmer like glass.",
+      "comment": "Aethermoor Kingdom",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": ["Lyra", "storm mage", "captain", "lightning"],
+      "content": "Captain Lyra Stormweaver, 29, leads the Skyguard from her post on Stormwatch Island. Born with the rare gift of storm magic, she can summon lightning and control winds. Her signature weapon is a crystalline staff that channels atmospheric energy. Known for her fierce loyalty to the crown and her tendency to act first and ask questions later.",
+      "comment": "Captain Lyra Stormweaver",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": ["Void Wraiths", "shadow creatures", "enemies"],
+      "content": "Void Wraiths are ethereal beings from the darkness below the cloud layer. They appear as shifting shadows with glowing purple eyes and feed on magical energy. When they attack the floating islands, they drain the levitation crystals, causing sections to fall. They can only be harmed by weapons forged from skysilver or magic infused with pure starlight.",
+      "comment": "Void Wraiths",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": ["skysilver", "metal", "crafting", "weapons"],
+      "content": "Skysilver is a rare metal that forms only in the cores of floating islands, created by centuries of concentrated magical energy. It appears as a bright silver metal with veins of blue light running through it. Weapons forged from skysilver can cut through magical barriers and harm ethereal creatures. The forging process requires both master smiths and storm mages working together.",
+      "comment": "Skysilver Metal",
+      "enable": true,
+      "disable": false
+    },
+    {
+      "keys": ["levitation crystals", "magic", "floating"],
+      "content": "Massive crystals at the heart of each floating island that generate the anti-gravity fields keeping them aloft. The crystals pulse with a soft blue light and hum with magical energy. They must be recharged monthly through complex rituals performed by the island's mage circles. If a crystal is damaged or drained, that section of the island begins to fall toward the earth below.",
+      "comment": "Levitation Crystals",
+      "enable": true,
+      "disable": false
+    }
+  ],
+  "name": "Aethermoor Chronicles",
+  "description": "Fantasy lorebook for a floating island kingdom setting"
+}
