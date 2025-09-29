@@ -49,8 +49,10 @@ class LLMClient:
             client = genai.GenerativeModel(
                 model_name=config.WRITING_MODEL_NAME,
                 generation_config=config.WRITING_MODEL_CONFIG,
+                safety_settings=config.SAFETY_SETTINGS,
             )
             self.console.print(f"[green]Successfully initialized Gemini client with model '{config.WRITING_MODEL_NAME}'[/green]")
+            self.console.print("[green]Content filtering disabled for creative writing[/green]")
             return client
         except Exception as e:
             self.console.print("[bold red]Fatal Error: Could not initialize Gemini client.[/bold red]")

@@ -29,39 +29,42 @@ def export_single_markdown(book_root: ET.Element, output_path: Path, console: Co
     try:
         markdown_content = []
         title = book_root.findtext("title", "Untitled Book")
-        markdown_content.append(f"# {unescape(title)}\n")
+        
+        # Add frontmatter sections if they exist and have content
+        frontmatter = book_root.find("frontmatter")
+        if frontmatter is not None:
+            # Title Page
+            title_page = frontmatter.findtext("title_page")
+            if title_page and title_page.strip():
+                markdown_content.append(f"{unescape(title_page.strip())}\n\n---\n")
+            
+            # Copyright Page
+            copyright_page = frontmatter.findtext("copyright_page")
+            if copyright_page and copyright_page.strip():
+                markdown_content.append(f"{unescape(copyright_page.strip())}\n\n---\n")
+            
+            # Dedication
+            dedication = frontmatter.findtext("dedication")
+            if dedication and dedication.strip():
+                markdown_content.append(f"## Dedication\n\n{unescape(dedication.strip())}\n\n---\n")
+            
+            # Acknowledgements
+            acknowledgements = frontmatter.findtext("acknowledgements")
+            if acknowledgements and acknowledgements.strip():
+                markdown_content.append(f"## Acknowledgements\n\n{unescape(acknowledgements.strip())}\n\n---\n")
+        
+        # Add main title if no custom title page was provided
+        has_custom_title_page = False
+        if frontmatter is not None:
+            title_page_text = frontmatter.findtext("title_page")
+            has_custom_title_page = title_page_text and title_page_text.strip()
+        
+        if not has_custom_title_page:
+            markdown_content.append(f"# {unescape(title)}\n")
 
         synopsis = book_root.findtext("synopsis")
         if synopsis:
             markdown_content.append(f"## Synopsis\n\n{unescape(synopsis.strip())}\n")
-
-        # Story elements
-        story_elements = book_root.find("story_elements")
-        if story_elements is not None:
-            markdown_content.append("## Story Elements\n")
-            genre = story_elements.findtext("genre")
-            tone = story_elements.findtext("tone") 
-            perspective = story_elements.findtext("perspective")
-            target_audience = story_elements.findtext("target_audience")
-            
-            if genre:
-                markdown_content.append(f"**Genre:** {unescape(genre)}")
-            if tone:
-                markdown_content.append(f"**Tone:** {unescape(tone)}")
-            if perspective:
-                markdown_content.append(f"**Perspective:** {unescape(perspective)}")
-            if target_audience:
-                markdown_content.append(f"**Target Audience:** {unescape(target_audience)}")
-            markdown_content.append("\n")
-
-        characters = book_root.findall(".//character")
-        if characters:
-            markdown_content.append("## Characters\n")
-            for char in characters:
-                name = unescape(char.findtext("name", "N/A"))
-                desc = unescape(char.findtext("description", "N/A"))
-                markdown_content.append(f"*   **{name}**: {desc}")
-            markdown_content.append("\n")
 
         markdown_content.append("## Chapters\n")
         chapters = _get_sorted_chapters(book_root)

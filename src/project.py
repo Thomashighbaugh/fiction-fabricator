@@ -72,6 +72,15 @@ class Project:
         ET.SubElement(story_elements, "target_audience").text = ""
         
         ET.SubElement(self.book_root, "characters")
+        
+        # Add frontmatter section
+        frontmatter = ET.SubElement(self.book_root, "frontmatter")
+        ET.SubElement(frontmatter, "author").text = ""
+        ET.SubElement(frontmatter, "title_page").text = ""
+        ET.SubElement(frontmatter, "copyright_page").text = ""
+        ET.SubElement(frontmatter, "dedication").text = ""
+        ET.SubElement(frontmatter, "acknowledgements").text = ""
+        
         ET.SubElement(self.book_root, "chapters")
 
         self.save_state("outline.xml")
@@ -85,30 +94,34 @@ class Project:
         if not outline_file.exists():
             raise FileNotFoundError(f"Required outline.xml not found in '{self.book_dir}'")
 
-        try:
-            tree = ET.parse(outline_file)
-            self.book_root = tree.getroot()
-            self.console.print(f"Loaded base state from: [cyan]outline.xml[/cyan]")
-        except ET.ParseError as e:
-            self.console.print(f"[bold red]Error parsing outline.xml: {e}[/bold red]")
-            raise
-        
-        # Apply patches in order
+        # Find all patch files and get the latest one (highest number)
         patch_files = sorted(
             [p for p in self.book_dir.glob("patch-*.xml") if p.stem.split("-")[-1].isdigit()],
             key=lambda p: int(p.stem.split("-")[-1]),
         )
-
+        
         if patch_files:
-            self.console.print(f"Found {len(patch_files)} patch file(s). Applying...")
-            for patch_file in patch_files:
-                try:
-                    patch_xml_str = patch_file.read_text(encoding="utf-8")
-                    if not self.apply_patch(patch_xml_str, is_loading=True):
-                        self.console.print(f"[yellow]Warning: Could not apply patch {patch_file.name}. State may be inconsistent.[/yellow]")
-                except Exception as e:
-                    self.console.print(f"[bold red]Error applying patch {patch_file.name}: {e}[/bold red]")
-            self.console.print("[green]All patches applied.[/green]")
+            # Load from the latest patch file (which contains the complete state)
+            latest_patch = patch_files[-1]
+            try:
+                tree = ET.parse(latest_patch)
+                self.book_root = tree.getroot()
+                self.console.print(f"Loaded project state from: [cyan]{latest_patch.name}[/cyan]")
+            except ET.ParseError as e:
+                self.console.print(f"[bold red]Error parsing {latest_patch.name}: {e}[/bold red]")
+                raise
+        else:
+            # No patch files, load from outline.xml
+            try:
+                tree = ET.parse(outline_file)
+                self.book_root = tree.getroot()
+                self.console.print(f"Loaded base state from: [cyan]outline.xml[/cyan]")
+            except ET.ParseError as e:
+                self.console.print(f"[bold red]Error parsing outline.xml: {e}[/bold red]")
+                raise
+        
+        # Restore chapters_generated_in_session based on chapters with content
+        self._restore_generated_chapters_set()
 
     def save_state(self, filename: str) -> bool:
         """Saves the current book_root to a specified XML file."""
@@ -131,7 +144,8 @@ class Project:
         """Applies a patch XML string to the current book_root."""
         patch_root = utils.parse_xml_string(patch_xml_str, self.console, expected_root_tag="patch")
         if patch_root is None or patch_root.tag != "patch":
-            self.console.print("[bold red]Error: Invalid patch XML. Cannot apply.[/bold red]")
+            if not is_loading:
+                self.console.print("[bold red]Error: Invalid patch XML. Cannot apply.[/bold red]")
             return False
 
         applied_changes = False
@@ -140,8 +154,15 @@ class Project:
             for chapter_patch in patch_root.findall("chapter"):
                 # Handle both attribute and child element ID formats
                 chapter_id = chapter_patch.get("id") or chapter_patch.findtext("id")
+                if not chapter_id:
+                    if not is_loading:
+                        self.console.print("[yellow]Warning: Chapter patch missing ID, skipping.[/yellow]")
+                    continue
+                
                 target_chapter = self.find_chapter(chapter_id)
-                if not chapter_id or target_chapter is None:
+                if target_chapter is None:
+                    if not is_loading:
+                        self.console.print(f"[yellow]Warning: Chapter {chapter_id} not found in book structure, skipping patch.[/yellow]")
                     continue
 
                 new_content = chapter_patch.find("content")
@@ -165,14 +186,15 @@ class Project:
                 if element_patch.tag not in ["title", "synopsis", "characters", "story_elements"]:
                     continue
                 
-                target_element = self.book_root.find(element_patch.tag)
-                if target_element is not None:
-                    self.book_root.remove(target_element)
-                
-                self.book_root.append(copy.deepcopy(element_patch))
-                if not is_loading:
-                    self.console.print(f"[green]Applied patch for <{element_patch.tag}>.[/green]")
-                applied_changes = True
+                if self.book_root is not None:
+                    target_element = self.book_root.find(element_patch.tag)
+                    if target_element is not None:
+                        self.book_root.remove(target_element)
+                    
+                    self.book_root.append(copy.deepcopy(element_patch))
+                    if not is_loading:
+                        self.console.print(f"[green]Applied patch for <{element_patch.tag}>.[/green]")
+                    applied_changes = True
 
         except Exception as e:
             self.console.print(f"[bold red]Error while applying patch: {e}[/bold red]")
@@ -184,9 +206,9 @@ class Project:
 
         return applied_changes
 
-    def find_chapter(self, chapter_id: str) -> ET.Element | None:
+    def find_chapter(self, chapter_id: str | None) -> ET.Element | None:
         """Finds a chapter element by its 'id' attribute or child element."""
-        if self.book_root is None:
+        if self.book_root is None or not chapter_id:
             return None
         # Try attribute-based ID first
         chapter = self.book_root.find(f".//chapter[@id='{chapter_id}']")
@@ -197,3 +219,203 @@ class Project:
             if chapter.findtext("id") == chapter_id:
                 return chapter
         return None
+
+    def debug_patch_failure(self, patch_xml_str: str):
+        """Debug helper to understand why patches fail during project resume."""
+        self.console.print("[bold yellow]Debugging patch failure...[/bold yellow]")
+        
+        # Show current book structure
+        if self.book_root is not None:
+            chapters = self.book_root.findall(".//chapter")
+            self.console.print(f"[cyan]Current book has {len(chapters)} chapters:[/cyan]")
+            for chapter in chapters:
+                chapter_id = chapter.get("id") or chapter.findtext("id")
+                self.console.print(f"  - Chapter ID: {chapter_id}")
+        
+        # Parse and show patch structure
+        try:
+            patch_root = utils.parse_xml_string(patch_xml_str, self.console, expected_root_tag="patch")
+            if patch_root is not None:
+                patch_chapters = patch_root.findall("chapter")
+                self.console.print(f"[cyan]Patch contains {len(patch_chapters)} chapters:[/cyan]")
+                for chapter_patch in patch_chapters:
+                    chapter_id = chapter_patch.get("id") or chapter_patch.findtext("id")
+                    self.console.print(f"  - Patch for Chapter ID: {chapter_id}")
+        except Exception as e:
+            self.console.print(f"[red]Error parsing patch: {e}[/red]")
+
+    def _restore_generated_chapters_set(self):
+        """Restores the chapters_generated_in_session set based on chapters with content."""
+        if not self.book_root:
+            return
+        
+        chapters_with_content = []
+        all_chapters = self.book_root.findall(".//chapter")
+        
+        for chapter in all_chapters:
+            # Check if chapter has content with paragraphs that contain text
+            content_elem = chapter.find("content")
+            if content_elem is not None:
+                paragraphs = content_elem.findall("paragraph")
+                has_text_content = any(p.text and p.text.strip() for p in paragraphs)
+                
+                if has_text_content:
+                    chapter_id = chapter.get("id") or chapter.findtext("id")
+                    if chapter_id:
+                        self.chapters_generated_in_session.add(chapter_id)
+                        chapters_with_content.append(chapter_id)
+        
+        if chapters_with_content:
+            self.console.print(f"[green]Restored {len(chapters_with_content)} chapters with existing content.[/green]")
+        else:
+            self.console.print("[dim]No chapters with content found to restore.[/dim]")
+
+    def edit_frontmatter_section(self, section_name: str) -> bool:
+        """
+        Edit a frontmatter section using the user's preferred editor.
+        
+        Args:
+            section_name: One of 'author', 'title_page', 'copyright_page', 'dedication', 'acknowledgements'
+        
+        Returns:
+            bool: True if the section was edited successfully, False otherwise
+        """
+        import os
+        import tempfile
+        import subprocess
+        
+        if not self.book_root:
+            self.console.print("[bold red]Error: No book loaded.[/bold red]")
+            return False
+        
+        # Ensure frontmatter section exists
+        frontmatter = self.book_root.find("frontmatter")
+        if frontmatter is None:
+            frontmatter = ET.SubElement(self.book_root, "frontmatter")
+            ET.SubElement(frontmatter, "author").text = ""
+            ET.SubElement(frontmatter, "title_page").text = ""
+            ET.SubElement(frontmatter, "copyright_page").text = ""
+            ET.SubElement(frontmatter, "dedication").text = ""
+            ET.SubElement(frontmatter, "acknowledgements").text = ""
+        
+        section_element = frontmatter.find(section_name)
+        if section_element is None:
+            section_element = ET.SubElement(frontmatter, section_name)
+            section_element.text = ""
+        
+        # Get current content
+        current_content = section_element.text or ""
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+            temp_file.write(current_content)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Get editor from environment, default to nano
+            editor = os.environ.get('EDITOR', 'nano')
+            
+            self.console.print(f"[yellow]Opening {section_name.replace('_', ' ')} in {editor}...[/yellow]")
+            self.console.print("[dim]Save and exit the editor when finished.[/dim]")
+            
+            # Launch editor
+            result = subprocess.run([editor, temp_file_path])
+            
+            if result.returncode == 0:
+                # Read the updated content
+                with open(temp_file_path, 'r') as temp_file:
+                    updated_content = temp_file.read().strip()
+                
+                # Update the XML element
+                section_element.text = updated_content
+                
+                # Save the changes
+                if self.book_dir:
+                    patch_num = utils.get_next_patch_number(self.book_dir)
+                    self.save_state(f"patch-{patch_num:02d}.xml")
+                    self.console.print(f"[green]✓ {section_name.replace('_', ' ')} updated successfully.[/green]")
+                    return True
+            else:
+                self.console.print(f"[red]Editor exited with error code {result.returncode}[/red]")
+                return False
+                
+        except Exception as e:
+            self.console.print(f"[bold red]Error editing {section_name}: {e}[/bold red]")
+            return False
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file_path)
+            except OSError:
+                pass
+        
+        return False
+
+    def edit_book_title(self) -> bool:
+        """Edit the book title using interactive prompt."""
+        from rich.prompt import Prompt
+        
+        if not self.book_root:
+            self.console.print("[bold red]Error: No book loaded.[/bold red]")
+            return False
+        
+        # Get current title
+        current_title = self.book_root.findtext("title", "")
+        
+        # Prompt for new title
+        new_title = Prompt.ask(
+            "[cyan]Enter new book title[/cyan]",
+            default=current_title
+        ).strip()
+        
+        if new_title and new_title != current_title:
+            # Update the title
+            title_elem = self.book_root.find("title")
+            if title_elem is None:
+                title_elem = ET.SubElement(self.book_root, "title")
+            title_elem.text = new_title
+            
+            self.console.print(f"[green]✓ Book title updated to: {new_title}[/green]")
+            return True
+        else:
+            self.console.print("[dim]Title unchanged.[/dim]")
+            return False
+
+    def edit_author_name(self) -> bool:
+        """Edit the author name using interactive prompt."""
+        from rich.prompt import Prompt
+        
+        if not self.book_root:
+            self.console.print("[bold red]Error: No book loaded.[/bold red]")
+            return False
+        
+        # Ensure frontmatter section exists
+        frontmatter = self.book_root.find("frontmatter")
+        if frontmatter is None:
+            frontmatter = ET.SubElement(self.book_root, "frontmatter")
+            ET.SubElement(frontmatter, "author").text = ""
+            ET.SubElement(frontmatter, "title_page").text = ""
+            ET.SubElement(frontmatter, "copyright_page").text = ""
+            ET.SubElement(frontmatter, "dedication").text = ""
+            ET.SubElement(frontmatter, "acknowledgements").text = ""
+        
+        # Get current author
+        author_elem = frontmatter.find("author")
+        if author_elem is None:
+            author_elem = ET.SubElement(frontmatter, "author")
+            author_elem.text = ""
+        current_author = author_elem.text or ""
+        
+        # Prompt for new author name
+        new_author = Prompt.ask(
+            "[cyan]Enter author name[/cyan]",
+            default=current_author
+        ).strip()
+        
+        if new_author != current_author:
+            author_elem.text = new_author
+            self.console.print(f"[green]✓ Author name updated to: {new_author}[/green]")
+            return True
+        else:
+            self.console.print("[dim]Author name unchanged.[/dim]")
+            return False

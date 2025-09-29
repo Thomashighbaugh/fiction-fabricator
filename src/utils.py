@@ -231,13 +231,17 @@ def parse_xml_string(
 def clean_paragraph_text(text: str) -> str:
     """
     Cleans paragraph text by removing unwanted line breaks while preserving intentional formatting.
+    Also removes markdown formatting artifacts like double asterisks.
     """
     if not text:
         return text
     
+    # Remove markdown bold formatting (**text**)
+    cleaned = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    
     # Remove line breaks that are not after sentence endings or dialogue
     # Keep breaks after: . ! ? " and at the start/end of paragraphs
-    cleaned = re.sub(r'(?<![.!?"\n])\n(?=\s*[a-z])', ' ', text)
+    cleaned = re.sub(r'(?<![.!?"\n])\n(?=\s*[a-z])', ' ', cleaned)
     
     # Clean up multiple spaces
     cleaned = re.sub(r'  +', ' ', cleaned)

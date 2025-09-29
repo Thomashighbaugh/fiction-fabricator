@@ -80,7 +80,7 @@ uv run python main.py --create-lorebook fantasy_world.json
 uv run python main.py --lorebook fantasy_world.json --prompt story_idea.txt
 ```
 
-For complete lorebook documentation, see [LOREBOOK.md](LOREBOOK.md) or [LOREBOOK_QUICK.md](LOREBOOK_QUICK.md) for a quick reference.
+For complete lorebook documentation, see [LOREBOOK.md](.github/documentation/LOREBOOK.md) or [LOREBOOK_QUICK.md](.github/documentation/LOREBOOK_QUICK.md) for a quick reference.
 
 ## Prompt Enhancement Features
 
@@ -148,3 +148,19 @@ This is a multiphase process:
 ## License
 
 MIT License. See the [LICENSE](LICENSE) file for the legalese.
+
+## Documentation
+
+For comprehensive documentation and guides, see the [documentation directory](.github/documentation/):
+
+### Getting Started
+- **[Getting Started Guide](.github/documentation/GETTING_STARTED.md)** - Installation, setup, and basic usage instructions
+- **[Architecture Overview](.github/documentation/ARCHITECTURE.md)** - Project structure and technical architecture
+
+### Features & Usage
+- **[Lorebook System](.github/documentation/LOREBOOK.md)** - Comprehensive world-building and context management guide
+- **[Lorebook Quick Reference](.github/documentation/LOREBOOK_QUICK.md)** - Quick start guide for lorebooks
+- **[Prompt Enhancement](.github/documentation/PROMPT_ENHANCEMENT.md)** - Advanced prompt creation and optimization
+
+### Development
+- **[Development Guide](.github/documentation/DEVELOPMENT.md)** - Code style, conventions, and contribution guidelines

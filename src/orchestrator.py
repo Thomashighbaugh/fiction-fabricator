@@ -123,6 +123,12 @@ class Orchestrator:
 
     def setup_new_project(self, idea: str):
         """Guides the user through setting up a new project."""
+        # Offer lorebook selection if none was provided via CLI
+        if not self.lorebook_data:
+            lorebook_path = ui.prompt_for_lorebook_selection()
+            if lorebook_path:
+                self.lorebook_data = self._load_lorebook(lorebook_path)
+        
         # 1. Get initial title and synopsis
         title, synopsis = self._generate_initial_summary(idea)
         if not title or not synopsis:
@@ -215,7 +221,7 @@ Output ONLY a JSON object in the format:
     def run_content_generation(self):
         """Generates content for batches of chapters/scenes."""
         self.console.print(Panel("Generating Chapter/Scene Content", style="bold blue"))
-        self.project.chapters_generated_in_session.clear()
+        # Don't clear chapters_generated_in_session for resumed projects - it was restored during loading
 
         while True:
             chapters_to_generate = self._select_chapters_to_generate(batch_size=5)
@@ -275,11 +281,13 @@ Full Book Context:
         
         edit_options = {
             "1": ("Make Chapter(s) Longer", self._edit_make_longer),
-            "2": ("Rewrite Chapter (with instructions)", lambda: self._edit_rewrite_chapter(blackout=False)),
-            "3": ("Rewrite Chapter (Fresh Rewrite)", lambda: self._edit_rewrite_chapter(blackout=True)),
-            "4": ("Ask LLM for Edit Suggestions", self._edit_suggest_edits),
-            "5": ("Export Menu", self._show_export_menu),
-            "6": ("Quit Editing", None),
+            "2": ("Make All Chapters Longer", self._edit_make_all_chapters_longer),
+            "3": ("Rewrite Chapter (with instructions)", lambda: self._edit_rewrite_chapter(blackout=False)),
+            "4": ("Rewrite Chapter (Fresh Rewrite)", lambda: self._edit_rewrite_chapter(blackout=True)),
+            "5": ("Ask LLM for Edit Suggestions", self._edit_suggest_edits),
+            "6": ("Apply LLM Advice to All Chapters", self._edit_apply_manuscript_advice),
+            "7": ("Export Menu", self._show_export_menu),
+            "8": ("Quit Editing", None),
         }
 
         while True:
@@ -414,7 +422,7 @@ Full Book Context:
             prompt = f"""
 Expand the existing content for chapter {chapter_id} to approximately {word_count} words by building upon what's already written.
 
-**IMPORTANT**: Do not rewrite or replace existing content. Instead, expand it by:
+IMPORTANT: Do not rewrite or replace existing content. Instead, expand it by:
 - Adding more descriptive detail to existing scenes
 - Expanding dialogue with additional exchanges and character reactions  
 - Including internal thoughts and emotions of characters
@@ -437,6 +445,58 @@ Relevant Context:
                 self._handle_patch_result_auto(patch_xml, f"Make Longer (Ch {chapter_id})")
             else:
                 self._handle_patch_result(patch_xml, f"Make Longer (Ch {chapter_id})")
+
+    def _edit_make_all_chapters_longer(self):
+        """Handler for making all chapters longer automatically."""
+        # Check if book_root exists
+        if not self.project.book_root:
+            self.console.print("[red]No project loaded.[/red]")
+            return
+            
+        # Get all chapters from the project
+        chapters = sorted(self.project.book_root.findall(".//chapter"), 
+                         key=lambda c: int(utils.get_chapter_id_with_default(c, "0")))
+        
+        if not chapters:
+            self.console.print("[red]No chapters found in the project.[/red]")
+            return
+
+        word_count = ui.IntPrompt.ask("[yellow]Enter target word count per chapter[/yellow]", default=4500)
+        
+        # Auto-apply patches for all chapters
+        self.console.print(f"[yellow]Auto-applying patches for all {len(chapters)} chapters (no confirmations)...[/yellow]")
+        
+        # Process each chapter individually to ensure all get expanded
+        for chapter in chapters:
+            chapter_id = utils.get_chapter_id(chapter)
+            self.console.print(f"[cyan]Expanding Chapter {chapter_id}...[/cyan]")
+            
+            # Create reduced context to avoid token limits
+            reduced_context = self._create_reduced_context_for_chapter(chapter_id)
+            
+            prompt = f"""
+Expand the existing content for chapter {chapter_id} to approximately {word_count} words by building upon what's already written.
+
+IMPORTANT: Do not rewrite or replace existing content. Instead, expand it by:
+- Adding more descriptive detail to existing scenes
+- Expanding dialogue with additional exchanges and character reactions  
+- Including internal thoughts and emotions of characters
+- Adding sensory details (sight, sound, smell, touch, taste)
+- Developing existing scenes with more depth and pacing
+- Adding transitional moments between existing plot points
+- Enhancing character interactions and relationships
+
+Maintain the original narrative flow, character voices, and plot progression. The expanded content should feel like a natural extension of what's already there, not a replacement.
+
+Output an XML `<patch>` with the expanded `<chapter>` content that preserves all key story elements while making them richer and more detailed.
+
+Relevant Context:
+```xml
+{reduced_context}
+```
+"""
+            patch_xml = self.llm.get_response(prompt, f"Expanding chapter {chapter_id}")
+            self._handle_patch_result_auto(patch_xml, f"Make Longer (Ch {chapter_id})")
 
     def _edit_rewrite_chapter(self, blackout: bool):
         """Handler for rewriting a chapter."""
@@ -472,6 +532,10 @@ Full Book Context:
 
     def _edit_suggest_edits(self):
         """Handler for asking the LLM for edit suggestions."""
+        if not self.project.book_root:
+            self.console.print("[red]No book data available.[/red]")
+            return
+            
         prompt = f"""
 You are an expert editor. Analyze the manuscript below and provide a numbered list of 5-10 concrete, actionable suggestions for improvement.
 
@@ -484,25 +548,179 @@ Full Book Context:
         if not suggestions_text: return
         
         self.console.print(Panel(suggestions_text, title="LLM Edit Suggestions", border_style="cyan"))
-        # This feature is simplified in the refactor. A full implementation would parse the list
-        # and let the user pick one to generate a patch for, as in the original code.
-        self.console.print("\n[yellow]Use the 'Rewrite Chapter' option to implement these suggestions.[/yellow]")
+        
+        # Ask if user wants to apply these suggestions to all chapters
+        if Confirm.ask("\n[yellow]Apply these suggestions to all chapters?[/yellow]", default=False):
+            self._apply_suggestions_to_all_chapters(suggestions_text)
+        else:
+            self.console.print("\n[yellow]Use the 'Rewrite Chapter' option to implement these suggestions.[/yellow]")
+
+    def _edit_apply_manuscript_advice(self):
+        """Handler for getting and applying LLM advice to all chapters."""
+        self.console.print("[cyan]Generating manuscript-wide editing advice...[/cyan]")
+        
+        prompt = f"""
+You are an expert editor providing manuscript-wide editing advice. Analyze this complete manuscript and provide specific, actionable suggestions that should be applied consistently across ALL chapters to improve the work.
+
+Focus on:
+- Consistent tone and voice improvements
+- Character development enhancements
+- Pacing adjustments
+- Narrative consistency
+- Style refinements
+- Dialogue improvements
+- Description and world-building enhancements
+
+Provide your advice as a numbered list of specific, implementable suggestions that can be applied to each chapter.
+
+Full Book Context:
+```xml
+{ET.tostring(self.project.book_root, encoding='unicode')}
+```
+"""
+        suggestions_text = self.llm.get_response(prompt, "Generating manuscript advice", allow_stream=False)
+        if not suggestions_text:
+            self.console.print("[red]Failed to generate manuscript advice.[/red]")
+            return
+        
+        self.console.print(Panel(suggestions_text, title="Manuscript-Wide Editing Advice", border_style="green"))
+        
+        if Confirm.ask("\n[yellow]Apply this advice to all chapters?[/yellow]", default=True):
+            self._apply_suggestions_to_all_chapters(suggestions_text)
+    
+    def _apply_suggestions_to_all_chapters(self, suggestions_text: str):
+        """Apply LLM suggestions to all chapters in the manuscript."""
+        chapters = sorted(self.project.book_root.findall(".//chapter"), 
+                         key=lambda c: int(utils.get_chapter_id_with_default(c, "0")))
+        
+        if not chapters:
+            self.console.print("[yellow]No chapters found to apply suggestions to.[/yellow]")
+            return
+        
+        self.console.print(f"[bold yellow]Applying advice to {len(chapters)} chapters...[/bold yellow]")
+        self.console.print("[dim]This will auto-apply patches without individual confirmations.[/dim]\n")
+        
+        failed_chapters = []
+        
+        for chapter in chapters:
+            chapter_id = utils.get_chapter_id(chapter)
+            self.console.print(f"[cyan]Applying advice to Chapter {chapter_id}...[/cyan]")
+            
+            # Create reduced context to avoid token limits
+            reduced_context = self._create_reduced_context_for_chapter(chapter_id)
+            
+            prompt = f"""
+Apply the following editing advice to Chapter {chapter_id}. Rewrite the chapter content incorporating these suggestions while maintaining the original plot, character development, and narrative flow.
+
+EDITING ADVICE TO APPLY:
+{suggestions_text}
+
+IMPORTANT: 
+- Maintain the chapter's existing structure and plot points
+- Keep all character actions and dialogue meaningful to the story
+- Preserve the chapter's role in the overall narrative
+- Focus on implementing the advice to improve writing quality, style, and consistency
+- Do not change major plot elements or character motivations
+
+Output format: Return ONLY an XML `<patch>` containing a `<chapter>` element with the complete updated content. Use this EXACT format:
+
+<patch>
+  <chapter id="{chapter_id}">
+    <content>
+      <paragraph>First updated paragraph...</paragraph>
+      <paragraph>Second updated paragraph...</paragraph>
+    </content>
+  </chapter>
+</patch>
+
+Relevant Context:
+```xml
+{reduced_context}
+```
+"""
+            
+            patch_xml = self.llm.get_response(prompt, f"Applying advice to chapter {chapter_id}")
+            
+            if patch_xml and self.project.apply_patch(patch_xml):
+                patch_num = utils.get_next_patch_number(self.project.book_dir)
+                self.project.save_state(f"patch-{patch_num:02d}.xml")
+                self.console.print(f"[green]✓ Chapter {chapter_id} updated successfully[/green]")
+            else:
+                failed_chapters.append(chapter_id)
+                self.console.print(f"[red]✗ Failed to update Chapter {chapter_id}[/red]")
+        
+        # Summary
+        success_count = len(chapters) - len(failed_chapters)
+        self.console.print(f"\n[bold green]Manuscript-wide advice application complete![/bold green]")
+        self.console.print(f"Successfully updated: {success_count}/{len(chapters)} chapters")
+        
+        if failed_chapters:
+            failed_list = ", ".join(failed_chapters)
+            self.console.print(f"[yellow]Failed chapters: {failed_list}[/yellow]")
+            self.console.print("[dim]You can try applying advice to failed chapters individually using 'Rewrite Chapter'.[/dim]")
 
 
     def _show_export_menu(self):
         """Displays the export menu and handles user choice."""
         export_options = {
-            "1": ("Export Full Book (Single Markdown)", self._export_single_md),
-            "2": ("Export Chapters (Markdown per Chapter)", self._export_multi_md),
-            "3": ("Export Full Book (Single HTML)", self._export_single_html),
-            "4": ("Export Chapters (HTML per Chapter)", self._export_multi_html),
-            "5": ("Export Full Book (EPUB)", self._export_epub),
-            "6": ("Return to Editing Menu", None),
+            "1": ("Edit Frontmatter", self._edit_frontmatter_menu),
+            "2": ("Export All Formats", self._export_all),
+            "3": ("Export Full Book (Single Markdown)", self._export_single_md),
+            "4": ("Export Chapters (Markdown per Chapter)", self._export_multi_md),
+            "5": ("Export Full Book (Single HTML)", self._export_single_html),
+            "6": ("Export Chapters (HTML per Chapter)", self._export_multi_html),
+            "7": ("Export Full Book (EPUB)", self._export_epub),
+            "8": ("Return to Editing Menu", None),
         }
         choice = ui.display_menu("Export Options", export_options)
         handler = export_options.get(choice)[1]
         if handler:
             handler()
+
+    def _edit_frontmatter_menu(self):
+        """Displays the frontmatter editing menu."""
+        frontmatter_options = {
+            "1": ("Edit Author Name", lambda: self._edit_author_name()),
+            "2": ("Edit Book Title", lambda: self._edit_book_title()),
+            "3": ("Edit Title Page", lambda: self._edit_frontmatter_section("title_page")),
+            "4": ("Edit Copyright Page", lambda: self._edit_frontmatter_section("copyright_page")),
+            "5": ("Edit Dedication", lambda: self._edit_frontmatter_section("dedication")),
+            "6": ("Edit Acknowledgements", lambda: self._edit_frontmatter_section("acknowledgements")),
+            "7": ("Return to Export Menu", None),
+        }
+        
+        while True:
+            choice = ui.display_menu("Edit Frontmatter", frontmatter_options)
+            handler = frontmatter_options.get(choice)[1]
+            if handler:
+                handler()
+                # Save changes after editing
+                if self.project.book_root is not None:
+                    patch_num = utils.get_next_patch_number(self.project.book_dir)
+                    self.project.save_state(f"patch-{patch_num:02d}.xml")
+            else:
+                break  # Return to Export Menu
+
+    def _edit_author_name(self):
+        """Edit the author name."""
+        if self.project.edit_author_name():
+            self.console.print("[green]Author name updated successfully.[/green]")
+        else:
+            self.console.print("[dim]Author name not changed.[/dim]")
+
+    def _edit_book_title(self):
+        """Edit the book title."""
+        if self.project.edit_book_title():
+            self.console.print("[green]Book title updated successfully.[/green]")
+        else:
+            self.console.print("[dim]Book title not changed.[/dim]")
+
+    def _edit_frontmatter_section(self, section_name: str):
+        """Edit a specific frontmatter section."""
+        if self.project.edit_frontmatter_section(section_name):
+            self.console.print(f"[green]Frontmatter section '{section_name.replace('_', ' ').title()}' saved.[/green]")
+        else:
+            self.console.print(f"[yellow]No changes made to frontmatter section '{section_name.replace('_', ' ').title()}'.[/yellow]")
 
     def _export_single_md(self):
         filename = f"{self.project.book_title_slug}-full.md"
@@ -549,6 +767,77 @@ Full Book Context:
             self.console,
             cover_image_path=cover_image_path
         )
+
+    def _export_all(self):
+        """Export the book in all available formats."""
+        from rich.prompt import Prompt, Confirm
+        from pathlib import Path
+        
+        self.console.print(Panel(
+            "[bold cyan]Export All Formats[/bold cyan]\n"
+            "This will create:\n"
+            "• Full book (single Markdown)\n"
+            "• Chapters (Markdown per chapter)\n"
+            "• Full book (single HTML)\n"
+            "• Chapters (HTML per chapter)\n"
+            "• Full book (EPUB)",
+            title="Export All"
+        ))
+        
+        if not Confirm.ask("Proceed with exporting all formats?", default=True):
+            return
+        
+        # Ask for optional cover image once for EPUB
+        cover_path_str = Prompt.ask(
+            "[cyan]Cover image path for EPUB (optional, press Enter to skip)[/cyan]",
+            default="",
+            show_default=False
+        )
+        
+        cover_image_path = None
+        if cover_path_str.strip():
+            cover_image_path = Path(cover_path_str.strip())
+            if not cover_image_path.exists():
+                self.console.print(f"[yellow]Warning: Cover image not found at {cover_image_path}[/yellow]")
+                self.console.print("[yellow]Proceeding without cover image...[/yellow]")
+                cover_image_path = None
+            elif not cover_image_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
+                self.console.print(f"[yellow]Warning: {cover_image_path} may not be a supported image format[/yellow]")
+        
+        # Export all formats
+        try:
+            self.console.print("[cyan]Exporting full book (single Markdown)...[/cyan]")
+            self._export_single_md()
+            
+            self.console.print("[cyan]Exporting chapters (Markdown per chapter)...[/cyan]")
+            self._export_multi_md()
+            
+            self.console.print("[cyan]Exporting full book (single HTML)...[/cyan]")
+            self._export_single_html()
+            
+            self.console.print("[cyan]Exporting chapters (HTML per chapter)...[/cyan]")
+            self._export_multi_html()
+            
+            self.console.print("[cyan]Exporting full book (EPUB)...[/cyan]")
+            # Temporarily store cover path for EPUB export
+            from src.exporters import epub
+            epub.export_epub(
+                self.project.book_root, 
+                self.project.book_dir, 
+                self.project.book_title_slug, 
+                self.console,
+                cover_image_path=cover_image_path
+            )
+            
+            self.console.print(Panel(
+                "[bold green]✓ All formats exported successfully![/bold green]\n"
+                f"Files saved to: {self.project.book_dir}",
+                title="Export Complete"
+            ))
+            
+        except Exception as e:
+            self.console.print(f"[bold red]Error during export: {e}[/bold red]")
+            self.console.print("[yellow]Some formats may have been exported successfully.[/yellow]")
 
     def manage_lorebook(self, lorebook_path: str):
         """Interactive lorebook management interface."""
@@ -778,11 +1067,44 @@ Full Book Context:
         title = entry.get("comment", entry.get("title", "Entry"))
         self.console.print(f"\n[bold]Condensing: {title}[/bold]")
         
+        # Show current content
+        self.console.print(Panel(
+            current_content,
+            title="[bold yellow]Current Content[/bold yellow]",
+            border_style="yellow"
+        ))
+        
+        self.console.print("\n[cyan]Requesting LLM to condense this content...[/cyan]")
+        
         condensed_content = self._llm_condense_entry_content(title, current_content)
         
-        if condensed_content and Confirm.ask("Use condensed version?"):
+        if not condensed_content:
+            self.console.print("[red]Failed to generate condensed content.[/red]")
+            return
+        
+        if condensed_content == current_content:
+            self.console.print("[yellow]LLM returned the same content - no condensing performed.[/yellow]")
+            return
+        
+        # Show the condensed version
+        self.console.print(Panel(
+            condensed_content,
+            title="[bold green]Condensed Content[/bold green]",
+            border_style="green"
+        ))
+        
+        # Show comparison stats
+        original_length = len(current_content)
+        condensed_length = len(condensed_content)
+        reduction_percent = ((original_length - condensed_length) / original_length) * 100 if original_length > 0 else 0
+        
+        self.console.print(f"\n[dim]Original: {original_length} characters | Condensed: {condensed_length} characters | Reduction: {reduction_percent:.1f}%[/dim]")
+        
+        if Confirm.ask("\nUse condensed version?"):
             entry["content"] = condensed_content
             self.console.print(f"[green]Condensed entry: {title}[/green]")
+        else:
+            self.console.print("[dim]Keeping original content.[/dim]")
 
     def _expand_lorebook_entry(self, lorebook_data: dict):
         """Use LLM to expand an entry's content."""
@@ -857,11 +1179,25 @@ Please condense this lorebook entry while preserving all essential information. 
 - Core concepts
 - Essential plot elements
 
-Remove redundancy and verbose descriptions while keeping the content informative and useful for writers."""
+Remove redundancy and verbose descriptions while keeping the content informative and useful for writers.
+Make the condensed version noticeably shorter than the original while retaining all critical information.
+
+Return ONLY the condensed content, no explanations or meta-commentary."""
 
         try:
             response = self.llm.get_response(prompt, "Condensing lorebook entry", allow_stream=False)
-            return response.strip() if response else current_content
+            if response and response.strip():
+                condensed = response.strip()
+                # Basic validation - make sure it's actually shorter
+                if len(condensed) < len(current_content):
+                    return condensed
+                else:
+                    self.console.print("[yellow]Warning: LLM did not reduce content length significantly.[/yellow]")
+                    return condensed
+            return current_content
+        except Exception as e:
+            self.console.print(f"[red]Error condensing content: {e}[/red]")
+            return current_content
         except Exception as e:
             self.console.print(f"[red]Error condensing content: {e}[/red]")
             return current_content
@@ -898,6 +1234,12 @@ Remove redundancy and verbose descriptions while keeping the content informative
             return
         
         self.console.print(f"\n[dim]Your basic idea: {basic_idea}[/dim]\n")
+        
+        # Offer lorebook selection if none was provided via CLI
+        if not self.lorebook_data:
+            lorebook_path = ui.prompt_for_lorebook_selection()
+            if lorebook_path:
+                self.lorebook_data = self._load_lorebook(lorebook_path)
         
         # Get optional story preferences
         story_type = self._prompt_for_enhancement_type()

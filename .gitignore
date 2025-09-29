@@ -67,3 +67,4 @@ logs/
 prompts/
 prompt.txt 
 prompts/*.txt
+*.txt 

@@ -172,3 +172,46 @@ def get_chapter_selection(project, prompt_text: str, allow_multiple: bool) -> Li
             continue
 
         return [project.find_chapter(cid) for cid in sorted(selected_ids, key=int) if project.find_chapter(cid) is not None]
+
+def prompt_for_lorebook_selection() -> str | None:
+    """Prompts the user to optionally select a lorebook file."""
+    import glob
+    from pathlib import Path
+    
+    console.print("\n[bold cyan]Lorebook Integration[/bold cyan]")
+    
+    # Look for JSON files in current directory that might be lorebooks
+    json_files = glob.glob("*.json")
+    if json_files:
+        console.print("[cyan]Found JSON files that could be lorebooks:[/cyan]")
+        for i, file in enumerate(json_files, 1):
+            console.print(f"  {i}. {file}")
+    
+    if not Confirm.ask("[yellow]Would you like to use a lorebook for additional world-building context?[/yellow]", default=False):
+        return None
+    
+    while True:
+        lorebook_path = Prompt.ask(
+            "[cyan]Enter the path to your lorebook JSON file[/cyan]\n"
+            "(Tavern AI format supported)",
+            default=""
+        ).strip()
+        
+        if not lorebook_path:
+            console.print("[dim]No lorebook selected.[/dim]")
+            return None
+        
+        path = Path(lorebook_path)
+        if not path.exists():
+            console.print(f"[red]File not found: {lorebook_path}[/red]")
+            if not Confirm.ask("Try again?", default=True):
+                return None
+            continue
+        
+        if not path.suffix.lower() == '.json':
+            console.print(f"[yellow]Warning: {lorebook_path} doesn't have a .json extension[/yellow]")
+            if not Confirm.ask("Use anyway?", default=True):
+                continue
+        
+        console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
+        return lorebook_path

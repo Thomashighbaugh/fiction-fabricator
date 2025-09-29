@@ -4,15 +4,21 @@ epub.py - Handles exporting the project to EPUB format.
 """
 import xml.etree.ElementTree as ET
 import uuid
-import html
 import mimetypes
 from pathlib import Path
-from datetime import datetime
+from html import escape
+import html
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
+import ebooklib
+from ebooklib import epub
 
 from src import utils
+
+if TYPE_CHECKING:
+    from ebooklib.epub import EpubBook, EpubImage
 
 try:
     from ebooklib import epub
@@ -37,7 +43,7 @@ def _get_sorted_chapters(book_root: ET.Element) -> list[ET.Element]:
     except ValueError:
         return chapters_raw
 
-def _add_cover_image(book: "epub.EpubBook", cover_image_path: Path, console: Console) -> bool:
+def _add_cover_image(book: epub.EpubBook, cover_image_path: Path, console: Console) -> bool:
     """
     Adds a cover image to the EPUB book.
     Returns True if successful, False otherwise.
@@ -159,6 +165,101 @@ def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, c
         css = epub.EpubItem(uid="style_default", file_name="style.css", media_type="text/css", content=DEFAULT_CSS.encode('utf-8'))
         book.add_item(css)
 
+        # Add frontmatter sections if they exist and have content
+        frontmatter_items = []
+        frontmatter = book_root.find("frontmatter")
+        if frontmatter is not None:
+            # Title Page
+            title_page = frontmatter.findtext("title_page")
+            if title_page and title_page.strip():
+                title_page_html = f"""<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Title Page</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+    <style>
+        body {{ text-align: center; padding: 2em; }}
+        .title-page {{ font-size: 1.2em; line-height: 1.6; }}
+    </style>
+</head>
+<body>
+    <div class="title-page">{html.escape(title_page.strip()).replace(chr(10), '<br/>')}</div>
+</body>
+</html>"""
+                title_page_item = epub.EpubHtml(title="Title Page", file_name="title_page.xhtml", lang="en")
+                title_page_item.content = title_page_html.encode('utf-8')
+                title_page_item.add_item(css)
+                book.add_item(title_page_item)
+                frontmatter_items.append(title_page_item)
+
+            # Copyright Page
+            copyright_page = frontmatter.findtext("copyright_page")
+            if copyright_page and copyright_page.strip():
+                copyright_html = f"""<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Copyright Page</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+    <style>
+        body {{ padding: 2em; font-size: 0.9em; line-height: 1.6; }}
+    </style>
+</head>
+<body>
+    <div class="copyright-page">{html.escape(copyright_page.strip()).replace(chr(10), '<br/>')}</div>
+</body>
+</html>"""
+                copyright_item = epub.EpubHtml(title="Copyright Page", file_name="copyright_page.xhtml", lang="en")
+                copyright_item.content = copyright_html.encode('utf-8')
+                copyright_item.add_item(css)
+                book.add_item(copyright_item)
+                frontmatter_items.append(copyright_item)
+
+            # Dedication
+            dedication = frontmatter.findtext("dedication")
+            if dedication and dedication.strip():
+                dedication_html = f"""<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Dedication</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+    <style>
+        body {{ padding: 2em; text-align: center; font-style: italic; }}
+    </style>
+</head>
+<body>
+    <h2>Dedication</h2>
+    <div class="dedication">{html.escape(dedication.strip()).replace(chr(10), '<br/>')}</div>
+</body>
+</html>"""
+                dedication_item = epub.EpubHtml(title="Dedication", file_name="dedication.xhtml", lang="en")
+                dedication_item.content = dedication_html.encode('utf-8')
+                dedication_item.add_item(css)
+                book.add_item(dedication_item)
+                frontmatter_items.append(dedication_item)
+
+            # Acknowledgements
+            acknowledgements = frontmatter.findtext("acknowledgements")
+            if acknowledgements and acknowledgements.strip():
+                acknowledgements_html = f"""<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Acknowledgements</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+    <style>
+        body {{ padding: 2em; }}
+    </style>
+</head>
+<body>
+    <h2>Acknowledgements</h2>
+    <div class="acknowledgements">{html.escape(acknowledgements.strip()).replace(chr(10), '<br/>')}</div>
+</body>
+</html>"""
+                acknowledgements_item = epub.EpubHtml(title="Acknowledgements", file_name="acknowledgements.xhtml", lang="en")
+                acknowledgements_item.content = acknowledgements_html.encode('utf-8')
+                acknowledgements_item.add_item(css)
+                book.add_item(acknowledgements_item)
+                frontmatter_items.append(acknowledgements_item)
+
         epub_chapters = []
         for i, chapter_elem in enumerate(chapters_sorted):
             chap_num = chapter_elem.findtext("number", str(i + 1))
@@ -172,8 +273,15 @@ def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, c
             book.add_item(chapter_xhtml_item)
             epub_chapters.append(chapter_xhtml_item)
 
-        book.spine = ['nav'] + epub_chapters
-        book.toc = [epub.Link(chap.file_name, chap.title, chap.id) for chap in epub_chapters]
+        book.spine = ['nav'] + frontmatter_items + epub_chapters
+        
+        # Create TOC with frontmatter sections first, then chapters
+        toc_items = []
+        for item in frontmatter_items:
+            toc_items.append(epub.Link(item.file_name, item.title, item.id))
+        for chap in epub_chapters:
+            toc_items.append(epub.Link(chap.file_name, chap.title, chap.id))
+        book.toc = toc_items
         
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())

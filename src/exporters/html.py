@@ -46,50 +46,6 @@ body {
     border-left: 4px solid #007bff;
 }
 
-.story-elements {
-    margin: 2em 0;
-    padding: 1em;
-    background-color: #fff3cd;
-    border-left: 4px solid #ffc107;
-    border-radius: 5px;
-}
-
-.story-elements h2 {
-    color: #856404;
-    margin-top: 0;
-}
-
-.story-element {
-    margin: 0.5em 0;
-}
-
-.element-label {
-    font-weight: bold;
-    color: #6c757d;
-}
-
-.characters-section {
-    margin: 2em 0;
-    padding: 1em;
-    background-color: #f1f3f4;
-    border-radius: 5px;
-}
-
-.characters-section h2 {
-    color: #2c3e50;
-    border-bottom: 1px solid #bdc3c7;
-    padding-bottom: 0.5em;
-}
-
-.character {
-    margin: 0.5em 0;
-}
-
-.character-name {
-    font-weight: bold;
-    color: #34495e;
-}
-
 .chapter {
     margin: 3em 0;
     page-break-before: always;
@@ -171,7 +127,6 @@ def export_single_html(book_root: ET.Element, output_path: Path, console: Consol
         html_parts = []
         title = book_root.findtext("title", "Untitled Book")
         
-        # HTML document structure
         html_parts.append(f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -180,52 +135,84 @@ def export_single_html(book_root: ET.Element, output_path: Path, console: Consol
     <title>{escape(title)}</title>
     <style>
 {DEFAULT_CSS}
+        .frontmatter-section {{
+            margin-bottom: 2em;
+            page-break-after: always;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 2em;
+        }}
+        .frontmatter-section h2 {{
+            color: #666;
+            border-bottom: 2px solid #ddd;
+        }}
+        .title-page {{
+            text-align: center;
+            font-size: 1.2em;
+        }}
+        .copyright-page {{
+            font-size: 0.9em;
+            line-height: 1.6;
+        }}
     </style>
 </head>
 <body>""")
 
-        # Book header
-        html_parts.append('<div class="book-header">')
-        html_parts.append(f'<h1 class="book-title">{escape(title)}</h1>')
-        
-        synopsis = book_root.findtext("synopsis")
-        if synopsis:
-            html_parts.append(f'<div class="book-synopsis">{escape(synopsis.strip())}</div>')
-        
-        # Story elements
-        story_elements = book_root.find("story_elements")
-        if story_elements is not None:
-            html_parts.append('<div class="story-elements">')
-            html_parts.append('<h2>Story Elements</h2>')
+        # Add frontmatter sections if they exist and have content
+        frontmatter = book_root.find("frontmatter")
+        if frontmatter is not None:
+            # Title Page
+            title_page = frontmatter.findtext("title_page")
+            if title_page and title_page.strip():
+                html_parts.append('<div class="frontmatter-section title-page">')
+                html_parts.append(f'<div>{escape(title_page.strip()).replace(chr(10), "<br>")}</div>')
+                html_parts.append('</div>')
             
-            genre = story_elements.findtext("genre")
-            tone = story_elements.findtext("tone")
-            perspective = story_elements.findtext("perspective")
-            target_audience = story_elements.findtext("target_audience")
+            # Copyright Page
+            copyright_page = frontmatter.findtext("copyright_page")
+            if copyright_page and copyright_page.strip():
+                html_parts.append('<div class="frontmatter-section copyright-page">')
+                html_parts.append(f'<div>{escape(copyright_page.strip()).replace(chr(10), "<br>")}</div>')
+                html_parts.append('</div>')
             
-            if genre:
-                html_parts.append(f'<div class="story-element"><span class="element-label">Genre:</span> {escape(genre)}</div>')
-            if tone:
-                html_parts.append(f'<div class="story-element"><span class="element-label">Tone:</span> {escape(tone)}</div>')
-            if perspective:
-                html_parts.append(f'<div class="story-element"><span class="element-label">Perspective:</span> {escape(perspective)}</div>')
-            if target_audience:
-                html_parts.append(f'<div class="story-element"><span class="element-label">Target Audience:</span> {escape(target_audience)}</div>')
+            # Dedication
+            dedication = frontmatter.findtext("dedication")
+            if dedication and dedication.strip():
+                html_parts.append('<div class="frontmatter-section">')
+                html_parts.append('<h2>Dedication</h2>')
+                html_parts.append(f'<div>{escape(dedication.strip()).replace(chr(10), "<br>")}</div>')
+                html_parts.append('</div>')
             
-            html_parts.append('</div>')
-        
-        html_parts.append('</div>')
+            # Acknowledgements
+            acknowledgements = frontmatter.findtext("acknowledgements")
+            if acknowledgements and acknowledgements.strip():
+                html_parts.append('<div class="frontmatter-section">')
+                html_parts.append('<h2>Acknowledgements</h2>')
+                html_parts.append(f'<div>{escape(acknowledgements.strip()).replace(chr(10), "<br>")}</div>')
+                html_parts.append('</div>')
 
-        # Characters section
-        characters = book_root.findall(".//character")
-        if characters:
-            html_parts.append('<div class="characters-section">')
-            html_parts.append('<h2>Characters</h2>')
-            for char in characters:
-                name = escape(char.findtext("name", "N/A"))
-                desc = escape(char.findtext("description", "N/A"))
-                html_parts.append(f'<div class="character"><span class="character-name">{name}:</span> {desc}</div>')
+        # Book header (only if no custom title page was provided)
+        has_custom_title_page = False
+        if frontmatter is not None:
+            title_page_text = frontmatter.findtext("title_page")
+            has_custom_title_page = title_page_text and title_page_text.strip()
+        
+        if not has_custom_title_page:
+            html_parts.append('<div class="book-header">')
+            html_parts.append(f'<h1 class="book-title">{escape(title)}</h1>')
+            
+            synopsis = book_root.findtext("synopsis")
+            if synopsis:
+                html_parts.append(f'<div class="book-synopsis">{escape(synopsis.strip())}</div>')
+            
             html_parts.append('</div>')
+        else:
+            # Add synopsis separately if we have a custom title page
+            synopsis = book_root.findtext("synopsis")
+            if synopsis:
+                html_parts.append('<div class="frontmatter-section">')
+                html_parts.append('<h2>Synopsis</h2>')
+                html_parts.append(f'<div class="book-synopsis">{escape(synopsis.strip())}</div>')
+                html_parts.append('</div>')
 
         # Chapters
         chapters = _get_sorted_chapters(book_root)
