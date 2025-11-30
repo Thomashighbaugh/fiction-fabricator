@@ -1,7 +1,7 @@
 [project]
 name = "fiction-fabricator"
 version = "0.1.0"
-description = "Add your description here"
+description = "An AI-powered tool for generating novels and short stories with outline creation, content generation, editing features, and export to multiple formats"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

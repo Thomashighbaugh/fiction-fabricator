@@ -12,11 +12,12 @@ from pathlib import Path
 from rich.prompt import Confirm
 from rich.panel import Panel
 
-from src import ui, utils
+from src import ui, utils, config
 from src.llm_client import LLMClient
 from src.project import Project
 from src.generators import novel, short_story
 from src.exporters import markdown, epub, html
+from src.exporters import pdf, txt
 
 class Orchestrator:
     """Orchestrates the entire novel generation process."""
@@ -125,7 +126,7 @@ class Orchestrator:
         """Guides the user through setting up a new project."""
         # Offer lorebook selection if none was provided via CLI
         if not self.lorebook_data:
-            lorebook_path = ui.prompt_for_lorebook_selection()
+            lorebook_path, is_import = ui.prompt_for_lorebook_creation_or_import()
             if lorebook_path:
                 self.lorebook_data = self._load_lorebook(lorebook_path)
         
@@ -399,6 +400,97 @@ Full Book Context:
         
         return ET.tostring(reduced_book, encoding='unicode')
 
+    def _create_enhanced_context_for_book_editing(self, chapter_id: str) -> str:
+        """Creates enhanced context for book-wide editing that includes narrative flow and continuity information."""
+        if not self.project.book_root:
+            return "<book></book>"
+        
+        # Create enhanced book structure for continuity-aware editing
+        enhanced_book = ET.Element("book")
+        
+        # Add essential book metadata
+        for elem_name in ["title", "synopsis", "story_elements"]:
+            elem = self.project.book_root.find(elem_name)
+            if elem is not None:
+                enhanced_book.append(copy.deepcopy(elem))
+        
+        # Add complete character information for consistency
+        characters_elem = self.project.book_root.find("characters")
+        if characters_elem is not None:
+            enhanced_book.append(copy.deepcopy(characters_elem))
+        
+        # Find target chapter
+        all_chapters = self.project.book_root.findall(".//chapter")
+        target_chapter = None
+        target_index = -1
+        
+        for i, chapter in enumerate(all_chapters):
+            if utils.get_chapter_id(chapter) == chapter_id:
+                target_chapter = chapter
+                target_index = i
+                break
+        
+        if target_chapter is None:
+            return ET.tostring(enhanced_book, encoding='unicode')
+        
+        # Add enhanced chapters section with broader context
+        chapters_elem = ET.SubElement(enhanced_book, "chapters")
+        
+        # Include more chapters for better continuity (2 before, target, 2 after)
+        context_range = range(max(0, target_index - 2), min(len(all_chapters), target_index + 3))
+        
+        for i in context_range:
+            chapter = all_chapters[i]
+            chapter_copy = ET.SubElement(chapters_elem, "chapter")
+            
+            # Copy chapter metadata
+            if chapter.get("id"):
+                chapter_copy.set("id", chapter.get("id"))
+            
+            for elem_name in ["id", "number", "title", "summary"]:
+                elem = chapter.find(elem_name)
+                if elem is not None:
+                    elem_copy = ET.SubElement(chapter_copy, elem_name)
+                    elem_copy.text = elem.text
+            
+            # For the target chapter, include full content
+            if utils.get_chapter_id(chapter) == chapter_id:
+                content_elem = chapter.find("content")
+                if content_elem is not None:
+                    chapter_copy.append(copy.deepcopy(content_elem))
+            else:
+                # For context chapters, include summary + first/last paragraphs for flow
+                content_elem = chapter.find("content")
+                if content_elem is not None:
+                    context_content = ET.SubElement(chapter_copy, "content_context")
+                    paragraphs = content_elem.findall("paragraph")
+                    if paragraphs:
+                        # Add first paragraph for lead-in context
+                        if len(paragraphs) > 0:
+                            first_para = ET.SubElement(context_content, "opening")
+                            first_para.text = (paragraphs[0].text or "")[:300] + "..." if len(paragraphs[0].text or "") > 300 else paragraphs[0].text
+                        
+                        # Add last paragraph for lead-out context (if different from first)
+                        if len(paragraphs) > 1:
+                            last_para = ET.SubElement(context_content, "closing")
+                            last_para.text = (paragraphs[-1].text or "")[:300] + "..." if len(paragraphs[-1].text or "") > 300 else paragraphs[-1].text
+        
+        # Add narrative flow summary for continuity awareness
+        flow_elem = ET.SubElement(enhanced_book, "narrative_flow")
+        flow_summary = f"This book has {len(all_chapters)} chapters. Target chapter {target_index + 1} of {len(all_chapters)}."
+        
+        if target_index > 0:
+            prev_title = all_chapters[target_index - 1].findtext("title", "Previous Chapter")
+            flow_summary += f" Follows '{prev_title}'."
+        
+        if target_index < len(all_chapters) - 1:
+            next_title = all_chapters[target_index + 1].findtext("title", "Next Chapter")
+            flow_summary += f" Leads to '{next_title}'."
+        
+        flow_elem.text = flow_summary
+        
+        return ET.tostring(enhanced_book, encoding='unicode')
+
     def _edit_make_longer(self):
         """Handler for making chapters longer."""
         chapters = ui.get_chapter_selection(self.project, "Enter chapter ID(s) to make longer", allow_multiple=True)
@@ -598,7 +690,8 @@ Full Book Context:
             return
         
         self.console.print(f"[bold yellow]Applying advice to {len(chapters)} chapters...[/bold yellow]")
-        self.console.print("[dim]This will auto-apply patches without individual confirmations.[/dim]\n")
+        self.console.print("[dim]This will auto-apply patches without individual confirmations.[/dim]")
+        self.console.print("[cyan]Using enhanced continuity-aware context for each chapter.[/cyan]\n")
         
         failed_chapters = []
         
@@ -606,8 +699,8 @@ Full Book Context:
             chapter_id = utils.get_chapter_id(chapter)
             self.console.print(f"[cyan]Applying advice to Chapter {chapter_id}...[/cyan]")
             
-            # Create reduced context to avoid token limits
-            reduced_context = self._create_reduced_context_for_chapter(chapter_id)
+            # Use enhanced context for better inter-chapter continuity
+            enhanced_context = self._create_enhanced_context_for_book_editing(chapter_id)
             
             prompt = f"""
 Apply the following editing advice to Chapter {chapter_id}. Rewrite the chapter content incorporating these suggestions while maintaining the original plot, character development, and narrative flow.
@@ -615,12 +708,22 @@ Apply the following editing advice to Chapter {chapter_id}. Rewrite the chapter 
 EDITING ADVICE TO APPLY:
 {suggestions_text}
 
-IMPORTANT: 
+IMPORTANT CONTINUITY REQUIREMENTS:
 - Maintain the chapter's existing structure and plot points
 - Keep all character actions and dialogue meaningful to the story
 - Preserve the chapter's role in the overall narrative
+- Ensure smooth transitions from previous chapter and to next chapter
+- Maintain character consistency and development arcs across chapters
+- Preserve any plot threads, foreshadowing, or story elements that connect to other chapters
 - Focus on implementing the advice to improve writing quality, style, and consistency
-- Do not change major plot elements or character motivations
+- Do not change major plot elements, character motivations, or narrative dependencies
+
+CONTEXT AWARENESS:
+The enhanced context below includes surrounding chapters and narrative flow information to help you maintain continuity. Pay attention to:
+- How this chapter connects to previous and following chapters
+- Character states and development from previous chapters
+- Ongoing plot threads and story elements that must be preserved
+- Tone and style consistency with the broader narrative
 
 Output format: Return ONLY an XML `<patch>` containing a `<chapter>` element with the complete updated content. Use this EXACT format:
 
@@ -633,9 +736,9 @@ Output format: Return ONLY an XML `<patch>` containing a `<chapter>` element wit
   </chapter>
 </patch>
 
-Relevant Context:
+Enhanced Context for Continuity:
 ```xml
-{reduced_context}
+{enhanced_context}
 ```
 """
             
@@ -658,19 +761,26 @@ Relevant Context:
             failed_list = ", ".join(failed_chapters)
             self.console.print(f"[yellow]Failed chapters: {failed_list}[/yellow]")
             self.console.print("[dim]You can try applying advice to failed chapters individually using 'Rewrite Chapter'.[/dim]")
+        else:
+            self.console.print("[bold cyan]All chapters updated with continuity-aware context! ✨[/bold cyan]")
+            self.console.print("[dim]Inter-chapter narrative flow and character consistency have been preserved.[/dim]")
 
 
     def _show_export_menu(self):
         """Displays the export menu and handles user choice."""
         export_options = {
             "1": ("Edit Frontmatter", self._edit_frontmatter_menu),
-            "2": ("Export All Formats", self._export_all),
-            "3": ("Export Full Book (Single Markdown)", self._export_single_md),
-            "4": ("Export Chapters (Markdown per Chapter)", self._export_multi_md),
-            "5": ("Export Full Book (Single HTML)", self._export_single_html),
-            "6": ("Export Chapters (HTML per Chapter)", self._export_multi_html),
-            "7": ("Export Full Book (EPUB)", self._export_epub),
-            "8": ("Return to Editing Menu", None),
+            "2": ("Select Chapter Heading Font", self._select_font),
+            "3": ("Export All Formats", self._export_all),
+            "4": ("Export Full Book (Single Markdown)", self._export_single_md),
+            "5": ("Export Chapters (Markdown per Chapter)", self._export_multi_md),
+            "6": ("Export Full Book (Single HTML)", self._export_single_html),
+            "7": ("Export Chapters (HTML per Chapter)", self._export_multi_html),
+            "8": ("Export Full Book (EPUB)", self._export_epub),
+            "9": ("Export Full Book (PDF)", self._export_pdf),
+            "10": ("Export Full Book (TXT)", self._export_single_txt),
+            "11": ("Export Chapters (TXT per Chapter)", self._export_multi_txt),
+            "12": ("Return to Editing Menu", None),
         }
         choice = ui.display_menu("Export Options", export_options)
         handler = export_options.get(choice)[1]
@@ -722,6 +832,56 @@ Relevant Context:
         else:
             self.console.print(f"[yellow]No changes made to frontmatter section '{section_name.replace('_', ' ').title()}'.[/yellow]")
 
+    def _select_font(self):
+        """Allow the user to select a custom font for chapter headings."""
+        # Display current font selection
+        current_font = getattr(self, 'selected_font', config.DEFAULT_CHAPTER_FONT)
+        self.console.print(f"[dim]Current chapter heading font: {current_font}[/dim]")
+        
+        # Create font selection menu
+        font_options = {str(i + 1): (font, None) for i, font in enumerate(config.GOOGLE_FONT_OPTIONS)}
+        font_options[str(len(config.GOOGLE_FONT_OPTIONS) + 1)] = ("Use Default Font (Georgia)", None)
+        font_options[str(len(config.GOOGLE_FONT_OPTIONS) + 2)] = ("Enter Custom Google Font URL", None)
+        font_options[str(len(config.GOOGLE_FONT_OPTIONS) + 3)] = ("Return to Export Menu", None)
+        
+        choice = ui.display_menu("Select Chapter Heading Font", font_options)
+        
+        if choice == str(len(config.GOOGLE_FONT_OPTIONS) + 1):
+            # Use default font
+            self.selected_font = config.DEFAULT_CHAPTER_FONT
+            self.selected_font_url = None
+            self.console.print(f"[green]Chapter heading font set to default: {self.selected_font}[/green]")
+        elif choice == str(len(config.GOOGLE_FONT_OPTIONS) + 2):
+            # Custom font URL
+            from rich.prompt import Prompt
+            font_url = Prompt.ask("[cyan]Enter Google Font CSS URL[/cyan]")
+            if font_url and font_url.strip():
+                font_name = Prompt.ask("[cyan]Enter font family name (e.g., 'Open Sans')[/cyan]")
+                if font_name and font_name.strip():
+                    self.selected_font = font_name.strip()
+                    self.selected_font_url = font_url.strip()
+                    self.console.print(f"[green]Custom font set: {self.selected_font}[/green]")
+                else:
+                    self.console.print("[yellow]Font name is required for custom fonts[/yellow]")
+            else:
+                self.console.print("[yellow]No font URL provided[/yellow]")
+        elif choice == str(len(config.GOOGLE_FONT_OPTIONS) + 3):
+            # Return to menu
+            return
+        else:
+            # Selected a predefined Google Font
+            try:
+                font_index = int(choice) - 1
+                if 0 <= font_index < len(config.GOOGLE_FONT_OPTIONS):
+                    selected_font = config.GOOGLE_FONT_OPTIONS[font_index]
+                    self.selected_font = selected_font
+                    self.selected_font_url = config.GOOGLE_FONT_URLS.get(selected_font)
+                    self.console.print(f"[green]Chapter heading font set to: {self.selected_font}[/green]")
+                else:
+                    self.console.print("[red]Invalid font selection[/red]")
+            except ValueError:
+                self.console.print("[red]Invalid selection[/red]")
+
     def _export_single_md(self):
         filename = f"{self.project.book_title_slug}-full.md"
         output_path = self.project.book_dir / filename
@@ -733,10 +893,16 @@ Relevant Context:
     def _export_single_html(self):
         filename = f"{self.project.book_title_slug}-full.html"
         output_path = self.project.book_dir / filename
-        html.export_single_html(self.project.book_root, output_path, self.console)
+        # Get selected font settings
+        font_name = getattr(self, 'selected_font', None)
+        font_url = getattr(self, 'selected_font_url', None)
+        html.export_single_html(self.project.book_root, output_path, self.console, font_name, font_url)
 
     def _export_multi_html(self):
-        html.export_html_per_chapter(self.project.book_root, self.project.book_dir, self.project.book_title_slug, self.console)
+        # Get selected font settings
+        font_name = getattr(self, 'selected_font', None)
+        font_url = getattr(self, 'selected_font_url', None)
+        html.export_html_per_chapter(self.project.book_root, self.project.book_dir, self.project.book_title_slug, self.console, font_name, font_url)
 
     def _export_epub(self):
         # Prompt for optional cover image
@@ -760,13 +926,35 @@ Relevant Context:
                 self.console.print(f"[yellow]Warning: {cover_image_path} may not be a supported image format[/yellow]")
                 self.console.print("[yellow]Supported formats: JPG, PNG, GIF, BMP, WebP[/yellow]")
         
+        # Get selected font settings
+        font_name = getattr(self, 'selected_font', None)
+        font_url = getattr(self, 'selected_font_url', None)
+        
         epub.export_epub(
             self.project.book_root, 
             self.project.book_dir, 
             self.project.book_title_slug, 
             self.console,
-            cover_image_path=cover_image_path
+            cover_image_path=cover_image_path,
+            custom_font_name=font_name,
+            custom_font_url=font_url
         )
+
+    def _export_pdf(self):
+        filename = f"{self.project.book_title_slug}-full.pdf"
+        output_path = self.project.book_dir / filename
+        # Get selected font settings
+        font_name = getattr(self, 'selected_font', None)
+        font_url = getattr(self, 'selected_font_url', None)
+        pdf.export_pdf(self.project.book_root, output_path, self.console, font_name, font_url)
+
+    def _export_single_txt(self):
+        filename = f"{self.project.book_title_slug}-full.txt"
+        output_path = self.project.book_dir / filename
+        txt.export_single_txt(self.project.book_root, output_path, self.console)
+
+    def _export_multi_txt(self):
+        txt.export_txt_per_chapter(self.project.book_root, self.project.book_dir, self.project.book_title_slug, self.console)
 
     def _export_all(self):
         """Export the book in all available formats."""
@@ -780,7 +968,10 @@ Relevant Context:
             "• Chapters (Markdown per chapter)\n"
             "• Full book (single HTML)\n"
             "• Chapters (HTML per chapter)\n"
-            "• Full book (EPUB)",
+            "• Full book (EPUB)\n"
+            "• Full book (PDF)\n"
+            "• Full book (TXT)\n"
+            "• Chapters (TXT per chapter)",
             title="Export All"
         ))
         
@@ -828,6 +1019,15 @@ Relevant Context:
                 self.console,
                 cover_image_path=cover_image_path
             )
+            
+            self.console.print("[cyan]Exporting full book (PDF)...[/cyan]")
+            self._export_pdf()
+            
+            self.console.print("[cyan]Exporting full book (TXT)...[/cyan]")
+            self._export_single_txt()
+            
+            self.console.print("[cyan]Exporting chapters (TXT per chapter)...[/cyan]")
+            self._export_multi_txt()
             
             self.console.print(Panel(
                 "[bold green]✓ All formats exported successfully![/bold green]\n"
@@ -890,11 +1090,14 @@ Relevant Context:
 
     def _load_or_create_lorebook(self, path: Path) -> dict | None:
         """Load existing lorebook or create new one."""
+        # The path is now already pointing to the correct location (lorebooks/ directory)
+        # since main.py handles the directory creation and path construction
+        
         if path.exists():
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                self.console.print(f"[green]Loaded existing lorebook: {path.name}[/green]")
+                self.console.print(f"[green]Loaded existing lorebook: {path}[/green]")
                 return data
             except (json.JSONDecodeError, IOError) as e:
                 self.console.print(f"[red]Error loading lorebook: {e}[/red]")
@@ -902,7 +1105,7 @@ Relevant Context:
                     return None
         
         # Create new lorebook
-        self.console.print(f"[blue]Creating new lorebook: {path.name}[/blue]")
+        self.console.print(f"[blue]Creating new lorebook: {path}[/blue]")
         return {
             "entries": [],
             "name": path.stem,
@@ -1205,8 +1408,11 @@ Return ONLY the condensed content, no explanations or meta-commentary."""
     def _save_lorebook(self, path: Path, lorebook_data: dict):
         """Save the lorebook data to file."""
         try:
+            # The path is already correctly pointing to lorebooks/ directory
+            # since main.py handles the directory creation and path construction
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(lorebook_data, f, indent=2, ensure_ascii=False)
+            self.console.print(f"[green]Lorebook saved to: {path}[/green]")
         except IOError as e:
             self.console.print(f"[red]Error saving lorebook: {e}[/red]")
             raise
@@ -1237,7 +1443,7 @@ Return ONLY the condensed content, no explanations or meta-commentary."""
         
         # Offer lorebook selection if none was provided via CLI
         if not self.lorebook_data:
-            lorebook_path = ui.prompt_for_lorebook_selection()
+            lorebook_path, is_import = ui.prompt_for_lorebook_creation_or_import()
             if lorebook_path:
                 self.lorebook_data = self._load_lorebook(lorebook_path)
         

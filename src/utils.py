@@ -280,3 +280,76 @@ def get_next_patch_number(book_dir: Path) -> int:
         return int(last_patch.split("-")[-1]) + 1
     except (IndexError, ValueError):
         return len(list(book_dir.glob("patch-*.xml"))) + 1
+
+def convert_tavern_lorebook_to_fiction_fabricator(tavern_lorebook_path: str) -> dict:
+    """
+    Converts a TavernAI/SillyTavern lorebook JSON file to Fiction Fabricator format.
+    
+    Args:
+        tavern_lorebook_path: Path to the TavernAI lorebook JSON file
+        
+    Returns:
+        dict: Fiction Fabricator compatible lorebook structure
+        
+    Raises:
+        FileNotFoundError: If the lorebook file doesn't exist
+        ValueError: If the file is not valid JSON or doesn't contain expected structure
+    """
+    import json
+    
+    try:
+        with open(tavern_lorebook_path, 'r', encoding='utf-8') as f:
+            tavern_data = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Lorebook file not found: {tavern_lorebook_path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in lorebook file: {e}")
+    
+    # Handle both old and new TavernAI formats
+    entries_data = None
+    
+    # Check for entries as an object (SillyTavern format)
+    if "entries" in tavern_data and isinstance(tavern_data["entries"], dict):
+        entries_data = tavern_data["entries"]
+    # Check for entries as a list (older TavernAI format)
+    elif "entries" in tavern_data and isinstance(tavern_data["entries"], list):
+        entries_data = {str(i): entry for i, entry in enumerate(tavern_data["entries"])}
+    # Check if the root is directly an entries object
+    elif all(isinstance(v, dict) and "keys" in v for v in tavern_data.values()):
+        entries_data = tavern_data
+    else:
+        raise ValueError("Lorebook file does not contain expected 'entries' structure")
+    
+    # Convert to Fiction Fabricator format
+    converted_entries = []
+    
+    for entry_id, entry in entries_data.items():
+        # Skip disabled entries unless explicitly requested
+        if not entry.get("enable", True):
+            continue
+            
+        # Extract keys - handle both string and array formats
+        keys = entry.get("keys", [])
+        if isinstance(keys, str):
+            keys = [keys]
+        
+        # Extract content
+        content = entry.get("content", "").strip()
+        if not content:
+            continue  # Skip empty entries
+            
+        # Extract optional fields
+        comment = entry.get("comment", entry.get("name", ""))
+        
+        # Create Fiction Fabricator entry
+        ff_entry = {
+            "keys": keys,
+            "content": content,
+            "comment": comment,
+            "enable": True,  # We already filtered out disabled entries
+            "disable": False
+        }
+        
+        converted_entries.append(ff_entry)
+    
+    return {"entries": converted_entries}

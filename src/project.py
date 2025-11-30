@@ -26,7 +26,22 @@ class Project:
 
         if resume_folder_name:
             self.console.print(f"Resuming project from: [cyan]{resume_folder_name}[/cyan]")
-            self.book_dir = Path(resume_folder_name)
+            
+            # Check if it's a direct path or just a folder name
+            resume_path = Path(resume_folder_name)
+            if resume_path.is_dir():
+                # Direct path provided
+                self.book_dir = resume_path
+            else:
+                # Look in projects directory
+                projects_dir = Path("projects")
+                potential_path = projects_dir / resume_folder_name
+                if potential_path.is_dir():
+                    self.book_dir = potential_path
+                else:
+                    # Fallback to original behavior for backward compatibility
+                    self.book_dir = Path(resume_folder_name)
+            
             if not self.book_dir.is_dir():
                 raise FileNotFoundError(f"Project directory '{resume_folder_name}' not found.")
             
@@ -50,7 +65,12 @@ class Project:
         
         today_date_str = datetime.now().strftime(DATE_FORMAT_FOR_FOLDER)
         folder_name = f"{today_date_str}-{self.book_title_slug}-{self.book_id}"
-        self.book_dir = Path(folder_name)
+        
+        # Ensure projects directory exists
+        projects_dir = Path("projects")
+        projects_dir.mkdir(exist_ok=True)
+        
+        self.book_dir = projects_dir / folder_name
 
         try:
             self.book_dir.mkdir(parents=True, exist_ok=True)

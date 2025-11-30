@@ -8,6 +8,7 @@ import mimetypes
 from pathlib import Path
 from html import escape
 import html
+import re
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -25,13 +26,47 @@ try:
 except ImportError:
     epub = None
 
+def _generate_epub_css_with_font(custom_font_name: str | None = None) -> str:
+    """Generate CSS for EPUB with custom font applied to headings."""
+    # Base font for body text
+    body_font = "Georgia, serif"
+    
+    # Chapter heading font
+    heading_font = f"'{custom_font_name}', {body_font}" if custom_font_name else body_font
+    
+    return f"""
+body {{ font-family: {body_font}; line-height: 1.6; margin: 1em 1.5em; text-align: justify; }}
+h1.chapter-number {{ font-family: {heading_font}; text-align: right; margin-top: 2.5em; margin-bottom: 0.5em; page-break-before: always; font-size: 1.8em; }}
+h2.chapter-title {{ font-family: {heading_font}; text-align: right; margin-top: 0; margin-bottom: 1.5em; font-size: 1.4em; }}
+h1, h2 {{ font-family: {heading_font}; }}
+p {{ text-indent: 1.5em; margin-top: 0; margin-bottom: 0.2em; }}
+h1 + p, h2 + p {{ text-indent: 0; }}
+"""
+
 # --- Basic CSS for the EPUB ---
 DEFAULT_CSS = """
 body { font-family: Georgia, serif; line-height: 1.6; margin: 1em 1.5em; text-align: justify; }
-h1.chapter-title { text-align: center; margin-top: 2.5em; margin-bottom: 1.5em; page-break-before: always; }
+h1.chapter-number { text-align: right; margin-top: 2.5em; margin-bottom: 0.5em; page-break-before: always; font-size: 1.8em; }
+h2.chapter-title { text-align: right; margin-top: 0; margin-bottom: 1.5em; font-size: 1.4em; }
 p { text-indent: 1.5em; margin-top: 0; margin-bottom: 0.2em; }
-h1 + p { text-indent: 0; }
+h1 + p, h2 + p { text-indent: 0; }
 """
+
+def _convert_markdown_to_html(text: str) -> str:
+    """Convert basic markdown formatting to HTML."""
+    if not text:
+        return text
+    
+    # Convert italic (*text*) to <em>
+    text = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', text)
+    
+    # Convert bold (**text**) to <strong>
+    text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
+    
+    # Convert underline (_text_) to <u> (alternative italic)
+    text = re.sub(r'_([^_]+)_', r'<em>\1</em>', text)
+    
+    return text
 
 def _get_sorted_chapters(book_root: ET.Element) -> list[ET.Element]:
     """Helper to get chapters sorted numerically by ID."""
@@ -87,7 +122,7 @@ def _add_cover_image(book: epub.EpubBook, cover_image_path: Path, console: Conso
         console.print(f"[yellow]Warning: Could not add cover image: {e}[/yellow]")
         return False
 
-def _format_chapter_xhtml(chapter_element: ET.Element, chapter_title: str) -> bytes:
+def _format_chapter_xhtml(chapter_element: ET.Element, chapter_number: str, chapter_title: str) -> bytes:
     """Formats a chapter's content into a valid XHTML string (as bytes)."""
     paragraphs_html = []
     content_element = chapter_element.find("content")
@@ -95,8 +130,17 @@ def _format_chapter_xhtml(chapter_element: ET.Element, chapter_title: str) -> by
         for para in content_element.findall(".//paragraph"):
             para_text = (para.text or "").strip()
             if para_text:
-                escaped_text = html.escape(para_text).replace("\n", "<br />\n    ")
-                paragraphs_html.append(f"<p>{escaped_text}</p>")
+                # First convert markdown to HTML
+                html_text = _convert_markdown_to_html(para_text)
+                # Then escape any remaining HTML entities (but preserve our converted tags)
+                html_text = html_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                # Restore our converted markdown tags
+                html_text = html_text.replace("&lt;em&gt;", "<em>").replace("&lt;/em&gt;", "</em>")
+                html_text = html_text.replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
+                html_text = html_text.replace("&lt;u&gt;", "<u>").replace("&lt;/u&gt;", "</u>")
+                # Handle line breaks
+                html_text = html_text.replace("\n", "<br />\n    ")
+                paragraphs_html.append(f"<p>{html_text}</p>")
 
     if not paragraphs_html:
         paragraphs_html.append("<p><i>[Chapter content is empty or missing]</i></p>")
@@ -105,17 +149,18 @@ def _format_chapter_xhtml(chapter_element: ET.Element, chapter_title: str) -> by
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
-    <title>{html.escape(chapter_title)}</title>
+    <title>Chapter {html.escape(chapter_number)}: {html.escape(chapter_title)}</title>
     <link rel="stylesheet" type="text/css" href="style.css" />
 </head>
 <body>
-    <h1 class="chapter-title">{html.escape(chapter_title)}</h1>
+    <h1 class="chapter-number">Chapter {html.escape(chapter_number)}</h1>
+    <h2 class="chapter-title">{html.escape(chapter_title)}</h2>
     {''.join(paragraphs_html)}
 </body>
 </html>"""
     return xhtml_content.encode('utf-8')
 
-def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, console: Console, author="Fiction Fabricator", cover_image_path: Path | None = None):
+def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, console: Console, author="Fiction Fabricator", cover_image_path: Path | None = None, custom_font_name: str | None = None, custom_font_url: str | None = None):
     """Exports the book content to an EPUB file."""
     if epub is None:
         console.print("[bold red]EPUB Export Failed: 'ebooklib' is not installed.[/bold red]")
@@ -161,8 +206,9 @@ def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, c
         if cover_image_path:
             _add_cover_image(book, cover_image_path, console)
 
-        # Add CSS
-        css = epub.EpubItem(uid="style_default", file_name="style.css", media_type="text/css", content=DEFAULT_CSS.encode('utf-8'))
+        # Add CSS with custom font
+        css_content = _generate_epub_css_with_font(custom_font_name) if custom_font_name else DEFAULT_CSS
+        css = epub.EpubItem(uid="style_default", file_name="style.css", media_type="text/css", content=css_content.encode('utf-8'))
         book.add_item(css)
 
         # Add frontmatter sections if they exist and have content
@@ -172,6 +218,19 @@ def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, c
             # Title Page
             title_page = frontmatter.findtext("title_page")
             if title_page and title_page.strip():
+                lines = title_page.strip().split('\n')
+                title_page_content = []
+                
+                if len(lines) >= 1:
+                    title_page_content.append(f'<h1>{html.escape(lines[0].strip())}</h1>')
+                if len(lines) >= 2:
+                    title_page_content.append(f'<h2>{html.escape(lines[1].strip())}</h2>')
+                if len(lines) > 2:
+                    # Handle any additional lines as regular text
+                    for line in lines[2:]:
+                        if line.strip():
+                            title_page_content.append(f'<div>{html.escape(line.strip())}</div>')
+                
                 title_page_html = f"""<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -180,10 +239,11 @@ def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, c
     <style>
         body {{ text-align: center; padding: 2em; }}
         .title-page {{ font-size: 1.2em; line-height: 1.6; }}
+        h1, h2 {{ text-align: center; }}
     </style>
 </head>
 <body>
-    <div class="title-page">{html.escape(title_page.strip()).replace(chr(10), '<br/>')}</div>
+    <div class="title-page">{''.join(title_page_content)}</div>
 </body>
 </html>"""
                 title_page_item = epub.EpubHtml(title="Title Page", file_name="title_page.xhtml", lang="en")
@@ -264,11 +324,11 @@ def export_epub(book_root: ET.Element, output_dir: Path, book_title_slug: str, c
         for i, chapter_elem in enumerate(chapters_sorted):
             chap_num = chapter_elem.findtext("number", str(i + 1))
             chap_title_raw = chapter_elem.findtext("title", f"Chapter {chap_num}")
-            chap_title = f"Chapter {chap_num}: {chap_title_raw}"
+            chap_title_display = f"Chapter {chap_num}: {chap_title_raw}"
 
             xhtml_filename = f"chapter_{i+1}.xhtml"
-            chapter_xhtml_item = epub.EpubHtml(title=chap_title, file_name=xhtml_filename, lang="en")
-            chapter_xhtml_item.content = _format_chapter_xhtml(chapter_elem, chap_title)
+            chapter_xhtml_item = epub.EpubHtml(title=chap_title_display, file_name=xhtml_filename, lang="en")
+            chapter_xhtml_item.content = _format_chapter_xhtml(chapter_elem, chap_num, chap_title_raw)
             chapter_xhtml_item.add_item(css)
             book.add_item(chapter_xhtml_item)
             epub_chapters.append(chapter_xhtml_item)

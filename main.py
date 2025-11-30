@@ -37,8 +37,10 @@ def main():
     parser.add_argument(
         "--create-lorebook",
         metavar="JSON_FILE",
-        help="Create or edit a lorebook file interactively with LLM assistance.",
+        help="Create or edit a lorebook file interactively with LLM assistance. If JSON_FILE is provided and exists, it will be imported; otherwise a new lorebook will be created.",
         type=str,
+        nargs="?",
+        const="",
         default=None,
     )
     parser.add_argument(
@@ -51,7 +53,92 @@ def main():
 
     try:
         # --- Lorebook Creation Mode ---
-        if args.create_lorebook:
+        if args.create_lorebook is not None:
+            from pathlib import Path
+            from rich.prompt import Prompt, Confirm
+            import json
+            
+            # Ensure lorebooks directory exists
+            lorebooks_dir = Path("lorebooks")
+            lorebooks_dir.mkdir(exist_ok=True)
+            
+            ui.console.print("\n[bold cyan]📚 Lorebook Creation[/bold cyan]")
+            
+            lorebook_path = None
+            is_import = False
+            
+            # Check if a file path was provided and if it exists
+            if args.create_lorebook:
+                provided_path = Path(args.create_lorebook)
+                if provided_path.exists():
+                    # File exists - offer to import it
+                    ui.console.print(f"[green]Found existing file: {provided_path}[/green]")
+                    if Prompt.ask(
+                        "[yellow]Import this existing lorebook?[/yellow]",
+                        choices=["y", "n"],
+                        default="y"
+                    ).lower() == "y":
+                        # Import the existing file
+                        try:
+                            # Test if it's valid JSON
+                            with open(provided_path, 'r', encoding='utf-8') as f:
+                                existing_data = json.load(f)
+                            
+                            # Determine where to save it in lorebooks directory
+                            target_name = provided_path.name
+                            if not target_name.endswith('.json'):
+                                target_name += '.json'
+                            
+                            lorebook_path = lorebooks_dir / target_name
+                            
+                            # If target already exists, ask for confirmation
+                            if lorebook_path.exists():
+                                if not Confirm.ask(f"[yellow]Overwrite existing {lorebook_path}?[/yellow]"):
+                                    # Ask for new name
+                                    new_name = Prompt.ask(
+                                        "[cyan]Enter a new name for the imported lorebook[/cyan]",
+                                        default=f"imported_{target_name}"
+                                    ).strip()
+                                    if not new_name.endswith('.json'):
+                                        new_name += '.json'
+                                    lorebook_path = lorebooks_dir / new_name
+                            
+                            # Copy/import the file
+                            import shutil
+                            shutil.copy2(provided_path, lorebook_path)
+                            ui.console.print(f"[green]Imported lorebook to: {lorebook_path}[/green]")
+                            is_import = True
+                            
+                        except json.JSONDecodeError:
+                            ui.console.print(f"[red]Error: {provided_path} is not a valid JSON file[/red]")
+                            ui.console.print("[yellow]Continuing with lorebook creation instead...[/yellow]")
+                        except Exception as e:
+                            ui.console.print(f"[red]Error importing {provided_path}: {e}[/red]")
+                            ui.console.print("[yellow]Continuing with lorebook creation instead...[/yellow]")
+                    
+                    # If import failed or declined, fall through to creation
+                else:
+                    # File doesn't exist - use provided path as basis for new lorebook name
+                    ui.console.print(f"[yellow]File {provided_path} doesn't exist, will create new lorebook[/yellow]")
+            
+            # If no lorebook path set yet, create new one
+            if not lorebook_path:
+                # Get lorebook name from user
+                default_name = Path(args.create_lorebook).stem if args.create_lorebook else "lorebook"
+                lorebook_name = Prompt.ask(
+                    "[yellow]Enter a name for your lorebook[/yellow]",
+                    default=default_name
+                ).strip()
+                
+                # Ensure .json extension
+                if not lorebook_name.endswith('.json'):
+                    lorebook_name += '.json'
+                
+                # Create full path in lorebooks directory
+                lorebook_path = lorebooks_dir / lorebook_name
+                
+                ui.console.print(f"[green]Creating lorebook: {lorebook_path}[/green]")
+            
             # Create LLM client for lorebook management
             llm_client = LLMClient(ui.console)
             # Create minimal orchestrator just for lorebook management
@@ -59,7 +146,7 @@ def main():
             orchestrator = Orchestrator(project, llm_client)
             
             # Run lorebook management interface
-            orchestrator.manage_lorebook(args.create_lorebook)
+            orchestrator.manage_lorebook(str(lorebook_path))
             return
 
         # --- Prompt Enhancement Mode ---

@@ -5,7 +5,7 @@ Test the lorebook creation functionality without requiring API calls.
 import json
 from pathlib import Path
 import sys
-sys.path.append('.')
+sys.path.append('..')
 
 def test_create_lorebook():
     """Test creating a new lorebook structure."""
@@ -33,7 +33,7 @@ def test_create_lorebook():
     }
     
     # Save test lorebook
-    output_path = Path("test_new_lorebook.json")
+    output_path = Path("test/test_new_lorebook.json")
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(test_lorebook, f, indent=2, ensure_ascii=False)
     

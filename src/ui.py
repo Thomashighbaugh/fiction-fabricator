@@ -180,10 +180,18 @@ def prompt_for_lorebook_selection() -> str | None:
     
     console.print("\n[bold cyan]Lorebook Integration[/bold cyan]")
     
-    # Look for JSON files in current directory that might be lorebooks
+    # Look for JSON files in current directory and lorebooks subdirectory
     json_files = glob.glob("*.json")
+    lorebooks_dir = Path("lorebooks")
+    if lorebooks_dir.exists():
+        lorebook_files = list(lorebooks_dir.glob("*.json"))
+        if lorebook_files:
+            console.print("[cyan]Found lorebook files in lorebooks/ directory:[/cyan]")
+            for i, file in enumerate(lorebook_files, 1):
+                console.print(f"  {i}. {file}")
+    
     if json_files:
-        console.print("[cyan]Found JSON files that could be lorebooks:[/cyan]")
+        console.print("[cyan]Found JSON files in current directory that could be lorebooks:[/cyan]")
         for i, file in enumerate(json_files, 1):
             console.print(f"  {i}. {file}")
     
@@ -215,3 +223,160 @@ def prompt_for_lorebook_selection() -> str | None:
         
         console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
         return lorebook_path
+
+def prompt_for_lorebook_creation_or_import() -> tuple[str | None, bool]:
+    """
+    Prompts the user to create a new lorebook or import an existing one.
+    
+    Returns:
+        tuple: (lorebook_path, is_import) where is_import indicates if this is an import operation
+    """
+    import glob
+    from pathlib import Path
+    
+    console.print("\n[bold cyan]Lorebook Setup[/bold cyan]")
+    
+    # Show available options
+    console.print("Options:")
+    console.print("1. Create a new lorebook")
+    console.print("2. Import from TavernAI/SillyTavern lorebook")
+    console.print("3. Use existing Fiction Fabricator lorebook")
+    console.print("4. Skip lorebook setup")
+    
+    choice = Prompt.ask(
+        "[yellow]Choose an option[/yellow]",
+        choices=["1", "2", "3", "4"],
+        default="4"
+    )
+    
+    if choice == "1":
+        # Create new lorebook - return path where it should be saved
+        lorebook_name = Prompt.ask(
+            "[cyan]Enter name for the new lorebook[/cyan]",
+            default="lorebook"
+        ).strip()
+        
+        # Ensure lorebooks directory exists
+        lorebooks_dir = Path("lorebooks")
+        lorebooks_dir.mkdir(exist_ok=True)
+        
+        # Create filename with .json extension
+        if not lorebook_name.endswith(".json"):
+            lorebook_name += ".json"
+        
+        lorebook_path = lorebooks_dir / lorebook_name
+        return str(lorebook_path), False
+        
+    elif choice == "2":
+        # Import from TavernAI
+        console.print("\n[cyan]Import from TavernAI/SillyTavern Lorebook[/cyan]")
+        
+        while True:
+            import_path = Prompt.ask(
+                "[cyan]Enter path to TavernAI/SillyTavern lorebook JSON file[/cyan]",
+                default=""
+            ).strip()
+            
+            if not import_path:
+                console.print("[dim]Import cancelled.[/dim]")
+                return None, False
+            
+            path = Path(import_path)
+            if not path.exists():
+                console.print(f"[red]File not found: {import_path}[/red]")
+                if not Confirm.ask("Try again?", default=True):
+                    return None, False
+                continue
+            
+            if not path.suffix.lower() == '.json':
+                console.print(f"[yellow]Warning: {import_path} doesn't have a .json extension[/yellow]")
+                if not Confirm.ask("Import anyway?", default=True):
+                    continue
+            
+            # Ask where to save the converted lorebook
+            default_name = path.stem + "_converted.json"
+            output_name = Prompt.ask(
+                "[cyan]Enter name for the converted lorebook[/cyan]",
+                default=default_name
+            ).strip()
+            
+            # Ensure lorebooks directory exists
+            lorebooks_dir = Path("lorebooks")
+            lorebooks_dir.mkdir(exist_ok=True)
+            
+            # Create output filename with .json extension
+            if not output_name.endswith(".json"):
+                output_name += ".json"
+            
+            output_path = lorebooks_dir / output_name
+            
+            # Perform the import
+            try:
+                from src.utils import convert_tavern_lorebook_to_fiction_fabricator
+                import json
+                
+                console.print(f"[yellow]Converting lorebook from {import_path}...[/yellow]")
+                converted_data = convert_tavern_lorebook_to_fiction_fabricator(import_path)
+                
+                # Save the converted lorebook
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(converted_data, f, indent=2, ensure_ascii=False)
+                
+                console.print(f"[green]✓ Successfully imported and converted lorebook to: {output_path}[/green]")
+                console.print(f"[green]✓ Converted {len(converted_data['entries'])} entries[/green]")
+                
+                return str(output_path), True
+                
+            except Exception as e:
+                console.print(f"[red]Error importing lorebook: {e}[/red]")
+                if not Confirm.ask("Try a different file?", default=True):
+                    return None, False
+                continue
+    
+    elif choice == "3":
+        # Use existing Fiction Fabricator lorebook
+        # Look for JSON files in current directory and lorebooks subdirectory
+        json_files = glob.glob("*.json")
+        lorebooks_dir = Path("lorebooks")
+        lorebook_files = []
+        
+        if lorebooks_dir.exists():
+            lorebook_files = list(lorebooks_dir.glob("*.json"))
+            if lorebook_files:
+                console.print("[cyan]Found lorebook files in lorebooks/ directory:[/cyan]")
+                for i, file in enumerate(lorebook_files, 1):
+                    console.print(f"  {i}. {file}")
+        
+        if json_files:
+            console.print("[cyan]Found JSON files in current directory that could be lorebooks:[/cyan]")
+            for i, file in enumerate(json_files, 1):
+                console.print(f"  {i}. {file}")
+        
+        while True:
+            lorebook_path = Prompt.ask(
+                "[cyan]Enter the path to your Fiction Fabricator lorebook JSON file[/cyan]",
+                default=""
+            ).strip()
+            
+            if not lorebook_path:
+                console.print("[dim]No lorebook selected.[/dim]")
+                return None, False
+            
+            path = Path(lorebook_path)
+            if not path.exists():
+                console.print(f"[red]File not found: {lorebook_path}[/red]")
+                if not Confirm.ask("Try again?", default=True):
+                    return None, False
+                continue
+            
+            if not path.suffix.lower() == '.json':
+                console.print(f"[yellow]Warning: {lorebook_path} doesn't have a .json extension[/yellow]")
+                if not Confirm.ask("Use anyway?", default=True):
+                    continue
+            
+            console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
+            return lorebook_path, False
+    
+    else:  # choice == "4"
+        console.print("[dim]Skipping lorebook setup.[/dim]")
+        return None, False
