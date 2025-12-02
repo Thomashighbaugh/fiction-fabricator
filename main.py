@@ -163,22 +163,28 @@ def main():
 
         # --- Standard Fiction Generation Mode ---
         # --- Initialization ---
-        project = Project(ui.console, resume_folder_name=args.resume)
+        
+        # If no --resume and no --prompt, ask user what they want to do
+        resume_folder = args.resume
+        if not resume_folder and not args.prompt:
+            is_new, project_folder = ui.prompt_for_project_selection()
+            if not is_new and project_folder:
+                resume_folder = project_folder
+        
+        project = Project(ui.console, resume_folder_name=resume_folder)
         ui.display_welcome(project.book_dir.name if project.book_dir else None)
         
         llm_client = LLMClient(ui.console)
         orchestrator = Orchestrator(project, llm_client, lorebook_path=args.lorebook)
 
         # --- Workflow ---
-        if args.resume:
+        if resume_folder:
             # If resuming, project is already loaded, go straight to the main run
             orchestrator.run()
         else:
             # New project workflow
             idea = ui.prompt_for_new_project_idea(args.prompt)
-            if not idea:
-                ui.console.print("[red]No idea provided. Exiting.[/red]")
-                return
+            # Note: prompt_for_new_project_idea now guarantees a non-empty idea
             
             # Setup new project (gets title, creates files)
             if orchestrator.setup_new_project(idea):

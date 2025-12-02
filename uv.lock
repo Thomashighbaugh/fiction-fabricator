@@ -12,6 +12,15 @@ wheels = [
 ]
 
 [[package]]
+name = "bullet"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/e7/a8571b2634843b08d7672415a178f6f9e3797ef99b179c82c0a483553c1c/bullet-2.2.0.tar.gz", hash = "sha256:dfa0fa81810ad1a9e688815ca04f24af87ff5cdbe803b42fa634b1f50fc9d887", size = 8894, upload-time = "2020-08-14T05:01:48.925Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c2/7e/7b8dc139e2c46b66d007b1c09d94142f3ff65618498cab68916f825c2c91/bullet-2.2.0-py3-none-any.whl", hash = "sha256:d22528deb914ce3ff20a4a000fa5ba37179697f384a0748f90691de8a74cf006", size = 10447, upload-time = "2020-08-14T05:01:47.217Z" },
+]
+
+[[package]]
 name = "cachetools"
 version = "5.5.2"
 source = { registry = "https://pypi.org/simple" }
@@ -87,6 +96,7 @@ name = "fiction-fabricator"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "bullet" },
     { name = "ebooklib" },
     { name = "google-generativeai" },
     { name = "lxml" },
@@ -96,6 +106,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bullet", specifier = ">=2.2.0" },
     { name = "ebooklib", specifier = ">=0.18" },
     { name = "google-generativeai", specifier = ">=0.8.4" },
     { name = "lxml", specifier = ">=5.3.2" },

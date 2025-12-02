@@ -112,11 +112,20 @@ class Orchestrator:
                 if not self.run_outline_generation():
                     self.console.print("[bold red]Outline re-generation failed.[/bold red]")
 
-        # Step 2: Content Generation
-        if Confirm.ask("\n[yellow]Proceed to Chapter/Scene Content Generation?[/yellow]", default=True):
+        # Step 2: Manage Outline Chapters (Edit/Add/Delete)
+        if Confirm.ask("\n[yellow]Would you like to review and edit the chapter outline?[/yellow]", default=True):
+            ui.manage_outline_chapters(self.project)
+
+        # Step 3: Review and Modify Story Elements
+        modified_elements = ui.review_and_modify_story_elements(self.project)
+        if modified_elements:
+            self._update_story_elements(modified_elements)
+        
+        # Step 4: Content Generation
+        if Confirm.ask("\n[yellow]Proceeding to Chapter/Scene Content Generation. Confirm?[/yellow]", default=True):
             self.run_content_generation()
 
-        # Step 3: Editing
+        # Step 5: Editing
         if Confirm.ask("\n[yellow]Content generation complete. Proceed to Editing?[/yellow]", default=True):
             self.run_editing_loop()
 
@@ -128,7 +137,24 @@ class Orchestrator:
         if not self.lorebook_data:
             lorebook_path, is_import = ui.prompt_for_lorebook_creation_or_import()
             if lorebook_path:
-                self.lorebook_data = self._load_lorebook(lorebook_path)
+                # For new lorebooks (not imports), use _load_or_create_lorebook to enable auto-generation
+                # For imports, just load the existing file
+                path = Path(lorebook_path)
+                if is_import or path.exists():
+                    self.lorebook_data = self._load_lorebook(lorebook_path)
+                else:
+                    # New lorebook - load/create with book idea for auto-generation
+                    # Then open management interface for user to review/edit
+                    self.lorebook_data = self._load_or_create_lorebook(path, book_idea=idea)
+                    if self.lorebook_data:
+                        # Save initial version
+                        self._save_lorebook(path, self.lorebook_data)
+                        # Open lorebook manager for user to review/edit entries
+                        if self.lorebook_data.get("entries"):
+                            if Confirm.ask("[yellow]Would you like to review and edit the generated lorebook entries now?[/yellow]", default=True):
+                                self.manage_lorebook(str(path))
+                                # Reload the potentially modified lorebook
+                                self.lorebook_data = self._load_lorebook(str(path))
         
         # 1. Get initial title and synopsis
         title, synopsis = self._generate_initial_summary(idea)
@@ -136,10 +162,19 @@ class Orchestrator:
             self.console.print("[bold red]Could not generate initial title and synopsis. Exiting.[/bold red]")
             return False
 
-        # 2. Initialize the project state
+        # 2. Allow user to customize the generated title
+        from rich.prompt import Prompt
+        self.console.print(f"\n[bold green]Generated Title:[/bold green] {title}")
+        if Confirm.ask("[yellow]Would you like to use a different title?[/yellow]", default=False):
+            custom_title = Prompt.ask("[cyan]Enter your preferred title[/cyan]", default=title)
+            if custom_title and custom_title.strip():
+                title = custom_title.strip()
+                self.console.print(f"[green]Using title: {title}[/green]")
+
+        # 3. Initialize the project state
         self.project.setup_new_project(idea, title, synopsis)
 
-        # 3. Ask for story type
+        # 4. Ask for story type
         self.project.story_type = ui.prompt_for_story_type()
         return True
 
@@ -188,6 +223,47 @@ Output ONLY a JSON object in the format:
         has_summaries = any(c.findtext("summary", "").strip() for c in chapters)
 
         return bool(chapters and characters and has_summaries)
+
+    def _update_story_elements(self, modified_elements: dict):
+        """
+        Updates the story_elements in the project XML with user modifications.
+        
+        Args:
+            modified_elements: Dictionary with title, genre, tone, perspective, and target_audience
+        """
+        if not self.project.book_root:
+            self.console.print("[red]Error: No book root found.[/red]")
+            return
+        
+        # Handle title separately as it's a direct child of book_root
+        if "title" in modified_elements:
+            title_element = self.project.book_root.find("title")
+            if title_element is not None:
+                title_element.text = modified_elements["title"]
+            else:
+                ET.SubElement(self.project.book_root, "title").text = modified_elements["title"]
+        
+        # Handle story_elements
+        story_elements = self.project.book_root.find("story_elements")
+        if story_elements is None:
+            self.console.print("[yellow]Warning: story_elements not found in project. Creating new section.[/yellow]")
+            story_elements = ET.SubElement(self.project.book_root, "story_elements")
+        
+        # Update or create each element (except title which was handled above)
+        for key, value in modified_elements.items():
+            if key == "title":
+                continue  # Already handled above
+            element = story_elements.find(key)
+            if element is not None:
+                element.text = value
+            else:
+                ET.SubElement(story_elements, key).text = value
+        
+        # Save the updated project
+        if self.project.save_state("outline.xml"):
+            self.console.print("[green]Story elements updated and saved.[/green]")
+        else:
+            self.console.print("[yellow]Warning: Could not save updated story elements.[/yellow]")
 
     def run_outline_generation(self) -> bool:
         """Executes the outline generation step."""
@@ -1057,16 +1133,21 @@ Enhanced Context for Continuity:
         
         while True:
             self.console.print("\n[bold]Lorebook Management Options:[/bold]")
-            self.console.print("1. List entries")
-            self.console.print("2. Add new entry")
-            self.console.print("3. Edit existing entry")
-            self.console.print("4. Remove entry")
-            self.console.print("5. Condense entry with LLM")
-            self.console.print("6. Expand entry with LLM")
-            self.console.print("7. Save and exit")
-            self.console.print("8. Exit without saving")
             
-            choice = Prompt.ask("\nSelect option", choices=["1", "2", "3", "4", "5", "6", "7", "8"])
+            choice = ui.bullet_choice(
+                "Select option:",
+                [
+                    "1. List entries",
+                    "2. Add new entry",
+                    "3. Edit existing entry",
+                    "4. Remove entry",
+                    "5. Condense entry with LLM",
+                    "6. Expand entry with LLM",
+                    "7. Save and exit",
+                    "8. Exit without saving"
+                ]
+            )
+            choice = choice[0]  # Extract the number from the choice
             
             if choice == "1":
                 self._list_lorebook_entries(lorebook_data)
@@ -1088,8 +1169,85 @@ Enhanced Context for Continuity:
                 if Confirm.ask("Exit without saving changes?"):
                     break
 
-    def _load_or_create_lorebook(self, path: Path) -> dict | None:
-        """Load existing lorebook or create new one."""
+    def _generate_lorebook_entries(self, book_idea: str) -> list:
+        """
+        Auto-generates lorebook entries from the book idea using LLM.
+        
+        Args:
+            book_idea: The initial book idea/prompt
+            
+        Returns:
+            list: List of generated lorebook entry dictionaries
+        """
+        self.console.print("[cyan]Generating lorebook entries from your story idea...[/cyan]")
+        
+        prompt = f"""Based on the following story idea, generate 5-10 lorebook entries that would be helpful for maintaining consistency during story generation.
+
+Story Idea:
+---
+{book_idea}
+---
+
+For each lorebook entry, identify:
+1. Important world-building elements (locations, magic systems, technology, etc.)
+2. Key concepts or rules unique to this story
+3. Cultural or historical background information
+4. Important objects or artifacts
+5. Organizations or groups
+
+Generate entries in the following JSON format:
+{{
+  "entries": [
+    {{
+      "comment": "Title/name of the entry",
+      "keys": ["keyword1", "keyword2", "keyword3"],
+      "content": "Complete, detailed description of this element. Include all relevant information to fully explain the concept, its significance, how it works, and its role in the story world. Write as much as needed to fully encapsulate the idea - do not cut descriptions short.",
+      "enable": true,
+      "disable": false
+    }}
+  ]
+}}
+
+Guidelines:
+- Each entry should focus on ONE specific element
+- Keywords should be terms that might appear in the story text
+- Content should be thorough and complete - include ALL important details about each element
+- Each content field should fully explain the concept without being cut off mid-thought
+- Write complete sentences and paragraphs - quality and completeness over brevity
+- Generate between 5-10 entries depending on story complexity
+- Focus on world-building elements, not plot points or characters
+- IMPORTANT: Complete each entry fully - do not truncate descriptions
+
+Output ONLY the JSON object, no additional text.
+"""
+        
+        response = self.llm.get_response(prompt, "Generating lorebook entries", allow_stream=True)
+        
+        if not response:
+            self.console.print("[red]Failed to generate lorebook entries.[/red]")
+            return []
+        
+        try:
+            # Clean up the response
+            cleaned = re.sub(r"^```json\s*|\s*```$", "", response.strip(), flags=re.IGNORECASE | re.MULTILINE)
+            data = json.loads(cleaned)
+            entries = data.get("entries", [])
+            
+            self.console.print(f"[green]Generated {len(entries)} lorebook entries.[/green]")
+            return entries
+            
+        except (json.JSONDecodeError, AttributeError) as e:
+            self.console.print(f"[yellow]Warning: Could not parse generated lorebook entries: {e}[/yellow]")
+            return []
+
+    def _load_or_create_lorebook(self, path: Path, book_idea: str | None = None) -> dict | None:
+        """
+        Load existing lorebook or create new one with auto-generated entries.
+        
+        Args:
+            path: Path to lorebook file
+            book_idea: Optional book idea to generate entries from
+        """
         # The path is now already pointing to the correct location (lorebooks/ directory)
         # since main.py handles the directory creation and path construction
         
@@ -1106,11 +1264,25 @@ Enhanced Context for Continuity:
         
         # Create new lorebook
         self.console.print(f"[blue]Creating new lorebook: {path}[/blue]")
-        return {
+        
+        lorebook_data = {
             "entries": [],
             "name": path.stem,
             "description": "Fiction Fabricator Lorebook"
         }
+        
+        # Auto-generate entries if book_idea is provided
+        if book_idea and Confirm.ask(
+            "[yellow]Would you like to auto-generate lorebook entries from your story idea?[/yellow]",
+            default=True
+        ):
+            generated_entries = self._generate_lorebook_entries(book_idea)
+            if generated_entries:
+                lorebook_data["entries"] = generated_entries
+                self.console.print("[green]Lorebook initialized with generated entries.[/green]")
+                self.console.print("[cyan]You can now review, edit, add, or remove entries.[/cyan]")
+        
+        return lorebook_data
 
     def _list_lorebook_entries(self, lorebook_data: dict):
         """List all entries in the lorebook."""
@@ -1134,8 +1306,8 @@ Enhanced Context for Continuity:
             self.console.print(f"    Keywords: {', '.join(keys) if keys else 'None'}")
             
             content = entry.get("content", "")
-            content_preview = content[:100] + "..." if len(content) > 100 else content
-            self.console.print(f"    Content: {content_preview}\n")
+            # Show full content without truncation so users can see complete descriptions
+            self.console.print(f"    Content: {content}\n")
 
     def _add_lorebook_entry(self, lorebook_data: dict):
         """Add a new entry to the lorebook with LLM assistance."""
