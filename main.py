@@ -49,6 +49,13 @@ def main():
         help="Create an enhanced story prompt from a basic idea using LLM assistance.",
         default=False,
     )
+    parser.add_argument(
+        "--character-card",
+        metavar="FILE_PATH",
+        help="Path to a TavernAI/SillyTavern character card file (JSON or PNG) to convert into a story premise.",
+        type=str,
+        default=None,
+    )
     args = parser.parse_args()
 
     try:
@@ -164,12 +171,31 @@ def main():
         # --- Standard Fiction Generation Mode ---
         # --- Initialization ---
         
+        # Handle character card import if specified
+        character_card_premise = None
+        if args.character_card:
+            from src.utils import load_character_card, convert_character_card_to_premise
+            
+            ui.console.print(f"[cyan]Loading character card from: {args.character_card}[/cyan]")
+            character_data = load_character_card(args.character_card)
+            
+            if character_data:
+                ui.console.print("[green]✓ Character card loaded successfully[/green]")
+                character_card_premise = convert_character_card_to_premise(character_data)
+                ui.console.print("[cyan]Converted character card to story premise[/cyan]")
+            else:
+                ui.console.print(f"[red]Error: Failed to load character card from {args.character_card}[/red]")
+                ui.console.print("[yellow]Continuing with normal prompt workflow...[/yellow]")
+        
         # If no --resume and no --prompt, ask user what they want to do
         resume_folder = args.resume
-        if not resume_folder and not args.prompt:
-            is_new, project_folder = ui.prompt_for_project_selection()
+        if not resume_folder and not args.prompt and not character_card_premise:
+            is_new, project_folder, imported_premise = ui.prompt_for_project_selection()
             if not is_new and project_folder:
                 resume_folder = project_folder
+            elif is_new and imported_premise:
+                # User imported a character card
+                character_card_premise = imported_premise
         
         project = Project(ui.console, resume_folder_name=resume_folder)
         ui.display_welcome(project.book_dir.name if project.book_dir else None)
@@ -183,7 +209,11 @@ def main():
             orchestrator.run()
         else:
             # New project workflow
-            idea = ui.prompt_for_new_project_idea(args.prompt)
+            # Use character card premise if available, otherwise get idea normally
+            if character_card_premise:
+                idea = character_card_premise
+            else:
+                idea = ui.prompt_for_new_project_idea(args.prompt)
             # Note: prompt_for_new_project_idea now guarantees a non-empty idea
             
             # Setup new project (gets title, creates files)

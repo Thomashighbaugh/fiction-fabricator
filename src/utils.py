@@ -353,3 +353,165 @@ def convert_tavern_lorebook_to_fiction_fabricator(tavern_lorebook_path: str) -> 
         converted_entries.append(ff_entry)
     
     return {"entries": converted_entries}
+
+def extract_character_card_from_png(png_path: str) -> dict | None:
+    """
+    Extracts character card data from a PNG file (SillyTavern/TavernAI format).
+    
+    Character cards are embedded in PNG files as base64-encoded JSON in the tEXt chunk.
+    
+    Args:
+        png_path: Path to the PNG file containing the character card
+        
+    Returns:
+        dict: Character card data, or None if extraction fails
+    """
+    import base64
+    import json
+    from pathlib import Path
+    
+    try:
+        with open(png_path, 'rb') as f:
+            # Read PNG signature
+            signature = f.read(8)
+            if signature != b'\x89PNG\r\n\x1a\n':
+                return None
+            
+            # Read chunks to find tEXt chunk with 'chara' key
+            while True:
+                # Read chunk length (4 bytes)
+                length_bytes = f.read(4)
+                if len(length_bytes) < 4:
+                    break
+                    
+                length = int.from_bytes(length_bytes, 'big')
+                
+                # Read chunk type (4 bytes)
+                chunk_type = f.read(4)
+                
+                # Read chunk data
+                chunk_data = f.read(length)
+                
+                # Read CRC (4 bytes)
+                f.read(4)
+                
+                # Check if this is a tEXt chunk with character data
+                if chunk_type == b'tEXt':
+                    # Split on null byte to separate keyword from data
+                    null_index = chunk_data.find(b'\x00')
+                    if null_index != -1:
+                        keyword = chunk_data[:null_index].decode('latin-1')
+                        text_data = chunk_data[null_index + 1:]
+                        
+                        if keyword == 'chara':
+                            # Decode base64 and parse JSON
+                            decoded = base64.b64decode(text_data)
+                            character_data = json.loads(decoded)
+                            return character_data
+                
+                # Stop at IEND chunk
+                if chunk_type == b'IEND':
+                    break
+                    
+    except Exception as e:
+        return None
+    
+    return None
+
+def load_character_card(file_path: str) -> dict | None:
+    """
+    Loads a character card from either a JSON or PNG file.
+    
+    Args:
+        file_path: Path to character card file (.json or .png)
+        
+    Returns:
+        dict: Character card data, or None if loading fails
+    """
+    import json
+    from pathlib import Path
+    
+    path = Path(file_path)
+    
+    if not path.exists():
+        return None
+    
+    # Try PNG first (check extension)
+    if path.suffix.lower() == '.png':
+        return extract_character_card_from_png(str(path))
+    
+    # Try JSON
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return None
+
+def convert_character_card_to_premise(character_data: dict) -> str:
+    """
+    Converts a TavernAI/SillyTavern character card into a story premise.
+    
+    Args:
+        character_data: Character card data dictionary
+        
+    Returns:
+        str: A formatted story premise suitable for Fiction Fabricator
+    """
+    # Extract fields from character card
+    name = character_data.get('name', 'Unknown Character')
+    description = character_data.get('description', '')
+    personality = character_data.get('personality', '')
+    scenario = character_data.get('scenario', '')
+    first_mes = character_data.get('first_mes', '')
+    mes_example = character_data.get('mes_example', '')
+    
+    # V2 spec fields
+    if 'data' in character_data:
+        v2_data = character_data['data']
+        name = v2_data.get('name', name)
+        description = v2_data.get('description', description)
+        personality = v2_data.get('personality', personality)
+        scenario = v2_data.get('scenario', scenario)
+        first_mes = v2_data.get('first_mes', first_mes)
+        mes_example = v2_data.get('mes_example', mes_example)
+    
+    # Build the premise
+    premise_parts = []
+    
+    # Character introduction
+    if name:
+        premise_parts.append(f"# Character: {name}\n")
+    
+    # Description
+    if description:
+        premise_parts.append(f"## Character Description\n{description}\n")
+    
+    # Personality
+    if personality:
+        premise_parts.append(f"## Personality\n{personality}\n")
+    
+    # Scenario/Setting
+    if scenario:
+        premise_parts.append(f"## Setting and Scenario\n{scenario}\n")
+    
+    # Example dialogue/interactions (for character voice)
+    if mes_example:
+        # Clean up example messages (they often have <START> markers)
+        cleaned_examples = mes_example.replace('<START>', '').strip()
+        if cleaned_examples:
+            premise_parts.append(f"## Character Voice and Mannerisms\n{cleaned_examples}\n")
+    
+    # Opening situation
+    if first_mes:
+        premise_parts.append(f"## Story Opening\n{first_mes}\n")
+    
+    # Add guidance for story generation
+    premise_parts.append(
+        "\n## Story Generation Notes\n"
+        f"Create a story featuring {name} as a main character. "
+        "Use the description, personality, and scenario above to inform the character's "
+        "actions, dialogue, and role in the narrative. Maintain consistency with the "
+        "established character traits and setting throughout the story."
+    )
+    
+    return '\n'.join(premise_parts)

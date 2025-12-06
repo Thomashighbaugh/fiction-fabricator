@@ -40,9 +40,10 @@ Based on the title, synopsis, and initial idea, please generate a complete outli
 3. A `<characters>` section with the main characters (`id`, `name`, `description`).
 4. A `<chapters>` section containing exactly {num_scenes} `<chapter>` elements. Treat each chapter as a distinct 'Scene' of the short story.
    * Each scene/chapter needs a unique sequential string `id` (e.g., '1', '2', ...).
+   * Each chapter opening tag must include a `setting` attribute with a brief description of the primary location/setting (e.g., <chapter id="1" setting="A dimly lit cafe on a rainy evening">)
    * Include `<number>`, a descriptive `<title>` for the scene, and a detailed `<summary>` (100-150 words) outlining the key events of that scene.
    * The `<content>` tag for each scene/chapter must be present but EMPTY.
-   * The summaries should follow a clear narrative structure (e.g., Beginning, Inciting Incident, Rising Action, Climax, Resolution).
+   * The summaries should follow a clear narrative structure (e.g., Beginning, Inciting Incident, Rising Action, Climax, Resolution) with settings that progress logically.
 
 Output ONLY the complete `<book>` XML structure, merging the generated details. Do not include any text outside the `<book>` tags.
 """

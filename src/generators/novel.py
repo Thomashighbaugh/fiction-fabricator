@@ -41,9 +41,10 @@ Based on the title, synopsis, and initial idea, please generate a full outline:
 4. A `<characters>` section with multiple `<character>` elements (with `id`, `name`, `description`)
 5. A `<chapters>` section with approximately {num_chapters} `<chapter>` elements:
    - Each chapter needs a unique sequential string `id` (e.g., '1', '2', ...)
+   - Each chapter opening tag must include a `setting` attribute with a brief description of the primary location/setting (e.g., <chapter id="1" setting="The dark forest near the village">)
    - Include `<number>`, `<title>`, and a detailed `<summary>` (150-200 words)
    - The `<content>` tag for each chapter must be present but EMPTY
-   - Ensure the summaries form a coherent narrative arc
+   - Ensure the summaries form a coherent narrative arc and settings progress logically through the story
 
 IMPORTANT XML REQUIREMENTS:
 - Output ONLY valid XML starting with `<book>` and ending with `</book>`

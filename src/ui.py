@@ -121,7 +121,7 @@ def display_summary(project):
         console.print(chap_table)
 
 def prompt_for_new_project_idea(prompt_file: str | None) -> str:
-    """Gets the initial book idea from a file or interactive prompt."""
+    """Gets the initial book idea from a file, character card import, or interactive prompt."""
     idea = ""
     if prompt_file:
         try:
@@ -136,6 +136,12 @@ def prompt_for_new_project_idea(prompt_file: str | None) -> str:
     while not idea:
         try:
             console.print("\n[bold cyan]Let's create a new story![/bold cyan]")
+            
+            # Offer character card import option
+            character_premise = prompt_for_character_card_import()
+            if character_premise:
+                return character_premise
+            
             console.print("[dim]Enter a brief description of your story idea (a few sentences or paragraphs)[/dim]")
             idea = Prompt.ask("[yellow]Your book idea/description[/yellow]")
             idea = idea.strip()
@@ -537,14 +543,15 @@ def prompt_for_lorebook_creation_or_import() -> tuple[str | None, bool]:
         console.print("[dim]Skipping lorebook setup.[/dim]")
         return None, False
 
-def prompt_for_project_selection() -> tuple[bool, str | None]:
+def prompt_for_project_selection() -> tuple[bool, str | None, str | None]:
     """
     Prompts the user to start a new project or load an existing one.
     
     Returns:
-        tuple: (is_new_project, project_folder_name)
+        tuple: (is_new_project, project_folder_name, character_card_premise)
                - is_new_project: True if starting new, False if loading existing
                - project_folder_name: Name of existing project folder or None for new project
+               - character_card_premise: Converted character card premise if imported, None otherwise
     """
     console.print("\n[bold cyan]Fiction Fabricator[/bold cyan]")
     
@@ -562,6 +569,9 @@ def prompt_for_project_selection() -> tuple[bool, str | None]:
     if existing_projects:
         choices.append("2. Load an existing project")
     
+    # Always show character card import option
+    choices.append(f"{len(choices) + 1}. Import character card to start new project")
+    
     choice = bullet_choice(
         "What would you like to do?",
         choices
@@ -571,9 +581,9 @@ def prompt_for_project_selection() -> tuple[bool, str | None]:
     
     if choice_num == "1":
         # Start new project
-        return True, None
+        return True, None, None
     
-    elif choice_num == "2":
+    elif choice_num == "2" and existing_projects:
         # Load existing project
         console.print("\n[bold]Available Projects:[/bold]")
         
@@ -608,15 +618,64 @@ def prompt_for_project_selection() -> tuple[bool, str | None]:
         # Check if user cancelled
         if selected_num > len(existing_projects):
             console.print("[dim]Starting new project instead.[/dim]")
-            return True, None
+            return True, None, None
         
         # Return the selected project folder name
         selected_project = existing_projects[selected_num - 1]
         console.print(f"[green]Loading project: {selected_project.name}[/green]")
-        return False, selected_project.name
+        return False, selected_project.name, None
+    
+    else:
+        # Import character card
+        console.print("\n[bold cyan]Import Character Card[/bold cyan]")
+        console.print("[dim]Supports TavernAI/SillyTavern character cards (JSON or PNG format)[/dim]")
+        
+        file_path = Prompt.ask(
+            "[cyan]Enter path to character card file (.json or .png)[/cyan]",
+            default=""
+        ).strip()
+        
+        if not file_path:
+            console.print("[yellow]No file provided, starting new project instead.[/yellow]")
+            return True, None, None
+        
+        path = Path(file_path)
+        
+        if not path.exists():
+            console.print(f"[red]Error: File not found: {file_path}[/red]")
+            console.print("[yellow]Starting new project instead.[/yellow]")
+            return True, None, None
+        
+        # Try to load the character card
+        from src.utils import load_character_card, convert_character_card_to_premise
+        
+        console.print("[cyan]Loading character card...[/cyan]")
+        character_data = load_character_card(str(path))
+        
+        if not character_data:
+            console.print("[red]Error: Failed to load character card. The file may be corrupted or in an unsupported format.[/red]")
+            console.print("[yellow]Starting new project instead.[/yellow]")
+            return True, None, None
+        
+        # Convert to premise
+        console.print("[cyan]Converting character card to story premise...[/cyan]")
+        premise = convert_character_card_to_premise(character_data)
+        
+        # Display preview
+        console.print(Panel(
+            premise[:500] + ("..." if len(premise) > 500 else ""),
+            title="[bold green]Character Card Converted to Premise[/bold green]",
+            border_style="green"
+        ))
+        
+        if not Confirm.ask("\n[yellow]Use this character card as the story premise?[/yellow]", default=True):
+            console.print("[dim]Character card import cancelled, starting new project instead.[/dim]")
+            return True, None, None
+        
+        return True, None, premise
     
     # Fallback to new project
-    return True, None
+    return True, None, None
 
 def manage_outline_chapters(project) -> bool:
     """
@@ -901,3 +960,57 @@ def _reorder_chapters(project) -> bool:
     
     console.print(f"[green]Moved chapter from position {from_pos} to {to_pos}![/green]")
     return True
+
+def prompt_for_character_card_import() -> str | None:
+    """
+    Prompts the user to import a character card and returns the converted premise.
+    
+    Returns:
+        str: Converted premise, or None if import is cancelled or fails
+    """
+    console.print("\n[bold cyan]Import Character Card[/bold cyan]")
+    console.print("[dim]Supports TavernAI/SillyTavern character cards (JSON or PNG format)[/dim]")
+    
+    if not Confirm.ask("\n[yellow]Would you like to import a character card?[/yellow]", default=False):
+        return None
+    
+    file_path = Prompt.ask(
+        "[cyan]Enter path to character card file (.json or .png)[/cyan]",
+        default=""
+    ).strip()
+    
+    if not file_path:
+        return None
+    
+    from pathlib import Path
+    path = Path(file_path)
+    
+    if not path.exists():
+        console.print(f"[red]Error: File not found: {file_path}[/red]")
+        return None
+    
+    # Try to load the character card
+    from src.utils import load_character_card, convert_character_card_to_premise
+    
+    console.print("[cyan]Loading character card...[/cyan]")
+    character_data = load_character_card(str(path))
+    
+    if not character_data:
+        console.print("[red]Error: Failed to load character card. The file may be corrupted or in an unsupported format.[/red]")
+        return None
+    
+    # Convert to premise
+    console.print("[cyan]Converting character card to story premise...[/cyan]")
+    premise = convert_character_card_to_premise(character_data)
+    
+    # Display preview
+    console.print(Panel(
+        premise[:500] + ("..." if len(premise) > 500 else ""),
+        title="[bold green]Character Card Converted to Premise[/bold green]",
+        border_style="green"
+    ))
+    
+    if Confirm.ask("\n[yellow]Use this character card as the story premise?[/yellow]", default=True):
+        return premise
+    
+    return None

@@ -323,7 +323,12 @@ Chapters/Scenes to write:
 
 {lorebook_context}
 
-Output ONLY an XML `<patch>` containing a `<chapter>` for each requested ID. Each chapter must have a `<content>` tag filled with sequentially ID'd `<paragraph>` tags.
+IMPORTANT: Keep the narrative grounded in the setting described in each chapter's `setting` attribute. This keeps the scene focused and prevents setting drift.
+
+Output ONLY an XML `<patch>` containing a `<chapter>` for each requested ID. Each chapter must:
+- Include the `setting` attribute from the outline (e.g., <chapter id="1" setting="The dark forest near the village">)
+- Have a `<content>` tag filled with sequentially ID'd `<paragraph>` tags
+- Stay true to the setting description throughout the chapter
 
 Full Book Context:
 ```xml
@@ -601,7 +606,9 @@ IMPORTANT: Do not rewrite or replace existing content. Instead, expand it by:
 
 Maintain the original narrative flow, character voices, and plot progression. The expanded content should feel like a natural extension of what's already there, not a replacement.
 
-Output an XML `<patch>` with the expanded `<chapter>` content that preserves all key story elements while making them richer and more detailed.
+Keep the narrative grounded in the setting described in the chapter's `setting` attribute to prevent setting drift.
+
+Output an XML `<patch>` with the expanded `<chapter>` content that preserves all key story elements while making them richer and more detailed. Make sure to include the `setting` attribute in the chapter tag.
 
 Relevant Context:
 ```xml
@@ -656,7 +663,9 @@ IMPORTANT: Do not rewrite or replace existing content. Instead, expand it by:
 
 Maintain the original narrative flow, character voices, and plot progression. The expanded content should feel like a natural extension of what's already there, not a replacement.
 
-Output an XML `<patch>` with the expanded `<chapter>` content that preserves all key story elements while making them richer and more detailed.
+Keep the narrative grounded in the setting described in the chapter's `setting` attribute to prevent setting drift.
+
+Output an XML `<patch>` with the expanded `<chapter>` content that preserves all key story elements while making them richer and more detailed. Make sure to include the `setting` attribute in the chapter tag.
 
 Relevant Context:
 ```xml
@@ -688,7 +697,10 @@ Rewrite the entire content for Chapter {chapter_id} based on these instructions:
 "{escape(instructions)}"
 {"The original content has been omitted from the context to encourage a fresh take." if blackout else ""}
 Ensure the new content respects the chapter's summary and the overall plot.
-Output an XML `<patch>` with the rewritten `<chapter>` content.
+
+IMPORTANT: Keep the narrative grounded in the setting described in the chapter's `setting` attribute. This keeps the scene focused and prevents setting drift.
+
+Output an XML `<patch>` with the rewritten `<chapter>` content. Make sure to include the `setting` attribute in the chapter tag (e.g., <chapter id="{chapter_id}" setting="...">).
 
 Full Book Context:
 ```xml
@@ -793,6 +805,7 @@ IMPORTANT CONTINUITY REQUIREMENTS:
 - Preserve any plot threads, foreshadowing, or story elements that connect to other chapters
 - Focus on implementing the advice to improve writing quality, style, and consistency
 - Do not change major plot elements, character motivations, or narrative dependencies
+- Keep the narrative grounded in the setting described in the chapter's `setting` attribute to prevent setting drift
 
 CONTEXT AWARENESS:
 The enhanced context below includes surrounding chapters and narrative flow information to help you maintain continuity. Pay attention to:
@@ -801,10 +814,10 @@ The enhanced context below includes surrounding chapters and narrative flow info
 - Ongoing plot threads and story elements that must be preserved
 - Tone and style consistency with the broader narrative
 
-Output format: Return ONLY an XML `<patch>` containing a `<chapter>` element with the complete updated content. Use this EXACT format:
+Output format: Return ONLY an XML `<patch>` containing a `<chapter>` element with the complete updated content. Use this EXACT format and include the `setting` attribute:
 
 <patch>
-  <chapter id="{chapter_id}">
+  <chapter id="{chapter_id}" setting="...">
     <content>
       <paragraph>First updated paragraph...</paragraph>
       <paragraph>Second updated paragraph...</paragraph>
