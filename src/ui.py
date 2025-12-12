@@ -121,7 +121,7 @@ def display_summary(project):
         console.print(chap_table)
 
 def prompt_for_new_project_idea(prompt_file: str | None) -> str:
-    """Gets the initial book idea from a file, character card import, or interactive prompt."""
+    """Gets the initial book idea from a file or interactive prompt."""
     idea = ""
     if prompt_file:
         try:
@@ -136,12 +136,6 @@ def prompt_for_new_project_idea(prompt_file: str | None) -> str:
     while not idea:
         try:
             console.print("\n[bold cyan]Let's create a new story![/bold cyan]")
-            
-            # Offer character card import option
-            character_premise = prompt_for_character_card_import()
-            if character_premise:
-                return character_premise
-            
             console.print("[dim]Enter a brief description of your story idea (a few sentences or paragraphs)[/dim]")
             idea = Prompt.ask("[yellow]Your book idea/description[/yellow]")
             idea = idea.strip()
@@ -342,49 +336,74 @@ def prompt_for_lorebook_selection() -> str | None:
     
     console.print("\n[bold cyan]Lorebook Integration[/bold cyan]")
     
-    # Look for JSON files in current directory and lorebooks subdirectory
-    json_files = glob.glob("*.json")
-    lorebooks_dir = Path("lorebooks")
-    if lorebooks_dir.exists():
-        lorebook_files = list(lorebooks_dir.glob("*.json"))
-        if lorebook_files:
-            console.print("[cyan]Found lorebook files in lorebooks/ directory:[/cyan]")
-            for i, file in enumerate(lorebook_files, 1):
-                console.print(f"  {i}. {file}")
-    
-    if json_files:
-        console.print("[cyan]Found JSON files in current directory that could be lorebooks:[/cyan]")
-        for i, file in enumerate(json_files, 1):
-            console.print(f"  {i}. {file}")
-    
     if not Confirm.ask("[yellow]Would you like to use a lorebook for additional world-building context?[/yellow]", default=False):
         return None
     
-    while True:
-        lorebook_path = Prompt.ask(
-            "[cyan]Enter the path to your lorebook JSON file[/cyan]\n"
-            "(Tavern AI format supported)",
-            default=""
-        ).strip()
-        
-        if not lorebook_path:
-            console.print("[dim]No lorebook selected.[/dim]")
-            return None
-        
-        path = Path(lorebook_path)
-        if not path.exists():
-            console.print(f"[red]File not found: {lorebook_path}[/red]")
-            if not Confirm.ask("Try again?", default=True):
-                return None
-            continue
-        
-        if not path.suffix.lower() == '.json':
-            console.print(f"[yellow]Warning: {lorebook_path} doesn't have a .json extension[/yellow]")
-            if not Confirm.ask("Use anyway?", default=True):
-                continue
-        
-        console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
-        return lorebook_path
+    # Look for JSON files in current directory and lorebooks subdirectory
+    json_files = glob.glob("*.json")
+    lorebooks_dir = Path("lorebooks")
+    lorebook_files = []
+    
+    if lorebooks_dir.exists():
+        lorebook_files = list(lorebooks_dir.glob("*.json"))
+    
+    # Build list of all available lorebooks
+    all_lorebooks = []
+    
+    # Add lorebooks from lorebooks/ directory first (preferred location)
+    for file in sorted(lorebook_files):
+        all_lorebooks.append(str(file))
+    
+    # Add JSON files from current directory
+    for file in sorted(json_files):
+        file_path = Path(file)
+        # Don't duplicate if file is already in lorebooks list
+        if file_path not in lorebook_files:
+            all_lorebooks.append(file)
+    
+    if not all_lorebooks:
+        console.print("[yellow]No lorebook files found.[/yellow]")
+        console.print("[dim]Create lorebooks in the 'lorebooks/' directory or use --create-lorebook[/dim]")
+        return None
+    
+    # Build menu choices
+    console.print("\n[bold]Available Lorebooks:[/bold]")
+    if lorebook_files:
+        console.print("[dim]From lorebooks/ directory and current directory[/dim]")
+    
+    menu_choices = []
+    for i, lorebook in enumerate(all_lorebooks, 1):
+        # Show just filename for lorebooks/ files, full path for others
+        display_name = Path(lorebook).name if str(lorebook).startswith("lorebooks/") else lorebook
+        menu_choices.append(f"{i}. {display_name}")
+    
+    # Add cancel option
+    menu_choices.append(f"{len(menu_choices) + 1}. Cancel (no lorebook)")
+    
+    selected = bullet_choice(
+        "Choose a lorebook:",
+        menu_choices
+    )
+    
+    # Extract the selection number
+    selected_num = int(selected.split(".")[0])
+    
+    # Check if user cancelled
+    if selected_num > len(all_lorebooks):
+        console.print("[dim]No lorebook selected.[/dim]")
+        return None
+    
+    # Get the selected lorebook path
+    lorebook_path = all_lorebooks[selected_num - 1]
+    
+    # Validate the file exists (should always be true, but safety check)
+    path = Path(lorebook_path)
+    if not path.exists():
+        console.print(f"[red]Error: File not found: {lorebook_path}[/red]")
+        return None
+    
+    console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
+    return lorebook_path
 
 def prompt_for_lorebook_creation_or_import() -> tuple[str | None, bool]:
     """
@@ -504,40 +523,64 @@ def prompt_for_lorebook_creation_or_import() -> tuple[str | None, bool]:
         
         if lorebooks_dir.exists():
             lorebook_files = list(lorebooks_dir.glob("*.json"))
-            if lorebook_files:
-                console.print("[cyan]Found lorebook files in lorebooks/ directory:[/cyan]")
-                for i, file in enumerate(lorebook_files, 1):
-                    console.print(f"  {i}. {file}")
         
-        if json_files:
-            console.print("[cyan]Found JSON files in current directory that could be lorebooks:[/cyan]")
-            for i, file in enumerate(json_files, 1):
-                console.print(f"  {i}. {file}")
+        # Build list of all available lorebooks
+        all_lorebooks = []
         
-        while True:
-            lorebook_path = Prompt.ask(
-                "[cyan]Enter the path to your Fiction Fabricator lorebook JSON file[/cyan]",
-                default=""
-            ).strip()
-            
-            if not lorebook_path:
-                console.print("[dim]No lorebook selected.[/dim]")
-                return None, False
-            
-            path = Path(lorebook_path)
-            if not path.exists():
-                console.print(f"[red]File not found: {lorebook_path}[/red]")
-                if not Confirm.ask("Try again?", default=True):
-                    return None, False
-                continue
-            
-            if not path.suffix.lower() == '.json':
-                console.print(f"[yellow]Warning: {lorebook_path} doesn't have a .json extension[/yellow]")
-                if not Confirm.ask("Use anyway?", default=True):
-                    continue
-            
-            console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
-            return lorebook_path, False
+        # Add lorebooks from lorebooks/ directory first (preferred location)
+        for file in sorted(lorebook_files):
+            all_lorebooks.append(str(file))
+        
+        # Add JSON files from current directory
+        for file in sorted(json_files):
+            file_path = Path(file)
+            # Don't duplicate if file is already in lorebooks list
+            if file_path not in lorebook_files:
+                all_lorebooks.append(file)
+        
+        if not all_lorebooks:
+            console.print("[yellow]No lorebook files found.[/yellow]")
+            console.print("[dim]Create lorebooks in the 'lorebooks/' directory or use --create-lorebook[/dim]")
+            return None, False
+        
+        # Build menu choices
+        console.print("\n[bold cyan]Select a Lorebook[/bold cyan]")
+        if lorebook_files:
+            console.print("[dim]Lorebooks from lorebooks/ directory:[/dim]")
+        
+        menu_choices = []
+        for i, lorebook in enumerate(all_lorebooks, 1):
+            # Show just filename for lorebooks/ files, full path for others
+            display_name = Path(lorebook).name if str(lorebook).startswith("lorebooks/") else lorebook
+            menu_choices.append(f"{i}. {display_name}")
+        
+        # Add cancel option
+        menu_choices.append(f"{len(menu_choices) + 1}. Cancel (skip lorebook)")
+        
+        selected = bullet_choice(
+            "Choose a lorebook:",
+            menu_choices
+        )
+        
+        # Extract the selection number
+        selected_num = int(selected.split(".")[0])
+        
+        # Check if user cancelled
+        if selected_num > len(all_lorebooks):
+            console.print("[dim]No lorebook selected.[/dim]")
+            return None, False
+        
+        # Get the selected lorebook path
+        lorebook_path = all_lorebooks[selected_num - 1]
+        
+        # Validate the file exists (should always be true, but safety check)
+        path = Path(lorebook_path)
+        if not path.exists():
+            console.print(f"[red]Error: File not found: {lorebook_path}[/red]")
+            return None, False
+        
+        console.print(f"[green]Selected lorebook: {lorebook_path}[/green]")
+        return lorebook_path, False
     
     else:  # choice_num == "4"
         console.print("[dim]Skipping lorebook setup.[/dim]")
@@ -960,57 +1003,3 @@ def _reorder_chapters(project) -> bool:
     
     console.print(f"[green]Moved chapter from position {from_pos} to {to_pos}![/green]")
     return True
-
-def prompt_for_character_card_import() -> str | None:
-    """
-    Prompts the user to import a character card and returns the converted premise.
-    
-    Returns:
-        str: Converted premise, or None if import is cancelled or fails
-    """
-    console.print("\n[bold cyan]Import Character Card[/bold cyan]")
-    console.print("[dim]Supports TavernAI/SillyTavern character cards (JSON or PNG format)[/dim]")
-    
-    if not Confirm.ask("\n[yellow]Would you like to import a character card?[/yellow]", default=False):
-        return None
-    
-    file_path = Prompt.ask(
-        "[cyan]Enter path to character card file (.json or .png)[/cyan]",
-        default=""
-    ).strip()
-    
-    if not file_path:
-        return None
-    
-    from pathlib import Path
-    path = Path(file_path)
-    
-    if not path.exists():
-        console.print(f"[red]Error: File not found: {file_path}[/red]")
-        return None
-    
-    # Try to load the character card
-    from src.utils import load_character_card, convert_character_card_to_premise
-    
-    console.print("[cyan]Loading character card...[/cyan]")
-    character_data = load_character_card(str(path))
-    
-    if not character_data:
-        console.print("[red]Error: Failed to load character card. The file may be corrupted or in an unsupported format.[/red]")
-        return None
-    
-    # Convert to premise
-    console.print("[cyan]Converting character card to story premise...[/cyan]")
-    premise = convert_character_card_to_premise(character_data)
-    
-    # Display preview
-    console.print(Panel(
-        premise[:500] + ("..." if len(premise) > 500 else ""),
-        title="[bold green]Character Card Converted to Premise[/bold green]",
-        border_style="green"
-    ))
-    
-    if Confirm.ask("\n[yellow]Use this character card as the story premise?[/yellow]", default=True):
-        return premise
-    
-    return None

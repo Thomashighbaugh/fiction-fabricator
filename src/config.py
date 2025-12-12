@@ -5,10 +5,10 @@ config.py - Centralized configuration for the Fiction Fabricator project.
 from google.generativeai import types
 
 # --- Model and API Configuration ---
-WRITING_MODEL_NAME = "gemini-2.5-flash-lite"
+WRITING_MODEL_NAME = "gemini-2.5-flash"
 WRITING_MODEL_CONFIG = types.GenerationConfig(
     temperature=1,
-    max_output_tokens=65536,  # Max for gemini-2.5-flash to avoid truncation
+    max_output_tokens=65536,  # Max for gemini-2.5-flash (65536 tokens)
     top_p=0.95,
     top_k=40,
 )

@@ -54,7 +54,12 @@ class Orchestrator:
         # Extract entries from lorebook structure
         entries = []
         if "entries" in self.lorebook_data:
-            entries = self.lorebook_data["entries"]
+            entries_data = self.lorebook_data["entries"]
+            # Handle both dict (TavernAI format with IDs as keys) and list formats
+            if isinstance(entries_data, dict):
+                entries = list(entries_data.values())
+            elif isinstance(entries_data, list):
+                entries = entries_data
         elif isinstance(self.lorebook_data, list):
             entries = self.lorebook_data
         elif "worldInfos" in self.lorebook_data:
@@ -67,17 +72,23 @@ class Orchestrator:
         text_lower = text.lower()
         
         for entry in entries:
+            # Skip non-dict entries
+            if not isinstance(entry, dict):
+                continue
+                
             # Skip disabled entries
             if entry.get("disable", False) or not entry.get("enable", True):
                 continue
             
-            # Check for keywords (keys field)
-            keys = entry.get("keys", [])
+            # Check for keywords (supports both "keys" and "key" fields)
+            keys = entry.get("keys", entry.get("key", []))
             if isinstance(keys, str):
                 keys = [k.strip() for k in keys.split(",")]
+            elif not isinstance(keys, list):
+                keys = []
             
             # Check if any keyword matches
-            matches = any(key.lower() in text_lower for key in keys if key.strip())
+            matches = any(key.lower() in text_lower for key in keys if isinstance(key, str) and key.strip())
             
             if matches:
                 content = entry.get("content", "").strip()
@@ -285,6 +296,25 @@ Output ONLY a JSON object in the format:
         new_book_root = utils.parse_xml_string(response_xml_str, self.console, expected_root_tag="book")
         if new_book_root is None or new_book_root.tag != "book":
             self.console.print("[bold red]Failed to parse generated outline or root tag was not <book>.[/bold red]")
+            self.console.print("[yellow]This may be due to:[/yellow]")
+            self.console.print("  1. LLM response was truncated (hit token limit)")
+            self.console.print("  2. LLM generated invalid XML")
+            self.console.print("  3. LLM included text before/after the XML")
+            
+            # Save the failed response for debugging
+            if self.project.book_dir:
+                debug_file = self.project.book_dir / "failed_outline_response.xml"
+                try:
+                    with open(debug_file, 'w', encoding='utf-8') as f:
+                        f.write(response_xml_str)
+                    self.console.print(f"\n[dim]Debug: Raw LLM response saved to {debug_file.name}[/dim]")
+                except Exception as e:
+                    self.console.print(f"[dim]Could not save debug file: {e}[/dim]")
+            
+            self.console.print("\n[cyan]You can:[/cyan]")
+            self.console.print("  - Try again (the LLM may generate valid XML on retry)")
+            self.console.print("  - Use a shorter initial idea/prompt")
+            self.console.print("  - Request fewer chapters")
             return False
         
         # Simple validation and replacement

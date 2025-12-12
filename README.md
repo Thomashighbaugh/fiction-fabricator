@@ -63,6 +63,7 @@ For detailed setup instructions, see [INSTALLATION.md](.github/documentation/INS
 |------|-------------|
 | [Comprehensive Prompt](.github/examples/example_comprehensive_prompt.txt) | Detailed story prompt example |
 | [Prompt Template](.github/examples/template_comprehensive_prompt.txt) | Template for creating prompts |
+| [Character Card](.github/examples/example_character_card.json) | Sample TavernAI/SillyTavern character card |
 | [Lorebook Example](.github/examples/example_lorebook.json) | Sample Tavern AI lorebook |
 
 ## License
