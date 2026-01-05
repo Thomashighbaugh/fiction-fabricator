@@ -46,6 +46,8 @@ Based on the title, synopsis, and initial idea, please generate a complete outli
    * The summaries should follow a clear narrative structure (e.g., Beginning, Inciting Incident, Rising Action, Climax, Resolution) with settings that progress logically.
 
 Output ONLY the complete `<book>` XML structure, merging the generated details. Do not include any text outside the `<book>` tags.
+
+
 """
     response_xml_str = llm_client.get_response(prompt, "Generating short story outline")
 

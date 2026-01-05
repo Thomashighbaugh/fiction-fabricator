@@ -186,6 +186,18 @@ class Project:
                     continue
 
                 new_content = chapter_patch.find("content")
+                
+                # Handle case where paragraphs are directly under chapter (without content wrapper)
+                if new_content is None:
+                    paragraphs = chapter_patch.findall("paragraph")
+                    if paragraphs:
+                        # Create a content element and move paragraphs into it
+                        new_content = ET.Element("content")
+                        for paragraph in paragraphs:
+                            if paragraph.text:
+                                paragraph.text = utils.clean_paragraph_text(paragraph.text)
+                            new_content.append(copy.deepcopy(paragraph))
+                
                 if new_content is not None:
                     # Clean paragraph text to remove unwanted line breaks
                     for paragraph in new_content.findall("paragraph"):

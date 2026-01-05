@@ -397,9 +397,8 @@ Full Book Context:
             "3": ("Rewrite Chapter (with instructions)", lambda: self._edit_rewrite_chapter(blackout=False)),
             "4": ("Rewrite Chapter (Fresh Rewrite)", lambda: self._edit_rewrite_chapter(blackout=True)),
             "5": ("Ask LLM for Edit Suggestions", self._edit_suggest_edits),
-            "6": ("Apply LLM Advice to All Chapters", self._edit_apply_manuscript_advice),
-            "7": ("Export Menu", self._show_export_menu),
-            "8": ("Quit Editing", None),
+            "6": ("Export Menu", self._show_export_menu),
+            "7": ("Quit Editing", None),
         }
 
         while True:
@@ -765,38 +764,7 @@ Full Book Context:
         else:
             self.console.print("\n[yellow]Use the 'Rewrite Chapter' option to implement these suggestions.[/yellow]")
 
-    def _edit_apply_manuscript_advice(self):
-        """Handler for getting and applying LLM advice to all chapters."""
-        self.console.print("[cyan]Generating manuscript-wide editing advice...[/cyan]")
-        
-        prompt = f"""
-You are an expert editor providing manuscript-wide editing advice. Analyze this complete manuscript and provide specific, actionable suggestions that should be applied consistently across ALL chapters to improve the work.
 
-Focus on:
-- Consistent tone and voice improvements
-- Character development enhancements
-- Pacing adjustments
-- Narrative consistency
-- Style refinements
-- Dialogue improvements
-- Description and world-building enhancements
-
-Provide your advice as a numbered list of specific, implementable suggestions that can be applied to each chapter.
-
-Full Book Context:
-```xml
-{ET.tostring(self.project.book_root, encoding='unicode')}
-```
-"""
-        suggestions_text = self.llm.get_response(prompt, "Generating manuscript advice", allow_stream=False)
-        if not suggestions_text:
-            self.console.print("[red]Failed to generate manuscript advice.[/red]")
-            return
-        
-        self.console.print(Panel(suggestions_text, title="Manuscript-Wide Editing Advice", border_style="green"))
-        
-        if Confirm.ask("\n[yellow]Apply this advice to all chapters?[/yellow]", default=True):
-            self._apply_suggestions_to_all_chapters(suggestions_text)
     
     def _apply_suggestions_to_all_chapters(self, suggestions_text: str):
         """Apply LLM suggestions to all chapters in the manuscript."""

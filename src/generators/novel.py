@@ -53,6 +53,8 @@ IMPORTANT XML REQUIREMENTS:
 - Ensure all tags are properly closed and nested
 - Keep content concise to avoid truncation
 
+
+
 Output the complete `<book>` XML structure with condensed initial_idea, story_elements, and new characters/chapters sections.
 """
     response_xml_str = llm_client.get_response(prompt, "Generating full novel outline")
