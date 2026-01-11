@@ -50,7 +50,7 @@ class LLMClient:
                 base_url="https://integrate.api.nvidia.com/v1",
                 api_key=self.api_key
             )
-            self.console.print(f"[green]Successfully initialized NVIDIA API client with model 'deepseek-v3.1-terminus'[/green]")
+            self.console.print(f"[green]Successfully initialized NVIDIA API client with model '{config.MODEL_NAME}'[/green]")
             return client
         except Exception as e:
             self.console.print("[bold red]Fatal Error: Could not initialize NVIDIA API client.[/bold red]")
@@ -75,7 +75,7 @@ class LLMClient:
                     progress.add_task(description="[cyan]DeepSeek is thinking...", total=None)
                     
                     response = self.client.chat.completions.create(
-                        model="deepseek-ai/deepseek-v3.1-terminus",
+                        model=config.MODEL_NAME,
                         messages=[{"role": "user", "content": prompt_content}]
                     )
                     

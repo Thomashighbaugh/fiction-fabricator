@@ -183,6 +183,20 @@ def main():
                 ui.console.print("[green]✓ Character card loaded successfully[/green]")
                 character_card_premise = convert_character_card_to_premise(character_data)
                 ui.console.print("[cyan]Converted character card to story premise[/cyan]")
+                
+                # Allow user to edit the premise if desired
+                if character_card_premise:
+                    from rich.prompt import Prompt
+                    from rich.panel import Panel
+                    from rich.text import Text
+                    
+                    if Prompt.ask("\n[yellow]Would you like to edit the premise?[/yellow]", choices=["y", "n"], default="n") == "y":
+                        ui.console.print("\n[bold]Current premise:[/bold]")
+                        ui.console.print(Panel(character_card_premise, border_style="cyan"))
+                        edited_premise = Prompt.ask("[cyan]Enter edited premise[/cyan]", default=character_card_premise)
+                        if edited_premise.strip():
+                            character_card_premise = edited_premise.strip()
+                            ui.console.print("[green]✓ Premise updated[/green]")
             else:
                 ui.console.print(f"[red]Error: Failed to load character card from {args.character_card}[/red]")
                 ui.console.print("[yellow]Continuing with normal prompt workflow...[/yellow]")

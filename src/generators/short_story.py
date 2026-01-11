@@ -30,6 +30,20 @@ The current state of the project is:
 
 {lorebook_context}
 
+CRITICAL CHARACTER NAMING REQUIREMENTS - DO NOT IGNORE:
+- ABSOLUTELY FORBIDDEN: Generic placeholder names like "John Smith", "Jane Doe", "Bob Johnson", "Alice Brown", "Tom Wilson"
+- ABSOLUTELY FORBIDDEN: Overused fantasy clichés like "Stormbringer", "Shadowblade", "Nightwing", "Darkheart", "Bloodbane", "Steelhand"
+- ABSOLUTELY FORBIDDEN: Names ending in common fantasy suffixes like "-bringer", "-blade", "-heart", "-bane", "-born", "-fury", "-shadow"
+- ABSOLUTELY FORBIDDEN: Names starting with generic prefixes like "Dark-", "Shadow-", "Blood-", "Iron-", "Storm-", "Fire-", "Ice-"
+- AVOID: Naming multiple characters with names starting with the same letter or having similar sounds
+- MUST: Create unique, memorable, culturally appropriate names that feel authentic to the setting and tone
+- MUST: Ensure character names reflect their personality, background, culture, or role in the story
+- MUST: Use names that are pronounceable and easy to remember
+- MUST: Consider naming patterns that fit the world's culture/language
+- CRITICAL: If you find yourself using any of the forbidden name patterns above, STOP and generate completely different, original names
+
+REMEMBER: Generic, cliché, or "edgy" fantasy names instantly destroy reader immersion. Take time to craft meaningful, unique names.
+
 Based on the title, synopsis, and initial idea, please generate a complete outline for a short story:
 1. Keep the existing title and synopsis exactly as provided
 2. A `<story_elements>` section with:
@@ -41,7 +55,7 @@ Based on the title, synopsis, and initial idea, please generate a complete outli
 4. A `<chapters>` section containing exactly {num_scenes} `<chapter>` elements. Treat each chapter as a distinct 'Scene' of the short story.
    * Each scene/chapter needs a unique sequential string `id` (e.g., '1', '2', ...).
    * Each chapter opening tag must include a `setting` attribute with a brief description of the primary location/setting (e.g., <chapter id="1" setting="A dimly lit cafe on a rainy evening">)
-   * Include `<number>`, a descriptive `<title>` for the scene, and a detailed `<summary>` (100-150 words) outlining the key events of that scene.
+   * Include `<number>`, a descriptive `<title>` for the scene, a detailed `<summary>` (100-150 words) outlining the key events of that scene, and an EMPTY `<plot_beats>` tag.
    * The `<content>` tag for each scene/chapter must be present but EMPTY.
    * The summaries should follow a clear narrative structure (e.g., Beginning, Inciting Incident, Rising Action, Climax, Resolution) with settings that progress logically.
 

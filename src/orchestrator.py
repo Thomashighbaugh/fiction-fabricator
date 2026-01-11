@@ -139,6 +139,18 @@ class Orchestrator:
         # Step 5: Editing
         if Confirm.ask("\n[yellow]Content generation complete. Proceed to Editing?[/yellow]", default=True):
             self.run_editing_loop()
+            self.run_editing_loop()
+
+        # Step 5.1: LLM Edit Suggestions (run once, auto-apply)
+        if Confirm.ask("[yellow]Ask LLM for overall manuscript editing suggestions?[/yellow]", default=False):
+            self._edit_suggest_edits()
+
+        # Step 5.2: Engagement Optimization
+        if self.project.book_root is not None:
+            if Confirm.ask("[yellow]Run engagement optimization on generated chapters?[/yellow]", default=True):
+                all_chapters = self.project.book_root.findall(".//chapter")
+                self._run_engagement_optimization(all_chapters)
+
 
         self.console.print(Panel("[bold green]📚 Fiction Fabricator session finished. 📚[/bold green]"))
 

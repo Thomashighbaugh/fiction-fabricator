@@ -23,6 +23,7 @@ class Project:
         self.book_id: str = ""
         self.book_title_slug: str = "untitled"
         self.chapters_generated_in_session: set = set()
+        self.story_type: str = "novel"
 
         if resume_folder_name:
             self.console.print(f"Resuming project from: [cyan]{resume_folder_name}[/cyan]")

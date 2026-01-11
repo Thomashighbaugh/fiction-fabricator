@@ -50,7 +50,7 @@ For detailed setup instructions, see [INSTALLATION.md](.github/documentation/INS
 | [Overview](.github/documentation/OVERVIEW.md) | Project overview, capabilities, and use cases |
 | [Installation](.github/documentation/INSTALLATION.md) | Setup guide, requirements, and troubleshooting |
 | [Usage Guide](.github/documentation/USAGE.md) | Complete walkthrough of features and workflows |
-| [New Features](.github/documentation/NEW_FEATURES.md) | Recent additions and enhancements |
+| [New Features](.github/documentation/NEW_FEATURES.md) | Recent additions and advanced quality systems |
 | [Architecture](.github/documentation/ARCHITECTURE.md) | Technical design and XML-based state management |
 | [AI Agent Architecture](.github/documentation/AI_AGENT_ARCHITECTURE.md) | Multi-phase agentic design philosophy |
 | [Lorebook System](.github/documentation/LOREBOOK.md) | World-building and context management |

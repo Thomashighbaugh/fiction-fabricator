@@ -195,6 +195,16 @@ def review_and_modify_story_elements(project) -> dict:
     current_perspective = story_elements.findtext("perspective", "Not specified")
     current_target_audience = story_elements.findtext("target_audience", "Not specified")
     
+    # Extract character names
+    character_names = {}
+    characters = project.book_root.find("characters")
+    if characters is not None:
+        for char in characters.findall("character"):
+            char_id = char.get("id") or char.findtext("id", "")
+            char_name = char.findtext("name", "")
+            if char_id and char_name:
+                character_names[char_id] = char_name
+    
     # Display current elements in a table
     table = Table(title="Generated Story Elements", title_style="bold yellow")
     table.add_column("Element", style="bold cyan", width=20)
@@ -206,13 +216,20 @@ def review_and_modify_story_elements(project) -> dict:
     table.add_row("Perspective", current_perspective)
     table.add_row("Target Audience", current_target_audience)
     
+    if character_names:
+        console.print("\n[bold cyan]Characters:[/bold cyan]")
+        for char_id, char_name in character_names.items():
+            console.print(f"  [dim]•[/dim] [yellow]{char_id}:[/yellow] {char_name}")
+    
+    console.print()
+    
     console.print(table)
     console.print()
     
     # Ask if user wants to modify
     if not Confirm.ask(
-        "[yellow]Would you like to modify any of these story elements?[/yellow]",
-        default=False
+        "[yellow]Would you like to review or modify any of these story elements?[/yellow]",
+        default=True
     ):
         console.print("[green]Keeping generated story elements as-is.[/green]")
         return {
@@ -251,6 +268,19 @@ def review_and_modify_story_elements(project) -> dict:
         default=current_target_audience
     ).strip()
     
+    # Character name editing
+    modified_character_names = {}
+    if character_names:
+        if Confirm.ask("\n[yellow]Would you like to edit any character names?[/yellow]", default=False):
+            console.print("\n[dim]Press Enter to keep the current name, or type a new name to change it.[/dim]\n")
+            for char_id, current_name in character_names.items():
+                new_name = Prompt.ask(
+                    f"[cyan]{char_id}[/cyan] [dim](current: {current_name})[/dim]",
+                    default=current_name
+                ).strip()
+                if new_name and new_name != current_name:
+                    modified_character_names[char_id] = new_name
+    
     # Display summary of changes
     changes_made = []
     if new_title != current_title:
@@ -263,8 +293,10 @@ def review_and_modify_story_elements(project) -> dict:
         changes_made.append(f"Perspective: {current_perspective} → {new_perspective}")
     if new_target_audience != current_target_audience:
         changes_made.append(f"Target Audience: {current_target_audience} → {new_target_audience}")
+    for char_id, new_name in modified_character_names.items():
+        changes_made.append(f"Character {char_id}: {character_names[char_id]} → {new_name}")
     
-    if changes_made:
+    if changes_made or modified_character_names:
         console.print("\n[bold green]Changes made:[/bold green]")
         for change in changes_made:
             console.print(f"  • {change}")
@@ -273,13 +305,77 @@ def review_and_modify_story_elements(project) -> dict:
     
     console.print("="*80 + "\n")
     
-    return {
+    result = {
         "title": new_title,
         "genre": new_genre,
         "tone": new_tone,
         "perspective": new_perspective,
         "target_audience": new_target_audience
     }
+    
+    if modified_character_names:
+        result["character_names"] = modified_character_names
+    
+    return result
+
+def edit_character_names(project) -> dict:
+    """
+    Displays all character names and allows user to edit them.
+    
+    Args:
+        project: The project object containing characters
+    
+    Returns:
+        dict: Dictionary with character_id -> new_name mappings for changed names
+    """
+    console.print("\n" + "="*80)
+    console.print(Panel("[bold cyan]Edit Character Names[/bold cyan]", style="bold blue"))
+    
+    characters = project.book_root.find("characters")
+    if characters is None:
+        console.print("[red]No characters found in project.[/red]")
+        return {}
+    
+    character_names = {}
+    for char in characters.findall("character"):
+        char_id = char.get("id") or char.findtext("id", "")
+        char_name = char.findtext("name", "")
+        if char_id and char_name:
+            character_names[char_id] = char_name
+    
+    if not character_names:
+        console.print("[red]No character names found.[/red]")
+        return {}
+    
+    console.print("\n[bold yellow]Current Character Names:[/bold yellow]")
+    for char_id, char_name in character_names.items():
+        console.print(f"  [dim]•[/dim] [cyan]{char_id}:[/cyan] {char_name}")
+    
+    if not Confirm.ask("\n[yellow]Would you like to edit any character names?[/yellow]", default=False):
+        console.print("[green]Keeping character names as-is.[/green]")
+        return {}
+    
+    console.print("\n[dim]Press Enter to keep the current name, or type a new name to change it.[/dim]\n")
+    
+    modified_character_names = {}
+    for char_id, current_name in character_names.items():
+        new_name = Prompt.ask(
+            f"[cyan]{char_id}[/cyan] [dim](current: {current_name})[/dim]",
+            default=current_name
+        ).strip()
+        if new_name and new_name != current_name:
+            modified_character_names[char_id] = new_name
+    
+    if modified_character_names:
+        console.print("\n[bold green]Character name changes:[/bold green]")
+        for char_id, new_name in modified_character_names.items():
+            console.print(f"  • {char_id}: {character_names[char_id]} → {new_name}")
+    else:
+        console.print("\n[dim]No changes made.[/dim]")
+    
+    console.print("="*80 + "\n")
+    
+    return modified_character_names
 
 def display_menu(title: str, options: dict) -> str:
     """A generic function to display a menu and get a choice."""
@@ -714,6 +810,14 @@ def prompt_for_project_selection() -> tuple[bool, str | None, str | None]:
         if not Confirm.ask("\n[yellow]Use this character card as the story premise?[/yellow]", default=True):
             console.print("[dim]Character card import cancelled, starting new project instead.[/dim]")
             return True, None, None
+        
+        if Prompt.ask("\n[yellow]Would you like to edit the premise?[/yellow]", choices=["y", "n"], default="n") == "y":
+            console.print("\n[bold]Current premise:[/bold]")
+            console.print(Panel(premise, border_style="cyan"))
+            edited_premise = Prompt.ask("[cyan]Enter edited premise[/cyan]", default=premise)
+            if edited_premise.strip():
+                premise = edited_premise.strip()
+                console.print("[green]✓ Premise updated[/green]")
         
         return True, None, premise
     

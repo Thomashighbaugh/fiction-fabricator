@@ -30,6 +30,20 @@ The current state of the book is:
 
 {lorebook_context}
 
+CRITICAL CHARACTER NAMING REQUIREMENTS - DO NOT IGNORE:
+- ABSOLUTELY FORBIDDEN: Generic placeholder names like "John Smith", "Jane Doe", "Bob Johnson", "Alice Brown", "Tom Wilson"
+- ABSOLUTELY FORBIDDEN: Overused fantasy clichés like "Stormbringer", "Shadowblade", "Nightwing", "Darkheart", "Bloodbane", "Steelhand"
+- ABSOLUTELY FORBIDDEN: Names ending in common fantasy suffixes like "-bringer", "-blade", "-heart", "-bane", "-born", "-fury", "-shadow"
+- ABSOLUTELY FORBIDDEN: Names starting with generic prefixes like "Dark-", "Shadow-", "Blood-", "Iron-", "Storm-", "Fire-", "Ice-"
+- AVOID: Naming multiple characters with names starting with the same letter or having similar sounds (e.g., "Alex", "Alice", "Alan")
+- MUST: Create unique, memorable, culturally appropriate names that feel authentic to the setting and tone
+- MUST: Ensure character names reflect their personality, background, culture, or role in the story
+- MUST: Use names that are pronounceable and easy to remember
+- MUST: Consider naming patterns that fit the world's culture/language (e.g., if medieval European, use appropriate names; if Eastern fantasy, use appropriate names)
+- CRITICAL: If you find yourself using any of the forbidden name patterns above, STOP and generate completely different, original names
+
+REMEMBER: Generic, cliché, or "edgy" fantasy names instantly destroy reader immersion. Take time to craft meaningful, unique names.
+
 Based on the title, synopsis, and initial idea, please generate a full outline:
 1. Keep the existing title and synopsis exactly as provided
 2. Create a condensed version of the initial_idea (maximum 500 words) that captures the key plot points
@@ -42,7 +56,7 @@ Based on the title, synopsis, and initial idea, please generate a full outline:
 5. A `<chapters>` section with approximately {num_chapters} `<chapter>` elements:
    - Each chapter needs a unique sequential string `id` (e.g., '1', '2', ...)
    - Each chapter opening tag must include a `setting` attribute with a brief description of the primary location/setting (e.g., <chapter id="1" setting="The dark forest near the village">)
-   - Include `<number>`, `<title>`, and a detailed `<summary>` (150-200 words)
+   - Include `<number>`, `<title>`, a detailed `<summary>` (150-200 words), and an EMPTY `<plot_beats>` tag
    - The `<content>` tag for each chapter must be present but EMPTY
    - Ensure the summaries form a coherent narrative arc and settings progress logically through the story
 
