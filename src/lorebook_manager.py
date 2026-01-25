@@ -14,7 +14,9 @@ from rich.prompt import Confirm, IntPrompt, Prompt
 
 from src import ui
 from src.exceptions import LorebookError
-from src.logger import logger
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class LorebookManager:

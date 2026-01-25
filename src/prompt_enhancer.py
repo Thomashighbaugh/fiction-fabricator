@@ -13,7 +13,9 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from src import ui
-from src.logger import logger
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class PromptEnhancer:
