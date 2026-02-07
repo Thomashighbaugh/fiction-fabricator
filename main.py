@@ -7,11 +7,15 @@ from pathlib import Path
 
 from src import ui
 from src.llm_client import LLMClient
-from src.project import Project
+from src.logger import setup_logging
 from src.orchestrator import Orchestrator
+from src.project import Project
+
 
 def main():
     """Initializes and runs the Fiction Fabricator application."""
+    setup_logging()
+
     parser = argparse.ArgumentParser(description="An AI agent for drafting novels and short stories.")
     parser.add_argument(
         "--resume",

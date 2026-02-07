@@ -2,15 +2,16 @@
 """
 engagement_optimizer.py - Reader engagement optimization system
 """
-import re
 import json
-from typing import Dict, List
+import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, List
 
 
 class EmotionalBeat(str, Enum):
     """Types of emotional beats in narrative."""
+
     SETUP = "setup"
     TENSION_BUILD = "tension_build"
     CONFLICT = "conflict"
@@ -23,6 +24,7 @@ class EmotionalBeat(str, Enum):
 @dataclass
 class EmotionalBeatData:
     """Data class for emotional beat analysis."""
+
     beat_type: EmotionalBeat
     position: float
     intensity: float
@@ -32,6 +34,7 @@ class EmotionalBeatData:
 @dataclass
 class EngagementAnalysis:
     """Results of engagement analysis."""
+
     has_cliffhanger: bool
     cliffhanger_strength: float
     emotional_arc_score: float
@@ -43,18 +46,20 @@ class EngagementAnalysis:
 class EngagementOptimizer:
     """Analyzes and optimizes reader engagement in content."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cliffhanger_patterns = [
-            r'(?i)(?:sudden|abrupt|unexpected)\s+(?:noise|sound|movement|discovery)',
-            r'(?i)(?:what|huh|who)(?:\'s)?\s+there',
-            r'(?i)(?:then|but)\s+(?:suddenly|everything changed)',
-            r'(?i)just as.*(?:was about to|going to)',
-            r'(?i)couldn\'t have(?:\s+known|\s+guessed)',
-            r'(?i)(?:the|a|an)\s+(?:door|sound|voice|figure)\s+(?:opened|called|appeared)',
-            r'\.\.\.$',
+            r"(?i)(?:sudden|abrupt|unexpected)\s+(?:noise|sound|movement|discovery)",
+            r"(?i)(?:what|huh|who)(?:\'s)?\s+there",
+            r"(?i)(?:then|but)\s+(?:suddenly|everything changed)",
+            r"(?i)just as.*(?:was about to|going to)",
+            r"(?i)couldn\'t have(?:\s+known|\s+guessed)",
+            r"(?i)(?:the|a|an)\s+(?:door|sound|voice|figure)\s+(?:opened|called|appeared)",
+            r"\.\.\.$",
         ]
 
-    def analyze_chapter_engagement(self, content_text: str, chapter_context: Dict | None = None) -> EngagementAnalysis:
+    def analyze_chapter_engagement(
+        self, content_text: str, chapter_context: Dict | None = None
+    ) -> EngagementAnalysis:
         """
         Analyze chapter for engagement elements.
 
@@ -73,19 +78,19 @@ class EngagementOptimizer:
         )
 
         overall_score = self._calculate_overall_engagement_score(
-            cliffhanger_analysis['has_cliffhanger'],
-            cliffhanger_analysis['strength'],
-            emotional_arc['score'],
-            len(tension_cycles)
+            cliffhanger_analysis["has_cliffhanger"],
+            cliffhanger_analysis["strength"],
+            emotional_arc["score"],
+            len(tension_cycles),
         )
 
         return EngagementAnalysis(
-            has_cliffhanger=cliffhanger_analysis['has_cliffhanger'],
-            cliffhanger_strength=cliffhanger_analysis['strength'],
-            emotional_arc_score=emotional_arc['score'],
+            has_cliffhanger=cliffhanger_analysis["has_cliffhanger"],
+            cliffhanger_strength=cliffhanger_analysis["strength"],
+            emotional_arc_score=emotional_arc["score"],
             tension_cycles=tension_cycles,
             suggestions=suggestions,
-            overall_engagement_score=overall_score
+            overall_engagement_score=overall_score,
         )
 
     def _analyze_cliffhanger(self, text: str) -> Dict:
@@ -94,11 +99,11 @@ class EngagementOptimizer:
         Returns analysis dict with has_cliffhanger and strength (0-1).
         """
         if not text or not text.strip():
-            return {'has_cliffhanger': False, 'strength': 0.0}
+            return {"has_cliffhanger": False, "strength": 0.0}
 
-        sentences = re.split(r'[.!?]+', text.strip())
+        sentences = re.split(r"[.!?]+", text.strip())
         if not sentences:
-            return {'has_cliffhanger': False, 'strength': 0.0}
+            return {"has_cliffhanger": False, "strength": 0.0}
 
         last_sentence = sentences[-1].strip()
         last_paragraph = self._get_last_paragraph(text)
@@ -109,10 +114,10 @@ class EngagementOptimizer:
             if re.search(pattern, last_sentence):
                 cliffhanger_indicators += 1
 
-        if '...' in last_sentence:
+        if "..." in last_sentence:
             cliffhanger_indicators += 1
 
-        if re.search(r'[?!]+$', last_paragraph.strip()):
+        if re.search(r"[?!]+$", last_paragraph.strip()):
             cliffhanger_indicators += 1
 
         if self._has_unresolved_question(last_paragraph):
@@ -124,19 +129,16 @@ class EngagementOptimizer:
         has_cliffhanger = cliffhanger_indicators >= 2
         strength = min(1.0, cliffhanger_indicators / 3.0)
 
-        return {
-            'has_cliffhanger': has_cliffhanger,
-            'strength': strength
-        }
+        return {"has_cliffhanger": has_cliffhanger, "strength": strength}
 
     def _analyze_emotional_arc(self, text: str) -> Dict:
         """
         Analyze the emotional arc of the chapter.
         Returns dict with score (0-1) and beat data.
         """
-        sentences = re.split(r'[.!?]+', text.strip())
+        sentences = re.split(r"[.!?]+", text.strip())
         if not sentences:
-            return {'score': 0.0, 'beats': []}
+            return {"score": 0.0, "beats": []}
 
         beats = []
         total_sentences = len(sentences)
@@ -150,19 +152,18 @@ class EngagementOptimizer:
             intensity = self._measure_emotional_intensity(sentence)
 
             if beat_type:
-                beats.append({
-                    'type': beat_type,
-                    'position': position,
-                    'intensity': intensity,
-                    'sentence': sentence[:50] + '...' if len(sentence) > 50 else sentence
-                })
+                beats.append(
+                    {
+                        "type": beat_type,
+                        "position": position,
+                        "intensity": intensity,
+                        "sentence": sentence[:50] + "..." if len(sentence) > 50 else sentence,
+                    }
+                )
 
         score = self._evaluate_emotional_arc_quality(beats, total_sentences)
 
-        return {
-            'score': score,
-            'beats': beats
-        }
+        return {"score": score, "beats": beats}
 
     def _detect_emotional_beat(self, sentence: str, position: float) -> str | None:
         """
@@ -173,28 +174,79 @@ class EngagementOptimizer:
         if position < 0.2:
             return EmotionalBeat.SETUP
 
-        tension_words = ['worried', 'feared', 'tense', 'anxious', 'nervous', 'danger', 'threat',
-                       'rising', 'building', 'growing', 'increasing']
+        tension_words = [
+            "worried",
+            "feared",
+            "tense",
+            "anxious",
+            "nervous",
+            "danger",
+            "threat",
+            "rising",
+            "building",
+            "growing",
+            "increasing",
+        ]
         if any(word in sentence_lower for word in tension_words):
             return EmotionalBeat.TENSION_BUILD
 
-        conflict_words = ['fight', 'argued', 'clashed', 'struggled', 'battle', 'war',
-                        'angry', 'furious', 'rage', 'violence', 'confronted']
+        conflict_words = [
+            "fight",
+            "argued",
+            "clashed",
+            "struggled",
+            "battle",
+            "war",
+            "angry",
+            "furious",
+            "rage",
+            "violence",
+            "confronted",
+        ]
         if any(word in sentence_lower for word in conflict_words):
             return EmotionalBeat.CONFLICT
 
-        climax_words = ['exploded', 'shattered', 'crashed', 'screamed', 'died', 'dying',
-                      'everything changed', 'nothing would ever be the same', 'ultimate', 'final']
+        climax_words = [
+            "exploded",
+            "shattered",
+            "crashed",
+            "screamed",
+            "died",
+            "dying",
+            "everything changed",
+            "nothing would ever be the same",
+            "ultimate",
+            "final",
+        ]
         if any(word in sentence_lower for word in climax_words):
             return EmotionalBeat.CLIMAX
 
-        release_words = ['sighed', 'relaxed', 'calmed', 'peaceful', 'relief', 'safe',
-                       'finally', 'over', 'done', 'settled']
+        release_words = [
+            "sighed",
+            "relaxed",
+            "calmed",
+            "peaceful",
+            "relief",
+            "safe",
+            "finally",
+            "over",
+            "done",
+            "settled",
+        ]
         if any(word in sentence_lower for word in release_words):
             return EmotionalBeat.RELEASE
 
-        resolution_words = ['learned', 'understood', 'realized', 'accepted', 'moved on',
-                         'changed', 'grown', 'forgiven', 'together']
+        resolution_words = [
+            "learned",
+            "understood",
+            "realized",
+            "accepted",
+            "moved on",
+            "changed",
+            "grown",
+            "forgiven",
+            "together",
+        ]
         if any(word in sentence_lower for word in resolution_words):
             return EmotionalBeat.RESOLUTION
 
@@ -204,10 +256,29 @@ class EngagementOptimizer:
         """
         Measure the emotional intensity of a sentence (0-1).
         """
-        high_intensity_words = ['screamed', 'shouted', 'cried', 'terrified', 'horrified',
-                             'ecstatic', 'overwhelmed', 'devastated', 'exploded', 'shattered']
-        medium_intensity_words = ['worried', 'angry', 'happy', 'excited', 'nervous',
-                               'calm', 'relieved', 'confused', 'surprised']
+        high_intensity_words = [
+            "screamed",
+            "shouted",
+            "cried",
+            "terrified",
+            "horrified",
+            "ecstatic",
+            "overwhelmed",
+            "devastated",
+            "exploded",
+            "shattered",
+        ]
+        medium_intensity_words = [
+            "worried",
+            "angry",
+            "happy",
+            "excited",
+            "nervous",
+            "calm",
+            "relieved",
+            "confused",
+            "surprised",
+        ]
 
         sentence_lower = sentence.lower()
 
@@ -226,7 +297,7 @@ class EngagementOptimizer:
         if not beats:
             return 0.0
 
-        beat_types = [b['type'] for b in beats]
+        beat_types = [b["type"] for b in beats]
         unique_beats = set(beat_types)
 
         if len(unique_beats) < 3:
@@ -254,7 +325,7 @@ class EngagementOptimizer:
         Identify tension/release cycles in the chapter.
         Returns list of cycle data.
         """
-        sentences = re.split(r'[.!?]+', text.strip())
+        sentences = re.split(r"[.!?]+", text.strip())
         if not sentences:
             return []
 
@@ -269,16 +340,14 @@ class EngagementOptimizer:
             sentence_tension = self._measure_tension_level(sentence)
 
             if sentence_tension > 0.5 and not in_tension:
-                cycles.append({
-                    'start_position': i,
-                    'peak_tension': sentence_tension,
-                    'type': 'tension_rise'
-                })
+                cycles.append(
+                    {"start_position": i, "peak_tension": sentence_tension, "type": "tension_rise"}
+                )
                 in_tension = True
             elif sentence_tension < 0.3 and in_tension:
                 if cycles:
-                    cycles[-1]['end_position'] = i
-                    cycles[-1]['type'] = 'complete'
+                    cycles[-1]["end_position"] = i
+                    cycles[-1]["type"] = "complete"
                 in_tension = False
 
             current_tension = sentence_tension
@@ -289,10 +358,30 @@ class EngagementOptimizer:
         """
         Measure the tension level of a sentence (0-1).
         """
-        high_tension_words = ['danger', 'death', 'kill', 'threat', 'escape', 'urgent',
-                           'impossible', 'now', 'suddenly', 'terror', 'panic', 'die']
-        medium_tension_words = ['worried', 'feared', 'nervous', 'anxious', 'concerned',
-                              'hesitated', 'uncertain', 'risk']
+        high_tension_words = [
+            "danger",
+            "death",
+            "kill",
+            "threat",
+            "escape",
+            "urgent",
+            "impossible",
+            "now",
+            "suddenly",
+            "terror",
+            "panic",
+            "die",
+        ]
+        medium_tension_words = [
+            "worried",
+            "feared",
+            "nervous",
+            "anxious",
+            "concerned",
+            "hesitated",
+            "uncertain",
+            "risk",
+        ]
 
         sentence_lower = sentence.lower()
 
@@ -302,25 +391,30 @@ class EngagementOptimizer:
         tension_score = (high_count * 0.4) + (medium_count * 0.2)
         return min(1.0, tension_score)
 
-    def _generate_engagement_suggestions(self, cliffhanger: Dict, emotional_arc: Dict,
-                                       tension_cycles: List, context: Dict | None = None) -> List[str]:
+    def _generate_engagement_suggestions(
+        self,
+        cliffhanger: Dict,
+        emotional_arc: Dict,
+        tension_cycles: List,
+        context: Dict | None = None,
+    ) -> List[str]:
         """
         Generate suggestions to improve engagement.
         """
         suggestions = []
 
-        if not cliffhanger['has_cliffhanger']:
+        if not cliffhanger["has_cliffhanger"]:
             suggestions.append(
                 "Consider ending with a cliffhanger: introduce an unexpected discovery, "
                 "abrupt action, or unresolved question to hook readers for the next chapter."
             )
-        elif cliffhanger['strength'] < 0.5:
+        elif cliffhanger["strength"] < 0.5:
             suggestions.append(
                 "The chapter ending could be stronger. Consider making the cliffhanger more dramatic "
                 "or raising the stakes of the unresolved situation."
             )
 
-        if emotional_arc['score'] < 0.5:
+        if emotional_arc["score"] < 0.5:
             suggestions.append(
                 "The emotional arc needs development. Ensure the chapter has clear tension buildup, "
                 "climax, and resolution points. Consider adding more emotional variety."
@@ -332,16 +426,16 @@ class EngagementOptimizer:
                 "high-tension moments more impactful and maintain reader engagement."
             )
 
-        if emotional_arc['beats']:
-            climax_beats = [b for b in emotional_arc['beats'] if b['type'] == EmotionalBeat.CLIMAX]
+        if emotional_arc["beats"]:
+            climax_beats = [b for b in emotional_arc["beats"] if b["type"] == EmotionalBeat.CLIMAX]
             if not climax_beats:
                 suggestions.append(
                     "The chapter lacks a clear climax. Add a moment of peak tension or emotional "
                     "intensity that resolves the chapter's primary conflict."
                 )
 
-        if context and context.get('is_last_chapter'):
-            if cliffhanger['has_cliffhanger']:
+        if context and context.get("is_last_chapter"):
+            if cliffhanger["has_cliffhanger"]:
                 suggestions.append(
                     "As the final chapter, consider providing more resolution rather than a cliffhanger. "
                     "Readers expect closure at story's end."
@@ -349,10 +443,13 @@ class EngagementOptimizer:
 
         return suggestions
 
-    def _calculate_overall_engagement_score(self, has_cliffhanger: bool,
-                                          cliffhanger_strength: float,
-                                          emotional_score: float,
-                                          cycle_count: int) -> float:
+    def _calculate_overall_engagement_score(
+        self,
+        has_cliffhanger: bool,
+        cliffhanger_strength: float,
+        emotional_score: float,
+        cycle_count: int,
+    ) -> float:
         """
         Calculate overall engagement score (0-1).
         """
@@ -370,20 +467,32 @@ class EngagementOptimizer:
 
     def _get_last_paragraph(self, text: str) -> str:
         """Get the last paragraph of the text."""
-        paragraphs = re.split(r'\n\n+', text.strip())
+        paragraphs = re.split(r"\n\n+", text.strip())
         return paragraphs[-1] if paragraphs else ""
 
     def _has_unresolved_question(self, text: str) -> bool:
         """Check if text contains unresolved questions."""
-        return bool(re.search(r'(?:who|what|where|when|why|how)\s+(?:was|is|did|would|could)', text, re.IGNORECASE))
+        return bool(
+            re.search(
+                r"(?:who|what|where|when|why|how)\s+(?:was|is|did|would|could)", text, re.IGNORECASE
+            )
+        )
 
     def _has_sudden_action(self, text: str) -> bool:
         """Check if text indicates sudden action."""
-        sudden_action_words = ['suddenly', 'instantly', 'abruptly', 'without warning', 'shock', 'startled']
+        sudden_action_words = [
+            "suddenly",
+            "instantly",
+            "abruptly",
+            "without warning",
+            "shock",
+            "startled",
+        ]
         return any(word in text.lower() for word in sudden_action_words)
 
-    def generate_cliffhanger_suggestion(self, content_text: str, chapter_summary: str = "",
-                                       next_chapter_summary: str = "") -> str | None:
+    def generate_cliffhanger_suggestion(
+        self, content_text: str, chapter_summary: str = "", next_chapter_summary: str = ""
+    ) -> str | None:
         """
         Generate a suggested cliffhanger ending for a chapter.
 
@@ -396,7 +505,7 @@ class EngagementOptimizer:
             Suggested ending paragraph
         """
         current_ending = self._get_last_paragraph(content_text)
-        current_sentences = re.split(r'[.!?]+', current_ending)
+        current_sentences = re.split(r"[.!?]+", current_ending)
         last_sentence = current_sentences[-1] if current_sentences else ""
 
         suggestion = f"""
@@ -438,8 +547,13 @@ Based on the chapter's content, here are cliffhanger suggestions:
 
         return suggestion
 
-    def create_engagement_prompt(self, content_text: str, chapter_summary: str,
-                              genre_guidance: str = "", current_word_count: int = 0) -> str:
+    def create_engagement_prompt(
+        self,
+        content_text: str,
+        chapter_summary: str,
+        genre_guidance: str = "",
+        current_word_count: int = 0,
+    ) -> str:
         """
         Create a prompt for LLM to improve engagement.
 
@@ -454,14 +568,18 @@ Based on the chapter's content, here are cliffhanger suggestions:
         """
         analysis = self.analyze_chapter_engagement(content_text)
 
-        word_count_instruction = f"""
+        word_count_instruction = (
+            f"""
 **CRITICAL WORD COUNT REQUIREMENT:**
 - Current chapter word count: {current_word_count:,} words
 - You MUST maintain or EXCEED this word count
 - Do NOT shorten the chapter
 - If anything, add more detail, description, and depth to increase engagement while maintaining length
 - Engagement should come from more compelling content, not fewer words
-""" if current_word_count > 0 else ""
+"""
+            if current_word_count > 0
+            else ""
+        )
 
         prompt = f"""
 You are enhancing reader engagement for a chapter.

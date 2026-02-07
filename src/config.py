@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 config.py - Centralized configuration for the Fiction Fabricator project.
 """
@@ -135,10 +134,10 @@ MIN_DIALOGUE_TAG_VARIETY_SCORE = 0.4
 DIALOGUE_TAG_OVERUSE_THRESHOLD = 0.2  # 20% of dialogue lines
 # Sentence variety target distribution
 SENTENCE_LENGTH_TARGETS = {
-    'short': 0.25,      # 25% should be < 10 words
-    'medium': 0.45,     # 45% should be 10-25 words
-    'long': 0.20,        # 20% should be 25-40 words
-    'very_long': 0.10     # 10% should be 40+ words
+    "short": 0.25,  # 25% should be < 10 words
+    "medium": 0.45,  # 45% should be 10-25 words
+    "long": 0.20,  # 20% should be 25-40 words
+    "very_long": 0.10,  # 10% should be 40+ words
 }
 # Generate chapter hooks
 ENABLE_CHAPTER_HOOK_GENERATION = True
@@ -164,7 +163,7 @@ GOOGLE_FONT_OPTIONS = [
     "Noto Serif",
     "Bitter",
     "Alegreya",
-    "Cardo"
+    "Cardo",
 ]
 
 # Font URLs mapping (Google Fonts)
@@ -183,5 +182,5 @@ GOOGLE_FONT_URLS = {
     "Noto Serif": "https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&display=swap",
     "Bitter": "https://fonts.googleapis.com/css2?family=Bitter:wght@400;500;600;700&display=swap",
     "Alegreya": "https://fonts.googleapis.com/css2?family=Alegreya:wght@400;500;700&display=swap",
-    "Cardo": "https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap"
+    "Cardo": "https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap",
 }

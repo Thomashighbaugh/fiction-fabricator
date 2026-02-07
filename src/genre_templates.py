@@ -1,13 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 genre_templates.py - Genre-specific templates and generation guidance
 """
 from enum import Enum
-from typing import Dict
 
 
 class Genre(str, Enum):
     """Supported genres for fiction generation."""
+
     FANTASY = "fantasy"
     SCIENCE_FICTION = "science_fiction"
     MYSTERY = "mystery"
@@ -28,24 +27,24 @@ class GenreTemplate:
 
     def get_outline_guidance(self) -> str:
         """Get genre-specific guidance for outline generation."""
-        return self._get_guidance_template().get('outline_guidance', '')
+        return self._get_guidance_template().get("outline_guidance", "")
 
     def get_content_guidance(self) -> str:
         """Get genre-specific guidance for content generation."""
-        return self._get_guidance_template().get('content_guidance', '')
+        return self._get_guidance_template().get("content_guidance", "")
 
-    def get_quality_criteria(self) -> Dict:
+    def get_quality_criteria(self) -> dict:
         """Get genre-specific quality criteria adjustments."""
-        return self._get_guidance_template().get('quality_criteria', {})
+        return self._get_guidance_template().get("quality_criteria", {})
 
-    def _get_guidance_template(self) -> Dict:
+    def _get_guidance_template(self) -> dict:
         """Return the template dict for this genre."""
         return TEMPLATES.get(self.genre, {})
 
 
 TEMPLATES = {
     Genre.FANTASY: {
-        'outline_guidance': """
+        "outline_guidance": """
 **FANTASY OUTLINE GUIDANCE:**
 
 Focus on world-building elements:
@@ -72,7 +71,7 @@ Setting focus:
 - Incorporate sensory details of fantasy settings
 - Balance wonder with danger
 """,
-        'content_guidance': """
+        "content_guidance": """
 **FANTASY CONTENT GENERATION:**
 
 When writing fantasy chapters:
@@ -88,15 +87,14 @@ Writing style tips:
 - Let characters react emotionally to fantastical elements
 - Include cultural touches: food, clothing, architecture, customs
 """,
-        'quality_criteria': {
-            'description_focus': 'high',
-            'dialogue_ratio_range': (0.2, 0.6),
-            'pacing_notes': 'Allow room for descriptive passages, maintain forward momentum'
-        }
+        "quality_criteria": {
+            "description_focus": "high",
+            "dialogue_ratio_range": (0.2, 0.6),
+            "pacing_notes": "Allow room for descriptive passages, maintain forward momentum",
+        },
     },
-
     Genre.MYSTERY: {
-        'outline_guidance': """
+        "outline_guidance": """
 **MYSTERY OUTLINE GUIDANCE:**
 
 Focus on puzzle elements:
@@ -120,7 +118,7 @@ Character dynamics:
 - Antagonist who is clever and resourceful
 - Allies who may have their own agendas
 """,
-        'content_guidance': """
+        "content_guidance": """
 **MYSTERY CONTENT GENERATION:**
 
 When writing mystery chapters:
@@ -137,14 +135,13 @@ Writing style tips:
 - End chapters with questions, not answers
 - Balance procedural elements with character development
 """,
-        'quality_criteria': {
-            'dialogue_ratio_range': (0.3, 0.7),
-            'pacing_notes': 'Vary pacing for investigation vs. action sequences'
-        }
+        "quality_criteria": {
+            "dialogue_ratio_range": (0.3, 0.7),
+            "pacing_notes": "Vary pacing for investigation vs. action sequences",
+        },
     },
-
     Genre.ROMANCE: {
-        'outline_guidance': """
+        "outline_guidance": """
 **ROMANCE OUTLINE GUIDANCE:**
 
 Focus on emotional arcs:
@@ -168,7 +165,7 @@ Relationship milestones:
 - Realization of love
 - Commitment
 """,
-        'content_guidance': """
+        "content_guidance": """
 **ROMANCE CONTENT GENERATION:**
 
 When writing romance chapters:
@@ -185,14 +182,13 @@ Writing style tips:
 - Avoid insta-love - build connection gradually
 - End scenes with emotional resonance or tension
 """,
-        'quality_criteria': {
-            'dialogue_ratio_range': (0.4, 0.75),
-            'pacing_notes': 'Slow down for romantic scenes, maintain plot momentum'
-        }
+        "quality_criteria": {
+            "dialogue_ratio_range": (0.4, 0.75),
+            "pacing_notes": "Slow down for romantic scenes, maintain plot momentum",
+        },
     },
-
     Genre.SCIENCE_FICTION: {
-        'outline_guidance': """
+        "outline_guidance": """
 **SCIENCE FICTION OUTLINE GUIDANCE:**
 
 Focus on speculative elements:
@@ -214,7 +210,7 @@ Plot frameworks:
 - Space exploration: Human expansion, survival, discovery
 - AI/technology: Questions of consciousness, ethics, control
 """,
-        'content_guidance': """
+        "content_guidance": """
 **SCIENCE FICTION CONTENT GENERATION:**
 
 When writing sci-fi chapters:
@@ -231,15 +227,14 @@ Writing style tips:
 - Consider implications: social, ethical, philosophical
 - Balance action with intellectual engagement
 """,
-        'quality_criteria': {
-            'description_focus': 'medium',
-            'dialogue_ratio_range': (0.25, 0.65),
-            'pacing_notes': 'Allow for conceptual explanation but integrate naturally'
-        }
+        "quality_criteria": {
+            "description_focus": "medium",
+            "dialogue_ratio_range": (0.25, 0.65),
+            "pacing_notes": "Allow for conceptual explanation but integrate naturally",
+        },
     },
-
     Genre.HORROR: {
-        'outline_guidance': """
+        "outline_guidance": """
 **HORROR OUTLINE GUIDANCE:**
 
 Focus on fear and tension:
@@ -262,7 +257,7 @@ Horror elements:
 - Supernatural: Rules and limitations of threat
 - Survival: Resources depleting, hope diminishing
 """,
-        'content_guidance': """
+        "content_guidance": """
 **HORROR CONTENT GENERATION:**
 
 When writing horror chapters:
@@ -279,15 +274,14 @@ Writing style tips:
 - Use setting as antagonist: isolation, darkness, decay
 - Let fear manifest physically: racing heart, shallow breath, trembling
 """,
-        'quality_criteria': {
-            'description_focus': 'high',
-            'dialogue_ratio_range': (0.2, 0.5),
-            'pacing_notes': 'Slow burn for tension, accelerate for terror sequences'
-        }
+        "quality_criteria": {
+            "description_focus": "high",
+            "dialogue_ratio_range": (0.2, 0.5),
+            "pacing_notes": "Slow burn for tension, accelerate for terror sequences",
+        },
     },
-
     Genre.THRILLER: {
-        'outline_guidance': """
+        "outline_guidance": """
 **THRILLER OUTLINE GUIDANCE:**
 
 Focus on suspense and pacing:
@@ -310,7 +304,7 @@ Thriller elements:
 - Betrayal: Allies aren't trustworthy
 - Reversals: What seems true isn't
 """,
-        'content_guidance': """
+        "content_guidance": """
 **THRILLER CONTENT GENERATION:**
 
 When writing thriller chapters:
@@ -327,14 +321,13 @@ Writing style tips:
 - Let characters be smart but fallible
 - Use pacing to control tension: fast for action, slow for dread
 """,
-        'quality_criteria': {
-            'dialogue_ratio_range': (0.3, 0.6),
-            'pacing_notes': 'Maintain consistent forward momentum'
-        }
+        "quality_criteria": {
+            "dialogue_ratio_range": (0.3, 0.6),
+            "pacing_notes": "Maintain consistent forward momentum",
+        },
     },
-
     Genre.LITERARY_FICTION: {
-        'outline_guidance': """
+        "outline_guidance": """
 **LITERARY FICTION OUTLINE GUIDANCE:**
 
 Focus on character and theme:
@@ -357,7 +350,7 @@ Narrative elements:
 - Prose style: Emphasis on language itself
 - Ambiguity: Multiple interpretations welcome
 """,
-        'content_guidance': """
+        "content_guidance": """
 **LITERARY FICTION CONTENT GENERATION:**
 
 When writing literary fiction chapters:
@@ -374,15 +367,14 @@ Writing style tips:
 - Balance interiority with external action
 - Consider cumulative emotional effect
 """,
-        'quality_criteria': {
-            'description_focus': 'high',
-            'dialogue_ratio_range': (0.2, 0.6),
-            'pacing_notes': 'Allow time for reflection and character development'
-        }
+        "quality_criteria": {
+            "description_focus": "high",
+            "dialogue_ratio_range": (0.2, 0.6),
+            "pacing_notes": "Allow time for reflection and character development",
+        },
     },
-
     Genre.HISTORICAL_FICTION: {
-        'outline_guidance': """
+        "outline_guidance": """
 **HISTORICAL FICTION OUTLINE GUIDANCE:**
 
 Focus on research and authenticity:
@@ -404,7 +396,7 @@ Plot integration:
 - Show how larger events affect individuals
 - Balance historical accuracy with narrative needs
 """,
-        'content_guidance': """
+        "content_guidance": """
 **HISTORICAL FICTION CONTENT GENERATION:**
 
 When writing historical fiction chapters:
@@ -421,15 +413,14 @@ Writing style tips:
 - Let characters be people of their time, not modern views in costume
 - Consider what's known vs. what's imagined about period
 """,
-        'quality_criteria': {
-            'description_focus': 'high',
-            'dialogue_ratio_range': (0.25, 0.6),
-            'pacing_notes': 'Respect historical timeline, maintain narrative momentum'
-        }
+        "quality_criteria": {
+            "description_focus": "high",
+            "dialogue_ratio_range": (0.25, 0.6),
+            "pacing_notes": "Respect historical timeline, maintain narrative momentum",
+        },
     },
-
     Genre.YOUNG_ADULT: {
-        'outline_guidance': """
+        "outline_guidance": """
 **YOUNG ADULT OUTLINE GUIDANCE:**
 
 Focus on coming-of-age:
@@ -452,7 +443,7 @@ Plot elements:
 - Community or connection with peers
 - A sense of hope or possibility
 """,
-        'content_guidance': """
+        "content_guidance": """
 **YOUNG ADULT CONTENT GENERATION:**
 
 When writing YA chapters:
@@ -469,14 +460,13 @@ Writing style tips:
 - Show growth through mistakes and learning
 - Balance external plot with internal development
 """,
-        'quality_criteria': {
-            'dialogue_ratio_range': (0.35, 0.7),
-            'pacing_notes': 'Engage quickly, maintain forward momentum'
-        }
+        "quality_criteria": {
+            "dialogue_ratio_range": (0.35, 0.7),
+            "pacing_notes": "Engage quickly, maintain forward momentum",
+        },
     },
-
     Genre.CONTEMPORARY_FICTION: {
-        'outline_guidance': """
+        "outline_guidance": """
 **CONTEMPORARY FICTION OUTLINE GUIDANCE:**
 
 Focus on relatable human experience:
@@ -498,7 +488,7 @@ Plot frameworks:
 - Relationship stories: Romance, friendship, found family
 - Social issues: Contemporary problems through character lens
 """,
-        'content_guidance': """
+        "content_guidance": """
 **CONTEMPORARY FICTION CONTENT GENERATION:**
 
 When writing contemporary fiction chapters:
@@ -515,21 +505,21 @@ Writing style tips:
 - Balance dialogue with internal thought
 - Create scenes that illuminate character
 """,
-        'quality_criteria': {
-            'dialogue_ratio_range': (0.3, 0.65),
-            'pacing_notes': 'Realistic pacing - slower for reflection, faster for conflict'
-        }
-    }
+        "quality_criteria": {
+            "dialogue_ratio_range": (0.3, 0.65),
+            "pacing_notes": "Realistic pacing - slower for reflection, faster for conflict",
+        },
+    },
 }
 
 
 def get_genre_template(genre: str) -> GenreTemplate:
     """
     Get a genre template for specified genre.
-    
+
     Args:
         genre: String name of genre
-        
+
     Returns:
         GenreTemplate object
     """
@@ -537,7 +527,7 @@ def get_genre_template(genre: str) -> GenreTemplate:
         genre_enum = Genre(genre.lower())
     except ValueError:
         genre_enum = Genre.CONTEMPORARY_FICTION
-    
+
     return GenreTemplate(genre_enum)
 
 
@@ -547,20 +537,53 @@ def detect_genre_from_outline(outline_text: str) -> Genre:
     Returns CONTEMPORARY_FICTION if unable to detect.
     """
     text_lower = outline_text.lower()
-    
+
     genre_keywords = {
-        Genre.FANTASY: ['magic', 'wizard', 'dragon', 'kingdom', 'quest', 'spell', 'enchanted', 'sword'],
-        Genre.SCIENCE_FICTION: ['space', 'robot', 'future', 'alien', 'technology', 'spaceship', 'ai', 'cyber'],
-        Genre.MYSTERY: ['murder', 'detective', 'clue', 'crime', 'suspect', 'investigation', 'whodunit'],
-        Genre.ROMANCE: ['love', 'romance', 'relationship', 'heart', 'kiss', 'wedding', 'affair'],
-        Genre.HORROR: ['ghost', 'monster', 'scary', 'haunted', 'killer', 'terror', 'nightmare'],
-        Genre.THRILLER: ['chase', 'spy', 'conspiracy', 'assassin', 'escape', 'danger', 'suspense'],
-        Genre.HISTORICAL_FICTION: ['war', 'medieval', 'victorian', 'ancient', 'revolution', 'historical'],
-        Genre.YOUNG_ADULT: ['teen', 'school', 'coming of age', 'adolescent', 'high school']
+        Genre.FANTASY: [
+            "magic",
+            "wizard",
+            "dragon",
+            "kingdom",
+            "quest",
+            "spell",
+            "enchanted",
+            "sword",
+        ],
+        Genre.SCIENCE_FICTION: [
+            "space",
+            "robot",
+            "future",
+            "alien",
+            "technology",
+            "spaceship",
+            "ai",
+            "cyber",
+        ],
+        Genre.MYSTERY: [
+            "murder",
+            "detective",
+            "clue",
+            "crime",
+            "suspect",
+            "investigation",
+            "whodunit",
+        ],
+        Genre.ROMANCE: ["love", "romance", "relationship", "heart", "kiss", "wedding", "affair"],
+        Genre.HORROR: ["ghost", "monster", "scary", "haunted", "killer", "terror", "nightmare"],
+        Genre.THRILLER: ["chase", "spy", "conspiracy", "assassin", "escape", "danger", "suspense"],
+        Genre.HISTORICAL_FICTION: [
+            "war",
+            "medieval",
+            "victorian",
+            "ancient",
+            "revolution",
+            "historical",
+        ],
+        Genre.YOUNG_ADULT: ["teen", "school", "coming of age", "adolescent", "high school"],
     }
-    
+
     for genre, keywords in genre_keywords.items():
         if any(keyword in text_lower for keyword in keywords):
             return genre
-    
+
     return Genre.CONTEMPORARY_FICTION

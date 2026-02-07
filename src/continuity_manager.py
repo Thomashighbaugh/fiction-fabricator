@@ -2,15 +2,16 @@
 """
 continuity_manager.py - Tracks continuity across chapters and validates references
 """
-import re
 import json
-from typing import Dict, List, Set, Tuple
+import re
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Dict, List, Set, Tuple
 
 
 class EntityType(str, Enum):
     """Types of entities to track for continuity."""
+
     CHARACTER = "character"
     PLACE = "place"
     OBJECT = "object"
@@ -20,6 +21,7 @@ class EntityType(str, Enum):
 @dataclass
 class Entity:
     """Represents a tracked entity (character, place, object, concept)."""
+
     name: str
     entity_type: EntityType
     first_chapter_id: str
@@ -31,6 +33,7 @@ class Entity:
 @dataclass
 class WorldRule:
     """Represents a rule about the story world."""
+
     rule_name: str
     rule_text: str
     chapter_established: str
@@ -40,6 +43,7 @@ class WorldRule:
 @dataclass
 class ContinuityIssue:
     """Represents a continuity problem."""
+
     issue_type: str
     severity: str  # 'warning', 'error', 'critical'
     chapter_id: str
@@ -51,14 +55,15 @@ class ContinuityIssue:
 class ContinuityManager:
     """Manages continuity tracking across chapters."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.entities: Dict[str, Entity] = {}
         self.world_rules: Dict[str, WorldRule] = {}
         self.chapter_context: Dict[str, Set[str]] = {}
         self.issues: List[ContinuityIssue] = []
 
-    def analyze_chapter_for_continuity(self, chapter_id: str, content_text: str,
-                                     chapter_summary: str = "") -> List[ContinuityIssue]:
+    def analyze_chapter_for_continuity(
+        self, chapter_id: str, content_text: str, chapter_summary: str = ""
+    ) -> List[ContinuityIssue]:
         """
         Analyze a chapter for continuity issues.
 
@@ -74,11 +79,11 @@ class ContinuityManager:
 
         # Extract proper nouns and track first mentions
         proper_nouns = self._extract_proper_nouns(content_text)
-        
+
         # Check for entities mentioned before introduction
         for noun in proper_nouns:
             entity_key = self._normalize_entity_name(noun)
-            
+
             if entity_key in self.entities:
                 # Entity exists - check for consistency
                 entity = self.entities[entity_key]
@@ -94,7 +99,7 @@ class ContinuityManager:
                         first_chapter_id=chapter_id,
                         first_position=position,
                         attributes={},
-                        aliases=[]
+                        aliases=[],
                     )
                     self.chapter_context.setdefault(chapter_id, set()).add(entity_key)
 
@@ -126,11 +131,21 @@ class ContinuityManager:
         proper_nouns = set()
 
         # Match capitalized words mid-sentence
-        mid_sentence_caps = re.findall(r'(?:^|[.!?]\s+)([A-Z][a-zA-Z]+)', text)
+        mid_sentence_caps = re.findall(r"(?:^|[.!?]\s+)([A-Z][a-zA-Z]+)", text)
         for match in mid_sentence_caps:
             word = match.group(1)
             # Filter out common words that get capitalized
-            if word.lower() not in ['the', 'and', 'but', 'or', 'when', 'where', 'then', 'so', 'because']:
+            if word.lower() not in [
+                "the",
+                "and",
+                "but",
+                "or",
+                "when",
+                "where",
+                "then",
+                "so",
+                "because",
+            ]:
                 if len(word) > 2:
                     proper_nouns.add(word)
 
@@ -151,16 +166,34 @@ class ContinuityManager:
         name_lower = name.lower()
 
         # Place indicators
-        place_indicators = ['street', 'road', 'city', 'town', 'room', 'house', 'building',
-                         'forest', 'mountain', 'river', 'sea', 'lake', 'castle',
-                         'palace', 'temple', 'shop', 'store', 'restaurant', 'cafe']
+        place_indicators = [
+            "street",
+            "road",
+            "city",
+            "town",
+            "room",
+            "house",
+            "building",
+            "forest",
+            "mountain",
+            "river",
+            "sea",
+            "lake",
+            "castle",
+            "palace",
+            "temple",
+            "shop",
+            "store",
+            "restaurant",
+            "cafe",
+        ]
         if any(ind in name_lower for ind in place_indicators):
             return EntityType.PLACE
 
         # Character indicators (verbs/actions associated with people)
-        char_indicators = ['walked', 'said', 'shouted', 'ran', 'thought', 'felt', 'saw']
+        char_indicators = ["walked", "said", "shouted", "ran", "thought", "felt", "saw"]
         text_lower = content.lower()
-        if any(f'{name_lower} {ind}' in text_lower for ind in char_indicators):
+        if any(f"{name_lower} {ind}" in text_lower for ind in char_indicators):
             return EntityType.CHARACTER
 
         # Object/concept - default
@@ -170,31 +203,34 @@ class ContinuityManager:
         """Check if entity is known (including aliases)."""
         if entity_key in self.entities:
             return True
-        
+
         # Check if it's an alias of a known entity
         for entity in self.entities.values():
             if original_name.lower() in [a.lower() for a in entity.aliases]:
                 return True
-        
+
         return False
 
-    def _check_entity_consistency(self, entity: Entity, current_name: str,
-                                 content_text: str, issues: List[ContinuityIssue]):
+    def _check_entity_consistency(
+        self, entity: Entity, current_name: str, content_text: str, issues: List[ContinuityIssue]
+    ) -> None:
         """
         Check if entity is used consistently.
         """
         # Check for spelling variations that might be unintentional
         variations = self._find_spelling_variations(entity.name, content_text)
-        
+
         if variations:
-            issues.append(ContinuityIssue(
-                issue_type="spelling_variation",
-                severity="warning",
-                chapter_id=entity.first_chapter_id,
-                entity_name=entity.name,
-                description=f"'{current_name}' appears to be a spelling variation of known entity '{entity.name}'",
-                suggestion=f"Consider using consistent spelling: '{entity.name}'"
-            ))
+            issues.append(
+                ContinuityIssue(
+                    issue_type="spelling_variation",
+                    severity="warning",
+                    chapter_id=entity.first_chapter_id,
+                    entity_name=entity.name,
+                    description=f"'{current_name}' appears to be a spelling variation of known entity '{entity.name}'",
+                    suggestion=f"Consider using consistent spelling: '{entity.name}'",
+                )
+            )
 
     def _find_spelling_variations(self, original_name: str, text: str) -> List[str]:
         """Find potential spelling variations of an entity name."""
@@ -203,7 +239,7 @@ class ContinuityManager:
         original_lower = original_name.lower()
 
         # Simple Levenshtein-like approximation
-        for word in re.findall(r'\b[A-Z][a-z]+\b', text):
+        for word in re.findall(r"\b[A-Z][a-z]+\b", text):
             word_lower = word.lower()
             if word_lower != original_lower and len(word_lower) == len(original_lower):
                 # Same length, different - possible typo
@@ -213,7 +249,7 @@ class ContinuityManager:
 
         return variations
 
-    def add_world_rule(self, rule_name: str, rule_text: str, chapter_id: str):
+    def add_world_rule(self, rule_name: str, rule_text: str, chapter_id: str) -> None:
         """
         Add a world rule established in a chapter.
 
@@ -223,14 +259,12 @@ class ContinuityManager:
             chapter_id: Chapter where rule was established
         """
         self.world_rules[rule_name] = WorldRule(
-            rule_name=rule_name,
-            rule_text=rule_text,
-            chapter_established=chapter_id,
-            violations=[]
+            rule_name=rule_name, rule_text=rule_text, chapter_established=chapter_id, violations=[]
         )
 
-    def _check_world_rule_compliance(self, chapter_id: str, content_text: str,
-                                    issues: List[ContinuityIssue]):
+    def _check_world_rule_compliance(
+        self, chapter_id: str, content_text: str, issues: List[ContinuityIssue]
+    ) -> None:
         """Check if chapter violates any established world rules."""
         if not self.world_rules:
             return
@@ -241,7 +275,7 @@ class ContinuityManager:
             # Simple heuristic: if rule contains keywords and content contradicts
             # This is simplified - real implementation would be more sophisticated
             rule_text_lower = rule.rule_text.lower()
-            
+
             # Check for potential contradictions (very basic)
             if "cannot" in rule_text_lower and "can" in content_lower:
                 # Might be a contradiction
@@ -253,13 +287,13 @@ class ContinuityManager:
             return "No entities tracked yet."
 
         lines = ["Continuity Report - Tracked Entities:\n"]
-        
+
         # Group by type
         by_type: Dict[EntityType, List[Entity]] = {
             EntityType.CHARACTER: [],
             EntityType.PLACE: [],
             EntityType.OBJECT: [],
-            EntityType.CONCEPT: []
+            EntityType.CONCEPT: [],
         }
 
         for entity in self.entities.values():
@@ -285,7 +319,7 @@ class ContinuityManager:
             return "No continuity issues found."
 
         lines = ["Continuity Issues Report:\n"]
-        
+
         for issue in self.issues:
             lines.append(
                 f"[{issue.severity.upper()}] Chapter {issue.chapter_id}: {issue.description}"
@@ -295,74 +329,71 @@ class ContinuityManager:
 
         return "\n".join(lines)
 
-    def save_to_file(self, filepath: str):
+    def save_to_file(self, filepath: str) -> None:
         """Save continuity data to JSON file."""
         data = {
-            'entities': {
+            "entities": {
                 name: {
-                    'type': entity.entity_type,
-                    'first_chapter': entity.first_chapter_id,
-                    'first_position': entity.first_position,
-                    'attributes': entity.attributes,
-                    'aliases': entity.aliases
+                    "type": entity.entity_type,
+                    "first_chapter": entity.first_chapter_id,
+                    "first_position": entity.first_position,
+                    "attributes": entity.attributes,
+                    "aliases": entity.aliases,
                 }
                 for name, entity in self.entities.items()
             },
-            'world_rules': {
+            "world_rules": {
                 name: {
-                    'rule_text': rule.rule_text,
-                    'chapter_established': rule.chapter_established,
-                    'violations': rule.violations
+                    "rule_text": rule.rule_text,
+                    "chapter_established": rule.chapter_established,
+                    "violations": rule.violations,
                 }
                 for name, rule in self.world_rules.items()
             },
-            'issues': [
+            "issues": [
                 {
-                    'type': issue.issue_type,
-                    'severity': issue.severity,
-                    'chapter_id': issue.chapter_id,
-                    'entity_name': issue.entity_name,
-                    'description': issue.description,
-                    'suggestion': issue.suggestion
+                    "type": issue.issue_type,
+                    "severity": issue.severity,
+                    "chapter_id": issue.chapter_id,
+                    "entity_name": issue.entity_name,
+                    "description": issue.description,
+                    "suggestion": issue.suggestion,
                 }
                 for issue in self.issues
-            ]
+            ],
         }
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-    def load_from_file(self, filepath: str):
+    def load_from_file(self, filepath: str) -> None:
         """Load continuity data from JSON file."""
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # Load entities
-            for name, entity_data in data.get('entities', {}).items():
+            for name, entity_data in data.get("entities", {}).items():
                 self.entities[name] = Entity(
                     name=name,
-                    entity_type=EntityType(entity_data['type']),
-                    first_chapter_id=entity_data['first_chapter'],
-                    first_position=entity_data['first_position'],
-                    attributes=entity_data.get('attributes', {}),
-                    aliases=entity_data.get('aliases', [])
+                    entity_type=EntityType(entity_data["type"]),
+                    first_chapter_id=entity_data["first_chapter"],
+                    first_position=entity_data["first_position"],
+                    attributes=entity_data.get("attributes", {}),
+                    aliases=entity_data.get("aliases", []),
                 )
 
             # Load world rules
-            for name, rule_data in data.get('world_rules', {}).items():
+            for name, rule_data in data.get("world_rules", {}).items():
                 self.world_rules[name] = WorldRule(
                     rule_name=name,
-                    rule_text=rule_data['rule_text'],
-                    chapter_established=rule_data['chapter_established'],
-                    violations=rule_data.get('violations', [])
+                    rule_text=rule_data["rule_text"],
+                    chapter_established=rule_data["chapter_established"],
+                    violations=rule_data.get("violations", []),
                 )
 
             # Load issues
-            self.issues = [
-                ContinuityIssue(**issue_data)
-                for issue_data in data.get('issues', [])
-            ]
+            self.issues = [ContinuityIssue(**issue_data) for issue_data in data.get("issues", [])]
 
         except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
             raise ValueError(f"Failed to load continuity data: {e}")

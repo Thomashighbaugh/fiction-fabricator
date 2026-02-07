@@ -1,17 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 content_enhancements.py - Advanced content analysis and enhancement tools
 """
 import re
-import json
-from typing import Dict, List, Tuple, Set
-from dataclasses import dataclass, field
 from collections import Counter
+from dataclasses import dataclass
 from enum import Enum
 
 
 class DialogueTag(str, Enum):
     """Types of dialogue tags."""
+
     SAID = "said"
     ASKED = "asked"
     REPLIED = "replied"
@@ -34,34 +32,37 @@ class DialogueTag(str, Enum):
 @dataclass
 class SubBeatValidation:
     """Results of sub-beat validation."""
+
     is_valid: bool
     coherence_score: float  # 0-1
     comprehensiveness_score: float  # 0-1
-    issues: List[str]
-    suggestions: List[str]
+    issues: list[str]
+    suggestions: list[str]
 
 
 @dataclass
 class DialogueTagAnalysis:
     """Analysis of dialogue tag usage."""
-    tag_counts: Dict[str, int]
+
+    tag_counts: dict[str, int]
     total_dialogue_lines: int
     variety_score: float  # 0-1, higher is better
-    overused_tags: List[Tuple[str, int]]  # (tag, count) for tags used too frequently
-    suggestions: List[str]
+    overused_tags: list[tuple[str, int]]  # (tag, count) for tags used too frequently
+    suggestions: list[str]
 
 
 @dataclass
 class SentenceVarietyAnalysis:
     """Detailed sentence variety analysis."""
-    sentence_lengths: List[int]
+
+    sentence_lengths: list[int]
     avg_length: float
     median_length: float
     std_dev: float
-    length_distribution: Dict[str, int]  # short, medium, long, very_long
+    length_distribution: dict[str, int]  # short, medium, long, very_long
     variety_score: float  # 0-1
-    patterns: List[str]  # Repeated patterns detected
-    suggestions: List[str]
+    patterns: list[str]  # Repeated patterns detected
+    suggestions: list[str]
 
 
 class ContentEnhancer:
@@ -69,8 +70,18 @@ class ContentEnhancer:
 
     def __init__(self):
         self.dialogue_tag_alternatives = {
-            "said": ["replied", "answered", "responded", "observed", "noted", 
-                     "continued", "went on", "added", "commented", "remarked"],
+            "said": [
+                "replied",
+                "answered",
+                "responded",
+                "observed",
+                "noted",
+                "continued",
+                "went on",
+                "added",
+                "commented",
+                "remarked",
+            ],
             "asked": ["inquired", "questioned", "wondered", "queried"],
             "replied": ["responded", "answered", "returned", "countered"],
             "answered": ["responded", "replied", "explained", "elaborated"],
@@ -82,7 +93,7 @@ class ContentEnhancer:
             "snapped": ["barked", "bit out", "shot back"],
         }
 
-    def validate_sub_beats(self, sub_beats: List[str], chapter_summary: str) -> SubBeatValidation:
+    def validate_sub_beats(self, sub_beats: list[str], chapter_summary: str) -> SubBeatValidation:
         """
         Validate that sub-beats are coherent and comprehensive.
 
@@ -99,7 +110,7 @@ class ContentEnhancer:
                 coherence_score=0.0,
                 comprehensiveness_score=0.0,
                 issues=["No sub-beats provided"],
-                suggestions=["Add sub-beats to define chapter structure"]
+                suggestions=["Add sub-beats to define chapter structure"],
             )
 
         issues = []
@@ -118,10 +129,10 @@ class ContentEnhancer:
         beat_words = set()
         for beat in sub_beats:
             beat_words.update(beat.lower().split())
-        
+
         coverage = len(summary_words & beat_words) / len(summary_words) if summary_words else 0
         comprehensiveness_score = coverage
-        
+
         if coverage < 0.6:
             issues.append(f"Sub-beats cover only {coverage:.0%} of chapter summary elements")
             suggestions.append("Ensure sub-beats collectively address all key events in summary")
@@ -130,7 +141,9 @@ class ContentEnhancer:
         too_vague = [b for b in sub_beats if len(b.split()) < 3]
         if too_vague:
             issues.append(f"{len(too_vague)} sub-beat(s) are too vague")
-            suggestions.append("Add more detail to vague sub-beats (e.g., specify actions, emotions, settings)")
+            suggestions.append(
+                "Add more detail to vague sub-beats (e.g., specify actions, emotions, settings)"
+            )
 
         # Check 4: Avoid redundancy
         unique_beats = set(b.lower() for b in sub_beats)
@@ -145,7 +158,9 @@ class ContentEnhancer:
 
         if progression_score < 0.5:
             issues.append("Sub-beats don't show clear progression")
-            suggestions.append("Ensure sub-beats move the story forward with clear cause-and-effect")
+            suggestions.append(
+                "Ensure sub-beats move the story forward with clear cause-and-effect"
+            )
 
         is_valid = coherence_score >= 0.6 and comprehensiveness_score >= 0.6
 
@@ -154,10 +169,10 @@ class ContentEnhancer:
             coherence_score=coherence_score,
             comprehensiveness_score=comprehensiveness_score,
             issues=issues,
-            suggestions=suggestions
+            suggestions=suggestions,
         )
 
-    def _check_sub_beat_flow(self, sub_beats: List[str]) -> float:
+    def _check_sub_beat_flow(self, sub_beats: list[str]) -> float:
         """Check how well sub-beats flow into each other."""
         if len(sub_beats) < 2:
             return 1.0
@@ -170,18 +185,21 @@ class ContentEnhancer:
             next_beat = sub_beats[i + 1].lower()
 
             # Good transition indicators
-            transition_words = ['then', 'next', 'after', 'following', 'before', 'when']
+            transition_words = ["then", "next", "after", "following", "before", "when"]
             has_transition = any(
-                current.endswith(tw) or next_beat.startswith(tw)
-                for tw in transition_words
+                current.endswith(tw) or next_beat.startswith(tw) for tw in transition_words
             )
 
             # Check for contradiction
-            contradiction_words = [('not', 'never'), ('cannot', 'can'), ('didn\'t', 'did'),
-                             ('doesn\'t', 'does'), ('won\'t', 'will')]
+            contradiction_words = [
+                ("not", "never"),
+                ("cannot", "can"),
+                ("didn't", "did"),
+                ("doesn't", "does"),
+                ("won't", "will"),
+            ]
             has_contradiction = any(
-                neg1 in current and neg2 in next_beat
-                for neg1, neg2 in contradiction_words
+                neg1 in current and neg2 in next_beat for neg1, neg2 in contradiction_words
             )
 
             if has_transition and not has_contradiction:
@@ -193,7 +211,7 @@ class ContentEnhancer:
 
         return flow_score / transitions if transitions > 0 else 1.0
 
-    def _check_logical_progression(self, sub_beats: List[str]) -> float:
+    def _check_logical_progression(self, sub_beats: list[str]) -> float:
         """Check if sub-beats show logical story progression."""
         if not sub_beats:
             return 0.0
@@ -217,8 +235,7 @@ class ContentEnhancer:
 
         return progression_score
 
-    def predict_word_count(self, sub_beats: List[str], 
-                          words_per_sub_beat: int = 150) -> Dict:
+    def predict_word_count(self, sub_beats: list[str], words_per_sub_beat: int = 150) -> dict:
         """
         Predict word count from sub-beat count.
 
@@ -232,8 +249,10 @@ class ContentEnhancer:
         base_count = len(sub_beats) * words_per_sub_beat
 
         # Adjust based on sub-beat complexity
-        avg_beat_length = sum(len(b.split()) for b in sub_beats) / len(sub_beats) if sub_beats else 0
-        
+        avg_beat_length = (
+            sum(len(b.split()) for b in sub_beats) / len(sub_beats) if sub_beats else 0
+        )
+
         complexity_multiplier = 1.0
         if avg_beat_length > 8:
             complexity_multiplier = 1.3  # More complex beats need more words
@@ -248,15 +267,16 @@ class ContentEnhancer:
         confidence = min(0.95, 0.7 + (len(sub_beats) / 50))
 
         return {
-            'predicted_words': predicted_count,
-            'confidence': confidence,
-            'sub_beat_count': len(sub_beats),
-            'words_per_sub_beat': words_per_sub_beat,
-            'complexity_multiplier': complexity_multiplier
+            "predicted_words": predicted_count,
+            "confidence": confidence,
+            "sub_beat_count": len(sub_beats),
+            "words_per_sub_beat": words_per_sub_beat,
+            "complexity_multiplier": complexity_multiplier,
         }
 
-    def generate_chapter_hooks(self, chapter_summary: str, 
-                             next_chapter_summary: str = "") -> Dict[str, str]:
+    def generate_chapter_hooks(
+        self, chapter_summary: str, next_chapter_summary: str = ""
+    ) -> dict[str, str]:
         """
         Generate hooks that connect current chapter to the next.
 
@@ -270,24 +290,23 @@ class ContentEnhancer:
         hooks = {}
 
         # Hook type 1: Narrative hook (unresolved situation)
-        hooks['narrative'] = self._generate_narrative_hook(chapter_summary, next_chapter_summary)
+        hooks["narrative"] = self._generate_narrative_hook(chapter_summary, next_chapter_summary)
 
         # Hook type 2: Emotional hook (character in emotional state)
-        hooks['emotional'] = self._generate_emotional_hook(chapter_summary)
+        hooks["emotional"] = self._generate_emotional_hook(chapter_summary)
 
         # Hook type 3: Mystery hook (question or revelation)
-        hooks['mystery'] = self._generate_mystery_hook(chapter_summary)
+        hooks["mystery"] = self._generate_mystery_hook(chapter_summary)
 
         # Hook type 4: Action hook (immediate consequence)
-        hooks['action'] = self._generate_action_hook(chapter_summary, next_chapter_summary)
+        hooks["action"] = self._generate_action_hook(chapter_summary, next_chapter_summary)
 
         # Hook type 5: Character hook (character's decision/realization)
-        hooks['character'] = self._generate_character_hook(chapter_summary)
+        hooks["character"] = self._generate_character_hook(chapter_summary)
 
         return hooks
 
-    def _generate_narrative_hook(self, chapter_summary: str,
-                                   next_chapter_summary: str = "") -> str:
+    def _generate_narrative_hook(self, chapter_summary: str, next_chapter_summary: str = "") -> str:
         """Generate a narrative continuity hook."""
         if next_chapter_summary:
             return f"""
@@ -319,8 +338,7 @@ Options:
 - An unexpected connection between seemingly unrelated elements
 """
 
-    def _generate_action_hook(self, chapter_summary: str,
-                               next_chapter_summary: str = "") -> str:
+    def _generate_action_hook(self, chapter_summary: str, next_chapter_summary: str = "") -> str:
         """Generate an action-oriented hook."""
         if next_chapter_summary:
             return f"""
@@ -365,7 +383,7 @@ Consider:
                 total_dialogue_lines=0,
                 variety_score=0.0,
                 overused_tags=[],
-                suggestions=["No dialogue tags found - consider adding some for clarity"]
+                suggestions=["No dialogue tags found - consider adding some for clarity"],
             )
 
         tag_counts = Counter(tag for _, tag in matches)
@@ -383,7 +401,7 @@ Consider:
 
         # Generate suggestions
         suggestions = []
-        
+
         if variety_score < 0.4:
             suggestions.append(
                 f"Dialogue tag variety is low ({unique_tags} unique tags for {total_lines} lines). "
@@ -413,7 +431,7 @@ Consider:
             total_dialogue_lines=total_lines,
             variety_score=variety_score,
             overused_tags=overused_tags,
-            suggestions=suggestions
+            suggestions=suggestions,
         )
 
     def analyze_sentence_variety_detailed(self, content_text: str) -> SentenceVarietyAnalysis:
@@ -427,7 +445,7 @@ Consider:
             SentenceVarietyAnalysis with detailed metrics
         """
         # Split into sentences
-        sentences = re.split(r'[.!?]+', content_text)
+        sentences = re.split(r"[.!?]+", content_text)
         sentences = [s.strip() for s in sentences if s.strip()]
 
         if not sentences:
@@ -439,49 +457,40 @@ Consider:
                 length_distribution={},
                 variety_score=0.0,
                 patterns=[],
-                suggestions=["No sentences to analyze"]
+                suggestions=["No sentences to analyze"],
             )
 
         # Calculate lengths
         sentence_lengths = [len(s.split()) for s in sentences]
-        
+
         # Statistics
         avg_length = sum(sentence_lengths) / len(sentence_lengths)
         sorted_lengths = sorted(sentence_lengths)
         median_length = sorted_lengths[len(sorted_lengths) // 2]
-        
+
         # Standard deviation
         variance = sum((l - avg_length) ** 2 for l in sentence_lengths) / len(sentence_lengths)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         # Length distribution
         distribution = {
-            'short': sum(1 for l in sentence_lengths if l < 10),
-            'medium': sum(1 for l in sentence_lengths if 10 <= l < 25),
-            'long': sum(1 for l in sentence_lengths if 25 <= l < 40),
-            'very_long': sum(1 for l in sentence_lengths if l >= 40)
+            "short": sum(1 for l in sentence_lengths if l < 10),
+            "medium": sum(1 for l in sentence_lengths if 10 <= l < 25),
+            "long": sum(1 for l in sentence_lengths if 25 <= l < 40),
+            "very_long": sum(1 for l in sentence_lengths if l >= 40),
         }
 
         # Variety score (0-1)
         # Ideal: 25% short, 45% medium, 20% long, 10% very_long
         total = len(sentence_lengths)
         if total > 0:
-            ideal = {
-                'short': 0.25,
-                'medium': 0.45,
-                'long': 0.20,
-                'very_long': 0.10
-            }
-            
-            actual_ratios = {
-                k: v / total for k, v in distribution.items()
-            }
-            
+            ideal = {"short": 0.25, "medium": 0.45, "long": 0.20, "very_long": 0.10}
+
+            actual_ratios = {k: v / total for k, v in distribution.items()}
+
             # Calculate deviation from ideal
-            deviation = sum(
-                abs(actual_ratios[k] - ideal[k]) for k in ideal.keys()
-            )
-            
+            deviation = sum(abs(actual_ratios[k] - ideal[k]) for k in ideal)
+
             variety_score = max(0, 1.0 - deviation * 2)
         else:
             variety_score = 0.0
@@ -493,7 +502,7 @@ Consider:
 
         # Generate suggestions
         suggestions = []
-        
+
         if variety_score < 0.5:
             suggestions.append(
                 "Sentence variety is low. Aim for mix of 25% short, 45% medium, "
@@ -501,20 +510,18 @@ Consider:
             )
 
         # Check distribution issues
-        if distribution['short'] / total > 0.40:
+        if distribution["short"] / total > 0.40:
             suggestions.append(
                 "Too many short sentences (<10 words). Combine some to create variety."
             )
-        
-        if distribution['very_long'] / total > 0.15:
+
+        if distribution["very_long"] / total > 0.15:
             suggestions.append(
                 "Too many very long sentences (40+ words). Break some up for readability."
             )
 
         if std_dev < 5:
-            suggestions.append(
-                "Sentence lengths are too uniform. Vary them more for better flow."
-            )
+            suggestions.append("Sentence lengths are too uniform. Vary them more for better flow.")
 
         if patterns:
             suggestions.append(
@@ -530,21 +537,21 @@ Consider:
             length_distribution=distribution,
             variety_score=variety_score,
             patterns=patterns,
-            suggestions=suggestions
+            suggestions=suggestions,
         )
 
-    def _detect_repeated_structures(self, sentences: List[str]) -> List[str]:
+    def _detect_repeated_structures(self, sentences: list[str]) -> list[str]:
         """Detect repeated sentence structures."""
         structures = []
-        
+
         for sentence in sentences:
             words = sentence.lower().split()
             if len(words) < 3:
                 continue
-            
+
             # Simple structure: subject-verb pattern
             if len(words) >= 3 and len(words) <= 8:
-                structure = ' '.join([words[0], words[1]])
+                structure = " ".join([words[0], words[1]])
                 structures.append(structure)
 
         # Find repeats
@@ -557,14 +564,14 @@ Consider:
 
         return repeated[:5]  # Return top 5
 
-    def _detect_sentence_start_patterns(self, sentences: List[str]) -> List[str]:
+    def _detect_sentence_start_patterns(self, sentences: list[str]) -> list[str]:
         """Detect repeated sentence starting patterns."""
         starts = []
-        
+
         for sentence in sentences:
             words = sentence.split()
             if words:
-                first_two = ' '.join(words[:2]).lower()
+                first_two = " ".join(words[:2]).lower()
                 starts.append(first_two)
 
         start_counts = Counter(starts)
@@ -576,10 +583,13 @@ Consider:
 
         return repeated[:5]  # Return top 5
 
-    def generate_improvement_prompt(self, sub_beat_validation: SubBeatValidation | None = None,
-                                   word_count_prediction: Dict | None = None,
-                                   dialogue_analysis: DialogueTagAnalysis | None = None,
-                                   sentence_analysis: SentenceVarietyAnalysis | None = None) -> str:
+    def generate_improvement_prompt(
+        self,
+        sub_beat_validation: SubBeatValidation | None = None,
+        word_count_prediction: dict | None = None,
+        dialogue_analysis: DialogueTagAnalysis | None = None,
+        sentence_analysis: SentenceVarietyAnalysis | None = None,
+    ) -> str:
         """
         Generate a comprehensive improvement prompt for LLM.
 
@@ -605,12 +615,12 @@ Consider:
                     prompt_parts.append(f"  - {suggestion}")
 
         if word_count_prediction:
-            prompt_parts.append(f"\n### Word Count Prediction:")
+            prompt_parts.append("\n### Word Count Prediction:")
             prompt_parts.append(
                 f"Predicted: {word_count_prediction['predicted_words']} words "
                 f"(confidence: {word_count_prediction['confidence']:.0%})"
             )
-            if word_count_prediction['predicted_words'] < 2000:
+            if word_count_prediction["predicted_words"] < 2000:
                 prompt_parts.append("  Consider expanding to reach minimum word count.")
 
         if dialogue_analysis and dialogue_analysis.suggestions:
@@ -625,8 +635,7 @@ Consider:
 
         return "\n".join(prompt_parts)
 
-    def get_quick_suggestions(self, content_text: str, 
-                               chapter_summary: str = "") -> List[str]:
+    def get_quick_suggestions(self, content_text: str, chapter_summary: str = "") -> list[str]:
         """
         Get quick improvement suggestions for content.
 
@@ -650,11 +659,11 @@ Consider:
             suggestions.extend(sentence_analysis.suggestions[:2])
 
         # Check for repeated words
-        words = re.findall(r'\b\w+\b', content_text.lower())
+        words = re.findall(r"\b\w+\b", content_text.lower())
         word_counts = Counter(words)
         repeated_words = [(w, c) for w, c in word_counts.items() if c > 5 and len(w) > 4]
         repeated_words.sort(key=lambda x: x[1], reverse=True)
-        
+
         if repeated_words:
             top_repeat = repeated_words[0]
             suggestions.append(

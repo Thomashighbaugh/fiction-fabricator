@@ -1,13 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 novel.py - Contains the specific logic for generating a novel outline.
 """
 import xml.etree.ElementTree as ET
+
 from rich.panel import Panel
 
+from src import ui
 from src.llm_client import LLMClient
 from src.project import Project
-from src import ui
+
 
 def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: str = ""):
     """
@@ -18,7 +19,7 @@ def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: 
 
     # Get required info from the user
     num_chapters = ui.prompt_for_chapter_count()
-    
+
     current_book_xml_for_prompt = ET.tostring(project.book_root, encoding="unicode")
 
     prompt = f"""
@@ -74,7 +75,9 @@ Output the complete `<book>` XML structure with condensed initial_idea, story_el
     response_xml_str = llm_client.get_response(prompt, "Generating full novel outline")
 
     if not response_xml_str:
-        ui.console.print("[bold red]Failed to get a valid response from the LLM for the outline.[/bold red]")
+        ui.console.print(
+            "[bold red]Failed to get a valid response from the LLM for the outline.[/bold red]"
+        )
         return None
 
     # The orchestrator will handle parsing and validation

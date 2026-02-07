@@ -1,13 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 short_story.py - Contains the specific logic for generating a short story outline.
 """
 import xml.etree.ElementTree as ET
+
 from rich.panel import Panel
 
+from src import ui
 from src.llm_client import LLMClient
 from src.project import Project
-from src import ui
+
 
 def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: str = ""):
     """
@@ -17,8 +18,8 @@ def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: 
     ui.console.print(Panel("Generating Short Story Outline", style="bold blue"))
 
     # For a short story, we'll aim for a fixed number of scenes (e.g., 3-5)
-    num_scenes = 5 
-    
+    num_scenes = 5
+
     current_book_xml_for_prompt = ET.tostring(project.book_root, encoding="unicode")
 
     prompt = f"""
@@ -66,9 +67,10 @@ Output ONLY the complete `<book>` XML structure, merging the generated details. 
     response_xml_str = llm_client.get_response(prompt, "Generating short story outline")
 
     if not response_xml_str:
-        ui.console.print("[bold red]Failed to get a valid response from the LLM for the outline.[/bold red]")
+        ui.console.print(
+            "[bold red]Failed to get a valid response from the LLM for the outline.[/bold red]"
+        )
         return None
 
     # The orchestrator will handle parsing and validation
     return response_xml_str
-
