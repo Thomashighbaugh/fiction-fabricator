@@ -429,7 +429,7 @@ Output ONLY a JSON object in the format:
         # Don't clear chapters_generated_in_session for resumed projects - it was restored during loading
 
         while True:
-            chapters_to_generate = self._select_chapters_to_generate(batch_size=5)
+            chapters_to_generate = self._select_chapters_to_generate(batch_size=1)
             if not chapters_to_generate:
                 self.console.print(
                     "[bold green]\nAll chapters/scenes appear to have content![/bold green]"
@@ -472,7 +472,7 @@ Output ONLY an XML `<patch>` containing a `<chapter>` for each requested ID. Eac
 
 Full Book Context:
 ```xml
-{ET.tostring(self.project.book_root, encoding='unicode')}
+{ET.tostring(self.project.book_root, encoding="unicode")}
 ```
 """
             patch_xml = self.llm.get_response(prompt, f"Writing chapters {ids_str}")
@@ -487,7 +487,7 @@ Full Book Context:
                 if not Confirm.ask("[yellow]Continue to the next batch?[/yellow]", default=True):
                     break
 
-    def _select_chapters_to_generate(self, batch_size=5) -> list:
+    def _select_chapters_to_generate(self, batch_size=2) -> list:
         """Selects the next batch of chapters to write using a fill-gaps strategy."""
         all_chapters = sorted(
             self.project.book_root.findall(".//chapter"),
@@ -879,7 +879,7 @@ Output an XML `<patch>` with the rewritten `<chapter>` content. Make sure to inc
 
 Full Book Context:
 ```xml
-{ET.tostring(temp_root, encoding='unicode')}
+{ET.tostring(temp_root, encoding="unicode")}
 ```
 """
         patch_xml = self.llm.get_response(prompt, f"Rewriting chapter {chapter_id}")
@@ -896,7 +896,7 @@ You are an expert editor. Analyze the manuscript below and provide a numbered li
 
 Full Book Context:
 ```xml
-{ET.tostring(self.project.book_root, encoding='unicode')}
+{ET.tostring(self.project.book_root, encoding="unicode")}
 ```
 """
         suggestions_text = self.llm.get_response(
