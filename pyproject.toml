@@ -5,10 +5,88 @@ description = "An AI-powered tool for generating novels and short stories with o
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "bullet>=2.2.0",
-    "ebooklib>=0.18",
-    "google-generativeai>=0.8.4",
-    "lxml>=5.3.2",
-    "python-dotenv>=1.1.0",
-    "rich>=14.0.0",
+    "aiofiles>=24.1.0",
+    "bullet==2.2.0",
+    "ebooklib==0.19",
+    "google-generativeai==0.8.5",
+    "lxml==6.0.1",
+    "openai==2.11.0",
+    "python-dotenv==1.1.1",
+    "rich==14.1.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "black==25.1.0",
+    "isort==6.0.0",
+    "pre-commit==4.0.1",
+    "pytest==8.3.5",
+    "pytest-asyncio==0.25.2",
+    "pytest-cov==6.0.0",
+    "ruff>=0.8.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.git
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+known_first_party = ["src"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # function call in argument defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__.py
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--verbose --cov=src --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/test/*", "*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+

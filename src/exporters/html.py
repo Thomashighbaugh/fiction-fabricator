@@ -3,22 +3,25 @@
 html.py - Handles exporting the project to HTML format.
 """
 import xml.etree.ElementTree as ET
-from pathlib import Path
-from html import escape
 from datetime import datetime
+from html import escape
+from pathlib import Path
 
 from rich.console import Console
 
 from src import utils
 
-def _generate_css_with_font(custom_font_name: str | None = None, custom_font_url: str | None = None) -> str:
+
+def _generate_css_with_font(
+    custom_font_name: str | None = None, custom_font_url: str | None = None
+) -> str:
     """Generate CSS with custom font applied to headings."""
     # Base font for body text
     body_font = "Georgia, 'Times New Roman', serif"
-    
+
     # Chapter heading font
     heading_font = f"'{custom_font_name}', {body_font}" if custom_font_name else body_font
-    
+
     return f"""
 body {{
     font-family: {body_font};
@@ -148,6 +151,7 @@ body {{
 }}
 """
 
+
 # --- Default CSS for the HTML export ---
 DEFAULT_CSS = """
 body {
@@ -252,6 +256,7 @@ body {
 }
 """
 
+
 def _get_sorted_chapters(book_root: ET.Element) -> list[ET.Element]:
     """Helper to get chapters sorted numerically by ID."""
     if book_root is None:
@@ -262,7 +267,14 @@ def _get_sorted_chapters(book_root: ET.Element) -> list[ET.Element]:
     except ValueError:
         return chapters_raw  # Fallback to XML order if IDs are not integers
 
-def export_single_html(book_root: ET.Element, output_path: Path, console: Console, custom_font_name: str | None = None, custom_font_url: str | None = None):
+
+def export_single_html(
+    book_root: ET.Element,
+    output_path: Path,
+    console: Console,
+    custom_font_name: str | None = None,
+    custom_font_url: str | None = None,
+) -> None:
     """Exports the entire book content to a single HTML file."""
     if book_root is None:
         console.print("[red]Error: Book data is missing, cannot export.[/red]")
@@ -271,16 +283,17 @@ def export_single_html(book_root: ET.Element, output_path: Path, console: Consol
     try:
         html_parts = []
         title = book_root.findtext("title", "Untitled Book")
-        
+
         # Generate CSS with custom font
         css_content = _generate_css_with_font(custom_font_name, custom_font_url)
-        
+
         # Generate font imports
         font_imports = ""
         if custom_font_url:
             font_imports = f'    <link href="{custom_font_url}" rel="stylesheet">\n'
-        
-        html_parts.append(f"""<!DOCTYPE html>
+
+        html_parts.append(
+            f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -308,7 +321,8 @@ def export_single_html(book_root: ET.Element, output_path: Path, console: Consol
         }}
     </style>
 </head>
-<body>""")
+<body>"""
+        )
 
         # Add frontmatter sections if they exist and have content
         frontmatter = book_root.find("frontmatter")
@@ -317,71 +331,77 @@ def export_single_html(book_root: ET.Element, output_path: Path, console: Consol
             title_page = frontmatter.findtext("title_page")
             if title_page and title_page.strip():
                 html_parts.append('<div class="frontmatter-section title-page">')
-                lines = title_page.strip().split('\n')
+                lines = title_page.strip().split("\n")
                 if len(lines) >= 1:
-                    html_parts.append(f'<h1>{escape(lines[0].strip())}</h1>')
+                    html_parts.append(f"<h1>{escape(lines[0].strip())}</h1>")
                 if len(lines) >= 2:
-                    html_parts.append(f'<h2>{escape(lines[1].strip())}</h2>')
+                    html_parts.append(f"<h2>{escape(lines[1].strip())}</h2>")
                 if len(lines) > 2:
                     # Handle any additional lines as regular text
                     for line in lines[2:]:
                         if line.strip():
-                            html_parts.append(f'<div>{escape(line.strip())}</div>')
-                html_parts.append('</div>')
-            
+                            html_parts.append(f"<div>{escape(line.strip())}</div>")
+                html_parts.append("</div>")
+
             # Copyright Page
             copyright_page = frontmatter.findtext("copyright_page")
             if copyright_page and copyright_page.strip():
                 html_parts.append('<div class="frontmatter-section copyright-page">')
-                html_parts.append(f'<div>{escape(copyright_page.strip()).replace(chr(10), "<br>")}</div>')
-                html_parts.append('</div>')
-            
+                html_parts.append(
+                    f'<div>{escape(copyright_page.strip()).replace(chr(10), "<br>")}</div>'
+                )
+                html_parts.append("</div>")
+
             # Dedication
             dedication = frontmatter.findtext("dedication")
             if dedication and dedication.strip():
                 html_parts.append('<div class="frontmatter-section">')
-                html_parts.append('<h2>Dedication</h2>')
-                html_parts.append(f'<div>{escape(dedication.strip()).replace(chr(10), "<br>")}</div>')
-                html_parts.append('</div>')
-            
+                html_parts.append("<h2>Dedication</h2>")
+                html_parts.append(
+                    f'<div>{escape(dedication.strip()).replace(chr(10), "<br>")}</div>'
+                )
+                html_parts.append("</div>")
+
             # Acknowledgements
             acknowledgements = frontmatter.findtext("acknowledgements")
             if acknowledgements and acknowledgements.strip():
                 html_parts.append('<div class="frontmatter-section">')
-                html_parts.append('<h2>Acknowledgements</h2>')
-                html_parts.append(f'<div>{escape(acknowledgements.strip()).replace(chr(10), "<br>")}</div>')
-                html_parts.append('</div>')
+                html_parts.append("<h2>Acknowledgements</h2>")
+                html_parts.append(
+                    f'<div>{escape(acknowledgements.strip()).replace(chr(10), "<br>")}</div>'
+                )
+                html_parts.append("</div>")
 
         # Book header (only if no custom title page was provided)
         has_custom_title_page = False
         if frontmatter is not None:
             title_page_text = frontmatter.findtext("title_page")
             has_custom_title_page = title_page_text and title_page_text.strip()
-        
+
         if not has_custom_title_page:
             html_parts.append('<div class="book-header">')
             html_parts.append(f'<h1 class="book-title">{escape(title)}</h1>')
-            
+
             synopsis = book_root.findtext("synopsis")
             if synopsis:
                 html_parts.append(f'<div class="book-synopsis">{escape(synopsis.strip())}</div>')
-            
-            html_parts.append('</div>')
+
+            html_parts.append("</div>")
         else:
             # Add synopsis separately if we have a custom title page
             synopsis = book_root.findtext("synopsis")
             if synopsis:
                 html_parts.append('<div class="frontmatter-section">')
-                html_parts.append('<h2>Synopsis</h2>')
+                html_parts.append("<h2>Synopsis</h2>")
                 html_parts.append(f'<div class="book-synopsis">{escape(synopsis.strip())}</div>')
-                html_parts.append('</div>')
+                html_parts.append("</div>")
 
         # Chapters
         chapters = _get_sorted_chapters(book_root)
         for chap in chapters:
             chap_num = chap.findtext("number", chap.get("id", "N/A"))
             chap_title = chap.findtext("title", "Untitled Chapter")
-            
+
             html_parts.append('<div class="chapter">')
             html_parts.append(f'<h2 class="chapter-number">Chapter {escape(chap_num)}</h2>')
             html_parts.append(f'<h3 class="chapter-title">{escape(chap_title)}</h3>')
@@ -394,35 +414,49 @@ def export_single_html(book_root: ET.Element, output_path: Path, console: Consol
                     for para in paragraphs:
                         para_text = (para.text or "").strip()
                         if para_text:
-                            html_parts.append(f'<p>{escape(para_text)}</p>')
+                            html_parts.append(f"<p>{escape(para_text)}</p>")
                 else:
-                    html_parts.append('<div class="missing-content">[Chapter content missing]</div>')
+                    html_parts.append(
+                        '<div class="missing-content">[Chapter content missing]</div>'
+                    )
             else:
                 html_parts.append('<div class="missing-content">[Chapter content missing]</div>')
-            
-            html_parts.append('</div>')
-            html_parts.append('</div>')
+
+            html_parts.append("</div>")
+            html_parts.append("</div>")
 
         # Export info
         export_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        html_parts.append(f'''<div class="export-info">
+        html_parts.append(
+            f"""<div class="export-info">
             <p>Exported by Fiction Fabricator on {export_time}</p>
-        </div>''')
+        </div>"""
+        )
 
         # Close HTML
-        html_parts.append('</body>\n</html>')
+        html_parts.append("</body>\n</html>")
 
         # Write file
-        full_html = '\n'.join(html_parts)
+        full_html = "\n".join(html_parts)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(full_html)
-        
-        console.print(f"[green]Successfully exported HTML file to:[/green] [cyan]{output_path.resolve()}[/cyan]")
+
+        console.print(
+            f"[green]Successfully exported HTML file to:[/green] [cyan]{output_path.resolve()}[/cyan]"
+        )
     except Exception as e:
         console.print(f"[bold red]Error exporting HTML file: {e}[/bold red]")
 
-def export_html_per_chapter(book_root: ET.Element, output_parent_dir: Path, book_title_slug: str, console: Console, custom_font_name: str | None = None, custom_font_url: str | None = None):
+
+def export_html_per_chapter(
+    book_root: ET.Element,
+    output_parent_dir: Path,
+    book_title_slug: str,
+    console: Console,
+    custom_font_name: str | None = None,
+    custom_font_url: str | None = None,
+) -> None:
     """Exports each chapter to its own HTML file within a dedicated directory."""
     if book_root is None:
         console.print("[red]Error: Book data is missing, cannot export.[/red]")
@@ -441,15 +475,16 @@ def export_html_per_chapter(book_root: ET.Element, output_parent_dir: Path, book
 
         # Generate CSS with custom font
         css_content = _generate_css_with_font(custom_font_name, custom_font_url)
-        
+
         # Generate font imports
         font_imports = ""
         if custom_font_url:
             font_imports = f'    <link href="{custom_font_url}" rel="stylesheet">\n'
-        
+
         # Create an index file
         index_parts = []
-        index_parts.append(f"""<!DOCTYPE html>
+        index_parts.append(
+            f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -468,7 +503,8 @@ def export_html_per_chapter(book_root: ET.Element, output_parent_dir: Path, book
         <h1 class="book-title">{escape(title)}</h1>
         <h2>Table of Contents</h2>
     </div>
-    <ul class="toc-list">""")
+    <ul class="toc-list">"""
+        )
 
         for chap in chapters:
             chap_num_str = chap.findtext("number", chap.get("id", "0"))
@@ -481,13 +517,16 @@ def export_html_per_chapter(book_root: ET.Element, output_parent_dir: Path, book
                 filename = f"{chap_num_str}-{chap_title_slug}.html"
 
             # Add to index
-            index_parts.append(f'        <li class="toc-item"><a href="{filename}" class="toc-link">Chapter {escape(chap_num_str)}: {escape(chap_title)}</a></li>')
+            index_parts.append(
+                f'        <li class="toc-item"><a href="{filename}" class="toc-link">Chapter {escape(chap_num_str)}: {escape(chap_title)}</a></li>'
+            )
 
             # Create individual chapter file
             chapter_file_path = export_dir / filename
             chapter_html = []
-            
-            chapter_html.append(f"""<!DOCTYPE html>
+
+            chapter_html.append(
+                f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -506,8 +545,9 @@ def export_html_per_chapter(book_root: ET.Element, output_parent_dir: Path, book
      <div class="chapter">
          <h2 class="chapter-number">Chapter {escape(chap_num_str)}</h2>
          <h3 class="chapter-title">{escape(chap_title)}</h3>
-         <div class="chapter-content">""")
-            
+         <div class="chapter-content">"""
+            )
+
             content = chap.find("content")
             if content is not None:
                 paragraphs = content.findall(".//paragraph")
@@ -515,30 +555,42 @@ def export_html_per_chapter(book_root: ET.Element, output_parent_dir: Path, book
                     for para in paragraphs:
                         para_text = (para.text or "").strip()
                         if para_text:
-                            chapter_html.append(f'            <p>{escape(para_text)}</p>')
+                            chapter_html.append(f"            <p>{escape(para_text)}</p>")
                 else:
-                    chapter_html.append('            <div class="missing-content">[Chapter content missing]</div>')
+                    chapter_html.append(
+                        '            <div class="missing-content">[Chapter content missing]</div>'
+                    )
             else:
-                chapter_html.append('            <div class="missing-content">[Chapter content missing]</div>')
-            
-            chapter_html.append("""        </div>
+                chapter_html.append(
+                    '            <div class="missing-content">[Chapter content missing]</div>'
+                )
+
+            chapter_html.append(
+                """        </div>
     </div>
 </body>
-</html>""")
-            
+</html>"""
+            )
+
             with open(chapter_file_path, "w", encoding="utf-8") as f:
-                f.write('\n'.join(chapter_html))
+                f.write("\n".join(chapter_html))
 
         # Finish index file
-        index_parts.append("""    </ul>
+        index_parts.append(
+            """    </ul>
 </body>
-</html>""")
-        
+</html>"""
+        )
+
         index_path = export_dir / "index.html"
         with open(index_path, "w", encoding="utf-8") as f:
-            f.write('\n'.join(index_parts))
-        
-        console.print(f"[green]Successfully exported {len(chapters)} HTML chapters with index.[/green]")
+            f.write("\n".join(index_parts))
+
+        console.print(
+            f"[green]Successfully exported {len(chapters)} HTML chapters with index.[/green]"
+        )
         console.print(f"[green]Open [cyan]{index_path.resolve()}[/cyan] to start reading.[/green]")
     except Exception as e:
-        console.print(f"[bold red]An unexpected error occurred during per-chapter HTML export: {e}[/bold red]")
+        console.print(
+            f"[bold red]An unexpected error occurred during per-chapter HTML export: {e}[/bold red]"
+        )

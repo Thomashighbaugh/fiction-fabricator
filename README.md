@@ -22,7 +22,7 @@ cd fiction-fabricator
 uv sync
 
 # 2. Configure API key in .env file
-echo "GEMINI_API_KEY=YOUR_KEY_HERE" > .env
+echo "NVIDIA_API_KEY=YOUR_KEY_HERE" > .env
 
 # 3. Run with interactive menu
 uv run python main.py
@@ -32,14 +32,17 @@ uv run python main.py --prompt your_idea.txt
 
 # Resume existing project
 uv run python main.py --resume projects/your-project-folder
+
+# Import character card
+uv run python main.py --character-card path/to/character.json
 ```
 
-Get your API key: https://aistudio.google.com/app/apikey
+Get your API key: https://build.nvidia.com/
 
 For detailed setup instructions, see [INSTALLATION.md](.github/documentation/INSTALLATION.md).
 
 ---
-
+
 ## Documentation
 
 | Documentation | Description |
@@ -47,7 +50,7 @@ For detailed setup instructions, see [INSTALLATION.md](.github/documentation/INS
 | [Overview](.github/documentation/OVERVIEW.md) | Project overview, capabilities, and use cases |
 | [Installation](.github/documentation/INSTALLATION.md) | Setup guide, requirements, and troubleshooting |
 | [Usage Guide](.github/documentation/USAGE.md) | Complete walkthrough of features and workflows |
-| [New Features](.github/documentation/NEW_FEATURES.md) | Recent additions and enhancements |
+| [New Features](.github/documentation/NEW_FEATURES.md) | Recent additions and advanced quality systems |
 | [Architecture](.github/documentation/ARCHITECTURE.md) | Technical design and XML-based state management |
 | [AI Agent Architecture](.github/documentation/AI_AGENT_ARCHITECTURE.md) | Multi-phase agentic design philosophy |
 | [Lorebook System](.github/documentation/LOREBOOK.md) | World-building and context management |

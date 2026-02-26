@@ -1,20 +1,21 @@
-# -*- coding: utf-8 -*-
 """
 utils.py - General-purpose helper functions for the Fiction Fabricator project.
 """
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from xml.dom import minidom
 from pathlib import Path
+from xml.dom import minidom
 
 from rich.console import Console
+
 
 def count_words(text: str) -> int:
     """Counts the number of words in a given string."""
     if not text or not text.strip():
         return 0
     return len(text.split())
+
 
 def slugify(value: str, allow_unicode: bool = False) -> str:
     """
@@ -29,16 +30,13 @@ def slugify(value: str, allow_unicode: bool = False) -> str:
     if allow_unicode:
         value = unicodedata.normalize("NFKC", value)
     else:
-        value = (
-            unicodedata.normalize("NFKD", value)
-            .encode("ascii", "ignore")
-            .decode("ascii")
-        )
+        value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"[^\w\s-]", "", value.lower())
     value = re.sub(r"[-\s]+", "-", value).strip("-_")
     # Limit length and ensure not empty
     slug = value[:50] or "untitled"
     return slug
+
 
 def pretty_xml(elem: ET.Element) -> str:
     """Returns a pretty-printed XML string for an ElementTree element."""
@@ -49,6 +47,7 @@ def pretty_xml(elem: ET.Element) -> str:
     except Exception:
         # Fallback to basic tostring if pretty-printing fails
         return ET.tostring(elem, encoding="unicode")
+
 
 def clean_llm_xml_output(xml_string: str) -> str:
     """
@@ -65,78 +64,92 @@ def clean_llm_xml_output(xml_string: str) -> str:
         # Remove markdown code fences
         cleaned = re.sub(r"^```xml\s*", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
         cleaned = re.sub(r"\s*```$", "", cleaned)
-        
+
         # Fix malformed attribute quotes with comprehensive patterns
         # Pattern 1: id="value\n" -> id="value"
         cleaned = re.sub(r'(\w+)="([^"]*?)\s*\n\s*"', r'\1="\2"', cleaned)
-        
+
         # Pattern 2: id="value\n"> -> id="value">
         cleaned = re.sub(r'(\w+)="([^"]*?)\s*\n\s*">', r'\1="\2">', cleaned)
-        
+
         # Pattern 3: id="value\nother_text" -> id="valueother_text" (no space for IDs)
-        cleaned = re.sub(r'(\w+)="([^"]*?)\n([^"]*?)"', lambda m: f'{m.group(1)}="{m.group(2)}{m.group(3)}"' if m.group(1) == 'id' else f'{m.group(1)}="{m.group(2)} {m.group(3)}"', cleaned)
-        
+        cleaned = re.sub(
+            r'(\w+)="([^"]*?)\n([^"]*?)"',
+            lambda m: (
+                f'{m.group(1)}="{m.group(2)}{m.group(3)}"'
+                if m.group(1) == "id"
+                else f'{m.group(1)}="{m.group(2)} {m.group(3)}"'
+            ),
+            cleaned,
+        )
+
         # Pattern 4: Fix cases where the newline is within the tag itself
         # Example: <paragraph id="2\n1"> -> <paragraph id="21">
-        cleaned = re.sub(r'(<\w+[^>]*?\s+\w+=")([^"]*?)\n([^"]*?)(")', r'\1\2\3\4', cleaned)
-        
+        cleaned = re.sub(r'(<\w+[^>]*?\s+\w+=")([^"]*?)\n([^"]*?)(")', r"\1\2\3\4", cleaned)
+
         # Pattern 5: Fix newlines breaking the opening tag
         # Example: <paragraph id="2\n1">content -> <paragraph id="21">content
-        cleaned = re.sub(r'(<\w+[^>]*?)\n([^<>]*?>)', r'\1\2', cleaned)
-        
+        cleaned = re.sub(r"(<\w+[^>]*?)\n([^<>]*?>)", r"\1\2", cleaned)
+
         # Fix unwanted line breaks within paragraph content with more comprehensive cleaning
         def fix_paragraph_content(match):
             full_para = match.group(0)
-            
+
             # First, fix any structural issues in the paragraph tag itself
             # Handle cases where attributes are split across lines
-            para_fixed = re.sub(r'(<paragraph[^>]*?)\n([^<>]*?>)', r'\1\2', full_para)
-            
+            para_fixed = re.sub(r"(<paragraph[^>]*?)\n([^<>]*?>)", r"\1\2", full_para)
+
             # Now fix content line breaks - be more aggressive
             # Replace line breaks that are NOT after sentence endings with spaces
-            content_pattern = r'>(.*?)<'
+            content_pattern = r">(.*?)<"
+
             def fix_content(content_match):
                 content = content_match.group(1)
                 # Replace newlines with spaces unless they follow sentence endings
                 # Keep breaks after: . ! ? " or if the next line starts with a capital (new sentence)
-                fixed_content = re.sub(r'(?<![.!?"\n])\n(?!\s*[A-Z"])', ' ', content)
+                fixed_content = re.sub(r'(?<![.!?"\n])\n(?!\s*[A-Z"])', " ", content)
                 # Clean up multiple spaces
-                fixed_content = re.sub(r'  +', ' ', fixed_content)
-                return f'>{fixed_content}<'
-            
+                fixed_content = re.sub(r"  +", " ", fixed_content)
+                return f">{fixed_content}<"
+
             para_fixed = re.sub(content_pattern, fix_content, para_fixed, flags=re.DOTALL)
             return para_fixed
-        
+
         # Apply the fix to all paragraph elements
-        cleaned = re.sub(r'<paragraph[^>]*>.*?</paragraph>', fix_paragraph_content, cleaned, flags=re.DOTALL)
-        
+        cleaned = re.sub(
+            r"<paragraph[^>]*>.*?</paragraph>", fix_paragraph_content, cleaned, flags=re.DOTALL
+        )
+
         # Additional patterns to fix specific XML formatting issues
-        
+
         # Fix cases where paragraph opening tags are broken across lines
         # Example: <paragraph id="2\n1"> -> <paragraph id="21">
-        cleaned = re.sub(r'<paragraph\s+id="([^"]*?)\n([^"]*?)">', r'<paragraph id="\1\2">', cleaned)
-        
+        cleaned = re.sub(
+            r'<paragraph\s+id="([^"]*?)\n([^"]*?)">', r'<paragraph id="\1\2">', cleaned
+        )
+
         # Fix any XML tag that has been split across lines
         # Pattern: <tag attr="val\nue"> -> <tag attr="value">
-        cleaned = re.sub(r'(<\w+[^>]*?="[^"]*?)\n([^"]*?"[^>]*?>)', r'\1\2', cleaned)
-        
+        cleaned = re.sub(r'(<\w+[^>]*?="[^"]*?)\n([^"]*?"[^>]*?>)', r"\1\2", cleaned)
+
         # Handle cases where the paragraph content starts on the next line after the tag
         # Pattern: <paragraph id="1">\nContent -> <paragraph id="1">Content
-        cleaned = re.sub(r'(<paragraph[^>]*>)\s*\n\s*([A-Z])', r'\1\2', cleaned)
-        
+        cleaned = re.sub(r"(<paragraph[^>]*>)\s*\n\s*([A-Z])", r"\1\2", cleaned)
+
         # Clean up multiple spaces that might result from the above fixes
-        cleaned = re.sub(r'  +', ' ', cleaned)
-        
+        cleaned = re.sub(r"  +", " ", cleaned)
+
         # Attempt to repair truncated XML for patches and book outlines
-        if cleaned.startswith('<patch>') and not cleaned.rstrip().endswith('</patch>'):
+        if cleaned.startswith("<patch>") and not cleaned.rstrip().endswith("</patch>"):
             # If the patch XML is truncated, try to repair it by closing open tags
             cleaned = _attempt_xml_repair(cleaned)
-        elif cleaned.startswith('<book>') and not cleaned.rstrip().endswith('</book>'):
+        elif cleaned.startswith("<book>") and not cleaned.rstrip().endswith("</book>"):
             # If the XML is truncated, try to repair it by closing open tags
             cleaned = _attempt_xml_repair(cleaned)
-        
+
         return cleaned
     return xml_string  # Return original if no tags found
+
 
 def _attempt_xml_repair(xml_string: str) -> str:
     """
@@ -144,11 +157,11 @@ def _attempt_xml_repair(xml_string: str) -> str:
     """
     # Track open tags using a simple stack
     import re
-    
+
     # Find all opening and closing tags
-    tag_pattern = r'<(/?)(\w+)(?:\s[^>]*)?>'
+    tag_pattern = r"<(/?)(\w+)(?:\s[^>]*)?>"
     matches = re.findall(tag_pattern, xml_string)
-    
+
     tag_stack = []
     for is_closing, tag_name in matches:
         if is_closing:  # Closing tag
@@ -156,21 +169,19 @@ def _attempt_xml_repair(xml_string: str) -> str:
                 tag_stack.pop()
         else:  # Opening tag
             # Skip self-closing tags or tags that don't need closing
-            if tag_name not in ['br', 'hr', 'img', 'input', 'meta', 'link']:
+            if tag_name not in ["br", "hr", "img", "input", "meta", "link"]:
                 tag_stack.append(tag_name)
-    
+
     # Close any remaining open tags in reverse order
     repaired = xml_string
     for tag in reversed(tag_stack):
-        repaired += f'</{tag}>'
-    
+        repaired += f"</{tag}>"
+
     return repaired
 
+
 def parse_xml_string(
-    xml_string: str,
-    console: Console,
-    expected_root_tag: str = "patch",
-    attempt_clean: bool = True
+    xml_string: str, console: Console, expected_root_tag: str = "patch", attempt_clean: bool = True
 ) -> ET.Element | None:
     """
     Safely parses an XML string, optionally cleaning it first.
@@ -190,18 +201,22 @@ def parse_xml_string(
         # Heuristic: If expecting a patch and it's missing the root tag, wrap it.
         if expected_root_tag == "patch" and not xml_string.strip().startswith("<patch>"):
             if "<chapter" in xml_string and "</chapter>" in xml_string:
-                console.print("[yellow]Warning: LLM output is missing root <patch> tag, attempting to wrap.[/yellow]")
+                console.print(
+                    "[yellow]Warning: LLM output is missing root <patch> tag, attempting to wrap.[/yellow]"
+                )
                 xml_string = f"<patch>{xml_string}</patch>"
 
         return ET.fromstring(xml_string)
     except ET.ParseError as e:
-        console.print(f"[bold red]Error parsing XML (expecting <{expected_root_tag}>):[/bold red] {e}")
+        console.print(
+            f"[bold red]Error parsing XML (expecting <{expected_root_tag}>):[/bold red] {e}"
+        )
         console.print("[yellow]Attempted to parse:[/yellow]")
-        
+
         # Show more context around the error for debugging
-        error_line = getattr(e, 'lineno', None)
+        error_line = getattr(e, "lineno", None)
         if error_line:
-            lines = xml_string.split('\n')
+            lines = xml_string.split("\n")
             start_line = max(0, error_line - 3)
             end_line = min(len(lines), error_line + 3)
             console.print("[dim]Context around error:[/dim]")
@@ -209,13 +224,19 @@ def parse_xml_string(
                 marker = ">>>" if i == error_line - 1 else "   "
                 console.print(f"[dim]{marker} {i+1:3d}: {lines[i]}[/dim]")
         else:
-            console.print(f"[dim]{xml_string[:2000]}{'...' if len(xml_string) > 2000 else ''}[/dim]")
-        
+            console.print(
+                f"[dim]{xml_string[:2000]}{'...' if len(xml_string) > 2000 else ''}[/dim]"
+            )
+
         # Try to detect if this is a truncation issue
-        if not xml_string.rstrip().endswith(f'</{expected_root_tag}>'):
-            console.print(f"[yellow]Warning: XML appears to be truncated (missing closing </{expected_root_tag}> tag)[/yellow]")
-            console.print("[yellow]This often indicates the LLM response was cut off due to token limits.[/yellow]")
-            
+        if not xml_string.rstrip().endswith(f"</{expected_root_tag}>"):
+            console.print(
+                f"[yellow]Warning: XML appears to be truncated (missing closing </{expected_root_tag}> tag)[/yellow]"
+            )
+            console.print(
+                "[yellow]This often indicates the LLM response was cut off due to token limits.[/yellow]"
+            )
+
             # Try to repair truncated XML automatically
             if expected_root_tag in ["patch", "book"]:
                 console.print("[yellow]Attempting to repair truncated XML...[/yellow]")
@@ -225,8 +246,9 @@ def parse_xml_string(
                         return ET.fromstring(repaired_xml)
                     except ET.ParseError:
                         console.print("[yellow]Automatic repair failed.[/yellow]")
-        
+
         return None
+
 
 def clean_paragraph_text(text: str) -> str:
     """
@@ -235,21 +257,22 @@ def clean_paragraph_text(text: str) -> str:
     """
     if not text:
         return text
-    
+
     # Remove markdown bold formatting (**text**)
-    cleaned = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+
     # Remove line breaks that are not after sentence endings or dialogue
     # Keep breaks after: . ! ? " and at the start/end of paragraphs
-    cleaned = re.sub(r'(?<![.!?"\n])\n(?=\s*[a-z])', ' ', cleaned)
-    
+    cleaned = re.sub(r'(?<![.!?"\n])\n(?=\s*[a-z])', " ", cleaned)
+
     # Clean up multiple spaces
-    cleaned = re.sub(r'  +', ' ', cleaned)
-    
+    cleaned = re.sub(r"  +", " ", cleaned)
+
     # Clean up trailing/leading whitespace while preserving intentional breaks
     cleaned = cleaned.strip()
-    
+
     return cleaned
+
 
 def get_chapter_id(chapter_element) -> str:
     """
@@ -258,12 +281,14 @@ def get_chapter_id(chapter_element) -> str:
     """
     return chapter_element.get("id") or chapter_element.findtext("id", "")
 
+
 def get_chapter_id_with_default(chapter_element, default="N/A") -> str:
     """
     Gets the chapter ID from either an attribute or child element.
     Returns the ID as a string, or the default value if not found.
     """
     return chapter_element.get("id") or chapter_element.findtext("id", default)
+
 
 def get_next_patch_number(book_dir: Path) -> int:
     """Finds the next available patch number based on existing files."""
@@ -281,33 +306,34 @@ def get_next_patch_number(book_dir: Path) -> int:
     except (IndexError, ValueError):
         return len(list(book_dir.glob("patch-*.xml"))) + 1
 
+
 def convert_tavern_lorebook_to_fiction_fabricator(tavern_lorebook_path: str) -> dict:
     """
     Converts a TavernAI/SillyTavern lorebook JSON file to Fiction Fabricator format.
-    
+
     Args:
         tavern_lorebook_path: Path to the TavernAI lorebook JSON file
-        
+
     Returns:
         dict: Fiction Fabricator compatible lorebook structure
-        
+
     Raises:
         FileNotFoundError: If the lorebook file doesn't exist
         ValueError: If the file is not valid JSON or doesn't contain expected structure
     """
     import json
-    
+
     try:
-        with open(tavern_lorebook_path, 'r', encoding='utf-8') as f:
+        with open(tavern_lorebook_path, encoding="utf-8") as f:
             tavern_data = json.load(f)
     except FileNotFoundError:
         raise FileNotFoundError(f"Lorebook file not found: {tavern_lorebook_path}")
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in lorebook file: {e}")
-    
+
     # Handle both old and new TavernAI formats
     entries_data = None
-    
+
     # Check for entries as an object (SillyTavern format)
     if "entries" in tavern_data and isinstance(tavern_data["entries"], dict):
         entries_data = tavern_data["entries"]
@@ -319,192 +345,194 @@ def convert_tavern_lorebook_to_fiction_fabricator(tavern_lorebook_path: str) -> 
         entries_data = tavern_data
     else:
         raise ValueError("Lorebook file does not contain expected 'entries' structure")
-    
+
     # Convert to Fiction Fabricator format
     converted_entries = []
-    
+
     for entry_id, entry in entries_data.items():
         # Skip disabled entries unless explicitly requested
         if not entry.get("enable", True):
             continue
-            
+
         # Extract keys - handle both string and array formats
         keys = entry.get("keys", [])
         if isinstance(keys, str):
             keys = [keys]
-        
+
         # Extract content
         content = entry.get("content", "").strip()
         if not content:
             continue  # Skip empty entries
-            
+
         # Extract optional fields
         comment = entry.get("comment", entry.get("name", ""))
-        
+
         # Create Fiction Fabricator entry
         ff_entry = {
             "keys": keys,
             "content": content,
             "comment": comment,
             "enable": True,  # We already filtered out disabled entries
-            "disable": False
+            "disable": False,
         }
-        
+
         converted_entries.append(ff_entry)
-    
+
     return {"entries": converted_entries}
+
 
 def extract_character_card_from_png(png_path: str) -> dict | None:
     """
     Extracts character card data from a PNG file (SillyTavern/TavernAI format).
-    
+
     Character cards are embedded in PNG files as base64-encoded JSON in the tEXt chunk.
-    
+
     Args:
         png_path: Path to the PNG file containing the character card
-        
+
     Returns:
         dict: Character card data, or None if extraction fails
     """
     import base64
     import json
-    from pathlib import Path
-    
+
     try:
-        with open(png_path, 'rb') as f:
+        with open(png_path, "rb") as f:
             # Read PNG signature
             signature = f.read(8)
-            if signature != b'\x89PNG\r\n\x1a\n':
+            if signature != b"\x89PNG\r\n\x1a\n":
                 return None
-            
+
             # Read chunks to find tEXt chunk with 'chara' key
             while True:
                 # Read chunk length (4 bytes)
                 length_bytes = f.read(4)
                 if len(length_bytes) < 4:
                     break
-                    
-                length = int.from_bytes(length_bytes, 'big')
-                
+
+                length = int.from_bytes(length_bytes, "big")
+
                 # Read chunk type (4 bytes)
                 chunk_type = f.read(4)
-                
+
                 # Read chunk data
                 chunk_data = f.read(length)
-                
+
                 # Read CRC (4 bytes)
                 f.read(4)
-                
+
                 # Check if this is a tEXt chunk with character data
-                if chunk_type == b'tEXt':
+                if chunk_type == b"tEXt":
                     # Split on null byte to separate keyword from data
-                    null_index = chunk_data.find(b'\x00')
+                    null_index = chunk_data.find(b"\x00")
                     if null_index != -1:
-                        keyword = chunk_data[:null_index].decode('latin-1')
-                        text_data = chunk_data[null_index + 1:]
-                        
-                        if keyword == 'chara':
+                        keyword = chunk_data[:null_index].decode("latin-1")
+                        text_data = chunk_data[null_index + 1 :]
+
+                        if keyword == "chara":
                             # Decode base64 and parse JSON
                             decoded = base64.b64decode(text_data)
                             character_data = json.loads(decoded)
                             return character_data
-                
+
                 # Stop at IEND chunk
-                if chunk_type == b'IEND':
+                if chunk_type == b"IEND":
                     break
-                    
-    except Exception as e:
+
+    except Exception:
         return None
-    
+
     return None
+
 
 def load_character_card(file_path: str) -> dict | None:
     """
     Loads a character card from either a JSON or PNG file.
-    
+
     Args:
         file_path: Path to character card file (.json or .png)
-        
+
     Returns:
         dict: Character card data, or None if loading fails
     """
     import json
     from pathlib import Path
-    
+
     path = Path(file_path)
-    
+
     if not path.exists():
         return None
-    
+
     # Try PNG first (check extension)
-    if path.suffix.lower() == '.png':
+    if path.suffix.lower() == ".png":
         return extract_character_card_from_png(str(path))
-    
+
     # Try JSON
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except (FileNotFoundError, PermissionError, json.JSONDecodeError, UnicodeDecodeError):
         return None
+
 
 def convert_character_card_to_premise(character_data: dict) -> str:
     """
     Converts a TavernAI/SillyTavern character card into a story premise.
-    
+
     Args:
         character_data: Character card data dictionary
-        
+
     Returns:
         str: A formatted story premise suitable for Fiction Fabricator
     """
     # Extract fields from character card
-    name = character_data.get('name', 'Unknown Character')
-    description = character_data.get('description', '')
-    personality = character_data.get('personality', '')
-    scenario = character_data.get('scenario', '')
-    first_mes = character_data.get('first_mes', '')
-    mes_example = character_data.get('mes_example', '')
-    
+    name = character_data.get("name", "Unknown Character")
+    description = character_data.get("description", "")
+    personality = character_data.get("personality", "")
+    scenario = character_data.get("scenario", "")
+    first_mes = character_data.get("first_mes", "")
+    mes_example = character_data.get("mes_example", "")
+
     # V2 spec fields
-    if 'data' in character_data:
-        v2_data = character_data['data']
-        name = v2_data.get('name', name)
-        description = v2_data.get('description', description)
-        personality = v2_data.get('personality', personality)
-        scenario = v2_data.get('scenario', scenario)
-        first_mes = v2_data.get('first_mes', first_mes)
-        mes_example = v2_data.get('mes_example', mes_example)
-    
+    if "data" in character_data:
+        v2_data = character_data["data"]
+        name = v2_data.get("name", name)
+        description = v2_data.get("description", description)
+        personality = v2_data.get("personality", personality)
+        scenario = v2_data.get("scenario", scenario)
+        first_mes = v2_data.get("first_mes", first_mes)
+        mes_example = v2_data.get("mes_example", mes_example)
+
     # Build the premise
     premise_parts = []
-    
+
     # Character introduction
     if name:
         premise_parts.append(f"# Character: {name}\n")
-    
+
     # Description
     if description:
         premise_parts.append(f"## Character Description\n{description}\n")
-    
+
     # Personality
     if personality:
         premise_parts.append(f"## Personality\n{personality}\n")
-    
+
     # Scenario/Setting
     if scenario:
         premise_parts.append(f"## Setting and Scenario\n{scenario}\n")
-    
+
     # Example dialogue/interactions (for character voice)
     if mes_example:
         # Clean up example messages (they often have <START> markers)
-        cleaned_examples = mes_example.replace('<START>', '').strip()
+        cleaned_examples = mes_example.replace("<START>", "").strip()
         if cleaned_examples:
             premise_parts.append(f"## Character Voice and Mannerisms\n{cleaned_examples}\n")
-    
+
     # Opening situation
     if first_mes:
         premise_parts.append(f"## Story Opening\n{first_mes}\n")
-    
+
     # Add guidance for story generation
     premise_parts.append(
         "\n## Story Generation Notes\n"
@@ -513,5 +541,5 @@ def convert_character_card_to_premise(character_data: dict) -> str:
         "actions, dialogue, and role in the narrative. Maintain consistency with the "
         "established character traits and setting throughout the story."
     )
-    
-    return '\n'.join(premise_parts)
+
+    return "\n".join(premise_parts)

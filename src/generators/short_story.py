@@ -1,13 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 short_story.py - Contains the specific logic for generating a short story outline.
 """
 import xml.etree.ElementTree as ET
+
 from rich.panel import Panel
 
+from src import ui
 from src.llm_client import LLMClient
 from src.project import Project
-from src import ui
+
 
 def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: str = ""):
     """
@@ -17,8 +18,8 @@ def generate_outline(llm_client: LLMClient, project: Project, lorebook_context: 
     ui.console.print(Panel("Generating Short Story Outline", style="bold blue"))
 
     # For a short story, we'll aim for a fixed number of scenes (e.g., 3-5)
-    num_scenes = 5 
-    
+    num_scenes = 5
+
     current_book_xml_for_prompt = ET.tostring(project.book_root, encoding="unicode")
 
     prompt = f"""
@@ -29,6 +30,20 @@ The current state of the project is:
 ```
 
 {lorebook_context}
+
+CRITICAL CHARACTER NAMING REQUIREMENTS - DO NOT IGNORE:
+- ABSOLUTELY FORBIDDEN: Generic placeholder names like "John Smith", "Jane Doe", "Bob Johnson", "Alice Brown", "Tom Wilson"
+- ABSOLUTELY FORBIDDEN: Overused fantasy clichés like "Stormbringer", "Shadowblade", "Nightwing", "Darkheart", "Bloodbane", "Steelhand"
+- ABSOLUTELY FORBIDDEN: Names ending in common fantasy suffixes like "-bringer", "-blade", "-heart", "-bane", "-born", "-fury", "-shadow"
+- ABSOLUTELY FORBIDDEN: Names starting with generic prefixes like "Dark-", "Shadow-", "Blood-", "Iron-", "Storm-", "Fire-", "Ice-"
+- AVOID: Naming multiple characters with names starting with the same letter or having similar sounds
+- MUST: Create unique, memorable, culturally appropriate names that feel authentic to the setting and tone
+- MUST: Ensure character names reflect their personality, background, culture, or role in the story
+- MUST: Use names that are pronounceable and easy to remember
+- MUST: Consider naming patterns that fit the world's culture/language
+- CRITICAL: If you find yourself using any of the forbidden name patterns above, STOP and generate completely different, original names
+
+REMEMBER: Generic, cliché, or "edgy" fantasy names instantly destroy reader immersion. Take time to craft meaningful, unique names.
 
 Based on the title, synopsis, and initial idea, please generate a complete outline for a short story:
 1. Keep the existing title and synopsis exactly as provided
@@ -41,18 +56,21 @@ Based on the title, synopsis, and initial idea, please generate a complete outli
 4. A `<chapters>` section containing exactly {num_scenes} `<chapter>` elements. Treat each chapter as a distinct 'Scene' of the short story.
    * Each scene/chapter needs a unique sequential string `id` (e.g., '1', '2', ...).
    * Each chapter opening tag must include a `setting` attribute with a brief description of the primary location/setting (e.g., <chapter id="1" setting="A dimly lit cafe on a rainy evening">)
-   * Include `<number>`, a descriptive `<title>` for the scene, and a detailed `<summary>` (100-150 words) outlining the key events of that scene.
+   * Include `<number>`, a descriptive `<title>` for the scene, a detailed `<summary>` (100-150 words) outlining the key events of that scene, and an EMPTY `<plot_beats>` tag.
    * The `<content>` tag for each scene/chapter must be present but EMPTY.
    * The summaries should follow a clear narrative structure (e.g., Beginning, Inciting Incident, Rising Action, Climax, Resolution) with settings that progress logically.
 
 Output ONLY the complete `<book>` XML structure, merging the generated details. Do not include any text outside the `<book>` tags.
+
+
 """
     response_xml_str = llm_client.get_response(prompt, "Generating short story outline")
 
     if not response_xml_str:
-        ui.console.print("[bold red]Failed to get a valid response from the LLM for the outline.[/bold red]")
+        ui.console.print(
+            "[bold red]Failed to get a valid response from the LLM for the outline.[/bold red]"
+        )
         return None
 
     # The orchestrator will handle parsing and validation
     return response_xml_str
-
