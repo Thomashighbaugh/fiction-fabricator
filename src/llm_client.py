@@ -94,9 +94,10 @@ class LLMClient:
                     temperature=1,
                     top_p=1,
                     max_tokens=16384,
-                    extra_body={
-                        "chat_template_kwargs": {"enable_thinking": True, "clear_thinking": False}
-                    },
+                    # Removed extra_body to fix function calling 404 error
+                    # extra_body={
+                    #     "chat_template_kwargs": {"enable_thinking": True, "clear_thinking": False}
+                    # },
                     stream=True,
                 )
 

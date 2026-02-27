@@ -22,6 +22,7 @@ from src.logger import get_logger
 from src.lorebook_manager import LorebookManager
 from src.project import Project
 from src.prompt_enhancer import PromptEnhancer
+from src.slop_detection import SlopDetectionAgent
 
 logger = get_logger(__name__)
 
@@ -30,7 +31,8 @@ class Orchestrator:
     """Orchestrates the entire novel generation process."""
 
     def __init__(
-        self, project: Project, llm_client: LLMClient, lorebook_path: str | None = None
+        self, project: Project, llm_client: LLMClient, lorebook_path: str | None = None, 
+        enable_slop_detection: bool | None = None, slop_sensitivity: str | None = None
     ) -> None:
         self.project = project
         self.llm = llm_client
@@ -38,6 +40,15 @@ class Orchestrator:
         self.lorebook_data = self._load_lorebook(lorebook_path) if lorebook_path else None
 
         self.export_manager = ExportManager(self.project, self.console)
+        
+        # Initialize slop detection with config defaults
+        self.enable_slop_detection = enable_slop_detection if enable_slop_detection is not None else config.ENABLE_SLOP_DETECTION
+        slop_sensitivity = slop_sensitivity or config.SLOP_DETECTION_SENSITIVITY
+        
+        if self.enable_slop_detection:
+            self.slop_agent = SlopDetectionAgent(sensitivity=slop_sensitivity)
+        else:
+            self.slop_agent = None
         self.lorebook_manager = LorebookManager(self.llm, self.console)
         self.prompt_enhancer = PromptEnhancer(self.llm, self.console, self)
 
@@ -209,17 +220,17 @@ class Orchestrator:
                 else:
                     # New lorebook - load/create with book idea for auto-generation
                     # Then open management interface for user to review/edit
-                    self.lorebook_data = self._load_or_create_lorebook(path, book_idea=idea)
+                    self.lorebook_data = self.lorebook_manager._load_or_create_lorebook(path, book_idea=idea)
                     if self.lorebook_data:
                         # Save initial version
-                        self._save_lorebook(path, self.lorebook_data)
+                        self.lorebook_manager._save_lorebook(path, self.lorebook_data)
                         # Open lorebook manager for user to review/edit entries
                         if self.lorebook_data.get("entries"):
                             if Confirm.ask(
                                 "[yellow]Would you like to review and edit the generated lorebook entries now?[/yellow]",
                                 default=True,
                             ):
-                                self.manage_lorebook(str(path))
+                                self.lorebook_manager.manage_lorebook(str(path))
                                 # Reload the potentially modified lorebook
                                 self.lorebook_data = self._load_lorebook(str(path))
 
@@ -476,6 +487,11 @@ Full Book Context:
 ```
 """
             patch_xml = self.llm.get_response(prompt, f"Writing chapters {ids_str}")
+            
+            # Apply slop detection to generated content before applying patch
+            if patch_xml and self.slop_agent:
+                self._apply_slop_detection_to_patch(patch_xml, ids_str)
+            
             if patch_xml and self.project.apply_patch(patch_xml):
                 patch_num = utils.get_next_patch_number(self.project.book_dir)
                 self.project.save_state(f"patch-{patch_num:02d}.xml")
@@ -518,9 +534,10 @@ Full Book Context:
                 lambda: self._edit_rewrite_chapter(blackout=True),
             ),
             "5": ("Ask LLM for Edit Suggestions", self._edit_suggest_edits),
-            "6": ("Manage Lorebooks", self.lorebook_manager.show_lorebook_menu),
-            "7": ("Export Menu", self.export_manager.show_export_menu),
-            "8": ("Quit Editing", None),
+            "6": ("Detect & Fix AI Slop", self._edit_detect_slop),
+            "7": ("Manage Lorebooks", self.lorebook_manager.show_lorebook_menu),
+            "8": ("Export Menu", self.export_manager.show_export_menu),
+            "9": ("Quit Editing", None),
         }
 
         while True:
@@ -1020,3 +1037,238 @@ Enhanced Context for Continuity:
             self.console.print(
                 "[dim]Inter-chapter narrative flow and character consistency have been preserved.[/dim]"
             )
+
+    def _run_engagement_optimization(self, chapters: list[ET.Element]) -> None:
+        """Run engagement optimization pass on all chapters."""
+        from src.engagement_optimizer import EngagementOptimizer
+        
+        optimizer = EngagementOptimizer()
+        
+        if not chapters:
+            self.console.print("[yellow]No chapters found to optimize.[/yellow]")
+            return
+
+        self.console.print(f"[bold yellow]Optimizing engagement for {len(chapters)} chapters...[/bold yellow]")
+        
+        failed_chapters = []
+        for chapter in chapters:
+            chapter_id = utils.get_chapter_id(chapter)
+            content_elem = chapter.find("content")
+            if content_elem is None or not content_elem.text:
+                continue
+                
+            original_text = content_elem.text
+            current_word_count = len(original_text.split())
+            
+            self.console.print(f"[cyan]Analyzing and optimizing Chapter {chapter_id}...[/cyan]")
+            
+            # analyze & create prompt
+            chapter_summary = chapter.findtext("summary", f"Chapter {chapter_id}")
+            genre_guidance = ""
+            
+            engagement_prompt = optimizer.create_engagement_prompt(
+                content_text=original_text,
+                chapter_summary=chapter_summary,
+                genre_guidance=genre_guidance,
+                current_word_count=current_word_count
+            )
+            
+            reduced_context = self._create_reduced_context_for_chapter(chapter_id)
+            
+            prompt = f"""
+{engagement_prompt}
+
+IMPORTANT: Output an XML `<patch>` containing a `<chapter>` element with the complete updated content. Use this EXACT format and include the `setting` attribute:
+
+<patch>
+  <chapter id="{chapter_id}" setting="...">
+    <content>
+      <paragraph>First updated paragraph...</paragraph>
+      <paragraph>Second updated paragraph...</paragraph>
+    </content>
+  </chapter>
+</patch>
+
+Relevant Context:
+```xml
+{reduced_context}
+```
+"""
+            patch_xml = self.llm.get_response(prompt, f"Optimizing engagement for chapter {chapter_id}")
+            
+            if patch_xml and self.project.apply_patch(patch_xml):
+                patch_num = utils.get_next_patch_number(self.project.book_dir)
+                self.project.save_state(f"patch-{patch_num:02d}.xml")
+                self.console.print(f"[green]✓ Chapter {chapter_id} engagement optimized successfully[/green]")
+            else:
+                failed_chapters.append(chapter_id)
+                self.console.print(f"[red]✗ Failed to optimize Chapter {chapter_id}[/red]")
+                
+        if failed_chapters:
+            failed_list = ", ".join(failed_chapters)
+            self.console.print(f"[yellow]Failed chapters: {failed_list}[/yellow]")
+        else:
+            self.console.print("[bold cyan]All chapters optimized for engagement! ✨[/bold cyan]")
+
+    def create_enhanced_prompt(self) -> None:
+        """Delegates to the prompt enhancer for creating enhanced prompts."""
+        self.prompt_enhancer.create_enhanced_prompt(self.lorebook_data)
+
+    def manage_lorebook(self, lorebook_path: str) -> None:
+        """Delegates to the lorebook manager for managing lorebooks."""
+        self.lorebook_manager.manage_lorebook(lorebook_path)
+    
+    def _apply_slop_detection_to_patch(self, patch_xml: str, chapter_ids: str) -> None:
+        """
+        Apply slop detection to generated content in a patch.
+        
+        Args:
+            patch_xml: The XML patch containing generated content
+            chapter_ids: String describing which chapters were generated
+        """
+        if not self.slop_agent:
+            return
+        
+        try:
+            # Parse the patch XML to extract content
+            patch_root = ET.fromstring(patch_xml)
+            chapters = patch_root.findall(".//chapter")
+            
+            total_issues = 0
+            cleaned_any = False
+            
+            for chapter in chapters:
+                chapter_id = chapter.get("id", "unknown")
+                paragraphs = chapter.findall(".//paragraph")
+                
+                if not paragraphs:
+                    continue
+                
+                # Extract text content from paragraphs
+                chapter_text = "\n".join(p.text or "" for p in paragraphs if p.text)
+                
+                if not chapter_text.strip():
+                    continue
+                
+                # Run slop detection
+                analysis = self.slop_agent.validate_content_quality(chapter_text, auto_clean=True)
+                
+                if analysis.has_issues:
+                    total_issues += len(analysis.issues)
+                    
+                    # Display slop detection results (if enabled in config)
+                    if config.SHOW_SLOP_REPORTS:
+                        self.console.print(f"\n[yellow]🔍 AI Slop detected in Chapter {chapter_id}:[/yellow]")
+                        self.console.print(f"  Score: {analysis.overall_score}/10 ({len(analysis.issues)} issues)")
+                        
+                        # Show major issues
+                        for issue in analysis.issues[:3]:  # Show top 3 issues
+                            severity_icon = "🔴" if issue.severity >= 0.7 else "🟡" if issue.severity >= 0.4 else "🟢"
+                            self.console.print(f"  {severity_icon} {len(issue.matches)}x {issue.category.value.replace('_', ' ')}: {issue.pattern}")
+                        
+                        if len(analysis.issues) > 3:
+                            self.console.print(f"  ... and {len(analysis.issues) - 3} more issues")
+                    
+                    # Apply auto-cleaning if enabled in config and available
+                    if config.AUTO_CLEAN_SLOP and analysis.cleaned_text:
+                        cleaned_any = True
+                        
+                        # Replace paragraph text with cleaned content
+                        cleaned_paragraphs = analysis.cleaned_text.split('\n')
+                        for i, para_element in enumerate(paragraphs):
+                            if i < len(cleaned_paragraphs):
+                                para_element.text = cleaned_paragraphs[i]
+                        
+                        self.console.print(f"  [green]✓ Auto-cleaned: removed {analysis.removals_count} fillers, replaced {analysis.replacements_count} weak phrases[/green]")
+                    else:
+                        self.console.print("  [dim]No auto-cleaning applied - manual review recommended[/dim]")
+            
+            # Summary message
+            if total_issues > 0:
+                if cleaned_any:
+                    self.console.print(f"\n[green]✅ Slop detection complete for {chapter_ids}: {total_issues} issues found and auto-cleaned[/green]")
+                else:
+                    self.console.print(f"\n[yellow]⚠️ Slop detection found {total_issues} issues in {chapter_ids} - consider manual review[/yellow]")
+            else:
+                self.console.print(f"\n[green]✨ No AI slop detected in {chapter_ids} - content is clean![/green]")
+        
+        except ET.ParseError as e:
+            self.console.print(f"[red]Failed to parse patch XML for slop detection: {e}[/red]")
+        except Exception as e:
+            self.console.print(f"[red]Error during slop detection: {e}[/red]")
+    
+    def _edit_detect_slop(self) -> None:
+        """Interactive slop detection and cleaning for chapters."""
+        if not self.slop_agent:
+            self.console.print("[red]Slop detection is disabled. Enable it in configuration.[/red]")
+            return
+        
+        # Get chapter selection
+        chapters = utils.select_chapters_interactive(self.project)
+        if not chapters:
+            return
+        
+        self.console.print(Panel(f"AI Slop Detection for {len(chapters)} Chapter(s)", style="bold blue"))
+        
+        total_chapters_with_issues = 0
+        total_issues = 0
+        
+        for chapter in chapters:
+            chapter_id = utils.get_chapter_id_with_default(chapter)
+            chapter_title = chapter.findtext("title", f"Chapter {chapter_id}")
+            
+            # Extract chapter content
+            paragraphs = chapter.findall(".//paragraph")
+            if not paragraphs or not any(p.text and p.text.strip() for p in paragraphs):
+                self.console.print(f"[dim]Skipping {chapter_title} - no content[/dim]")
+                continue
+            
+            chapter_text = "\n".join(p.text or "" for p in paragraphs if p.text)
+            
+            # Run slop detection
+            self.console.print(f"\n🔍 Analyzing {chapter_title}...")
+            analysis = self.slop_agent.validate_content_quality(chapter_text)
+            
+            if analysis.has_issues:
+                total_chapters_with_issues += 1
+                total_issues += len(analysis.issues)
+                
+                self.console.print(f"[yellow]⚠️ {chapter_title} - Score: {analysis.overall_score}/10[/yellow]")
+                
+                # Display detailed report
+                report = self.slop_agent.generate_quality_report(analysis)
+                self.console.print(report)
+                
+                # Ask if user wants to auto-clean
+                if Confirm.ask(f"[cyan]Auto-clean {chapter_title}? This will remove/replace detected slop.[/cyan]"):
+                    cleaned_analysis = self.slop_agent.validate_content_quality(chapter_text, auto_clean=True)
+                    
+                    if cleaned_analysis.cleaned_text:
+                        # Apply cleaned content back to chapter
+                        cleaned_paragraphs = cleaned_analysis.cleaned_text.split('\n')
+                        
+                        # Update paragraph elements
+                        for i, para_element in enumerate(paragraphs):
+                            if i < len(cleaned_paragraphs) and cleaned_paragraphs[i].strip():
+                                para_element.text = cleaned_paragraphs[i]
+                            elif i >= len(cleaned_paragraphs):
+                                # Remove excess paragraphs if cleaned text is shorter
+                                chapter.find(".//content").remove(para_element)
+                        
+                        self.console.print(f"[green]✅ {chapter_title} cleaned: removed {cleaned_analysis.removals_count} fillers, replaced {cleaned_analysis.replacements_count} weak phrases[/green]")
+                        
+                        # Save changes
+                        patch_num = utils.get_next_patch_number(self.project.book_dir)
+                        self.project.save_state(f"slop-fix-{patch_num:02d}.xml")
+                    else:
+                        self.console.print(f"[yellow]No auto-cleaning available for {chapter_title}[/yellow]")
+            else:
+                self.console.print(f"[green]✨ {chapter_title} - No slop detected! (Score: {analysis.overall_score}/10)[/green]")
+        
+        # Summary
+        if total_issues > 0:
+            self.console.print(f"\n[bold]Slop Detection Summary:[/bold]")
+            self.console.print(f"  📊 {total_chapters_with_issues}/{len(chapters)} chapters had issues")
+            self.console.print(f"  🔍 {total_issues} total issues detected")
+        else:
+            self.console.print(f"\n[bold green]🎉 All {len(chapters)} chapters are slop-free![/bold green]")

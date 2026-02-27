@@ -3,8 +3,10 @@ quality_metrics.py - Quality evaluation system for generated content
 """
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 from src import config
+from src.slop_detection import SlopDetectionAgent, SlopAnalysis
 
 
 @dataclass
@@ -18,12 +20,13 @@ class QualityMetrics:
     overall_score: float
     meets_thresholds: bool
     issues: list[str]
+    slop_analysis: Optional[SlopAnalysis] = None  # AI slop detection results
 
 
 class QualityEvaluator:
     """Evaluates content quality against defined thresholds."""
 
-    def __init__(self, thresholds: dict | None = None):
+    def __init__(self, thresholds: dict | None = None, enable_slop_detection: bool = True, slop_sensitivity: str = "medium"):
         self.thresholds = thresholds or {
             "min_words": config.MIN_WORDS_PER_CHAPTER,
             "min_dialogue_ratio": config.MIN_DIALOGUE_RATIO,
@@ -31,6 +34,13 @@ class QualityEvaluator:
             "min_sentence_variety": config.MIN_SENTENCE_VARIETY_SCORE,
             "min_vocabulary_richness": config.MIN_VOCABULARY_RICHNESS_SCORE,
         }
+        
+        # Initialize slop detection if enabled
+        self.enable_slop_detection = enable_slop_detection
+        if enable_slop_detection:
+            self.slop_agent = SlopDetectionAgent(sensitivity=slop_sensitivity)
+        else:
+            self.slop_agent = None
 
     def evaluate_chapter(
         self, content_text: str, chapter_context: dict | None = None
@@ -94,8 +104,18 @@ class QualityEvaluator:
                 f"Vocabulary richness score ({vocabulary_richness_score:.1f}/10) below threshold"
             )
 
+        # Run slop detection if enabled
+        slop_analysis = None
+        if self.enable_slop_detection and self.slop_agent:
+            slop_analysis = self.slop_agent.validate_content_quality(content_text)
+            
+            # Add slop issues to overall issues list
+            if slop_analysis.has_issues:
+                slop_summary = f"AI slop detected (score: {slop_analysis.overall_score}/10, {len(slop_analysis.issues)} issues)"
+                issues.append(slop_summary)
+
         overall_score = self._calculate_overall_score(
-            word_count, dialogue_ratio, sentence_variety_score, vocabulary_richness_score
+            word_count, dialogue_ratio, sentence_variety_score, vocabulary_richness_score, slop_analysis
         )
 
         meets_thresholds = len(issues) == 0
@@ -108,6 +128,7 @@ class QualityEvaluator:
             overall_score=overall_score,
             meets_thresholds=meets_thresholds,
             issues=issues,
+            slop_analysis=slop_analysis,
         )
 
     def _is_dialogue_expected(self, chapter_context: dict) -> bool:
@@ -315,6 +336,7 @@ class QualityEvaluator:
         dialogue_ratio: float,
         sentence_variety: float,
         vocabulary_richness: float,
+        slop_analysis: Optional[SlopAnalysis] = None,
     ) -> float:
         """
         Calculate an overall quality score (1-10) based on all metrics.
@@ -341,6 +363,10 @@ class QualityEvaluator:
 
         scores.append(sentence_variety)
         scores.append(vocabulary_richness)
+        
+        # Include slop score if available
+        if slop_analysis:
+            scores.append(slop_analysis.overall_score)
 
         overall = sum(scores) / len(scores)
         return round(overall, 1)
@@ -377,6 +403,11 @@ class QualityEvaluator:
         report.append(
             f"Vocabulary Richness: {metrics.vocabulary_richness_score}/10 (min: {self.thresholds['min_vocabulary_richness']})"
         )
+        
+        # Add slop analysis if available
+        if metrics.slop_analysis:
+            report.append(f"AI Slop Score: {metrics.slop_analysis.overall_score}/10")
+        
         report.append(f"Overall Score: {metrics.overall_score}/10")
 
         if metrics.issues:
@@ -385,5 +416,13 @@ class QualityEvaluator:
                 report.append(f"  - {issue}")
         else:
             report.append("\n✓ All quality thresholds met")
+        
+        # Add detailed slop report if available
+        if metrics.slop_analysis and metrics.slop_analysis.has_issues:
+            report.append("\n" + "="*50)
+            report.append("AI SLOP DETECTION DETAILS:")
+            if self.slop_agent:
+                detailed_slop_report = self.slop_agent.generate_quality_report(metrics.slop_analysis)
+                report.append(detailed_slop_report)
 
         return "\n".join(report)

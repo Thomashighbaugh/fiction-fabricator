@@ -3,8 +3,8 @@ config.py - Centralized configuration for the Fiction Fabricator project.
 """
 
 # --- Model and API Configuration ---
-# Using NVIDIA API with DeepSeek model
-MODEL_NAME = "deepseek-ai/deepseek-v3.1-terminus"
+# Using NVIDIA API with GLM4.7 model (switched from GLM5 due to function calling issues)
+MODEL_NAME = "z-ai/glm4.7"
 
 # --- API Retry Configuration ---
 MAX_API_RETRIES = 3
@@ -23,6 +23,16 @@ MIN_QUALITY_SCORE = 6
 ENABLE_AUTO_CRITIQUE = True
 # Enable/disable auto-refinement if quality threshold not met
 ENABLE_AUTO_REFINE = True
+
+# --- AI Slop Detection Configuration ---
+# Enable/disable slop detection during content generation
+ENABLE_SLOP_DETECTION = True
+# Auto-clean detected slop (True = automatic, False = detection only)
+AUTO_CLEAN_SLOP = True
+# Sensitivity level: "low", "medium", "high", "strict"
+SLOP_DETECTION_SENSITIVITY = "medium"
+# Show detailed slop reports in console
+SHOW_SLOP_REPORTS = True
 
 # --- Adaptive Sub-beat Configuration ---
 # Target word count per chapter (used for calculating sub-beat count)
