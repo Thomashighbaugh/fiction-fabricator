@@ -1,0 +1,29 @@
+# CORE CONCEPT
+[Describe the fundamental story idea, premise, or concept that drives your narrative. This should be a clear, concise statement of what your story is about at its most basic level.]
+
+# GENRE AND STYLE
+[Specify the primary genre(s) and any subgenres. Include information about the narrative style, tone, and literary approach you want the AI to adopt.]
+
+# SETTING
+[Detail the world, time period, location, and environment where your story takes place. Include cultural, technological, and social context that shapes the narrative backdrop.]
+
+# MAIN CHARACTERS
+[Provide comprehensive descriptions of your primary characters including their backgrounds, motivations, personality traits, relationships, and character arcs.]
+
+# PLOT STRUCTURE
+[Outline the major plot points, story beats, conflicts, and narrative progression. Include information about pacing and story structure preferences.]
+
+# THEMES AND MESSAGES
+[Identify the central themes, ideas, or messages you want to explore through the narrative. Include any philosophical or emotional elements you want to emphasize.]
+
+# TONE AND ATMOSPHERE
+[Describe the mood, emotional atmosphere, and overall feeling you want the story to convey. Include information about how dark, light, serious, or humorous the narrative should be.]
+
+# LENGTH AND SCOPE
+[Specify whether this is a short story, novella, or full novel, and provide any requirements about chapter structure, word count targets, or narrative scope.]
+
+# SPECIFIC REQUIREMENTS
+[List any particular elements, scenes, plot devices, or constraints that must be included or avoided in the generation process.]
+
+# INSPIRATION AND REFERENCES
+[Mention any books, authors, movies, or other works that serve as inspiration or reference points for the style and content you're seeking.]

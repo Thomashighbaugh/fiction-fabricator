@@ -4,13 +4,18 @@ llm_client.py - Manages all interactions with the OpenAI API.
 
 import getpass
 import os
+import sys
 import time
 
 from dotenv import load_dotenv
 from openai import OpenAI
+
+_USE_COLOR = sys.stdout.isatty() and os.getenv("NO_COLOR") is None
+_REASONING_COLOR = "\033[90m" if _USE_COLOR else ""
+_RESET_COLOR = "\033[0m" if _USE_COLOR else ""
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
 from src import config
@@ -75,41 +80,54 @@ class LLMClient:
             try:
                 self.console.print(
                     Panel(
-                        f"[yellow]Sending request to DeepSeek ({task_description})... (Attempt {retries + 1}/{config.MAX_API_RETRIES})[/yellow]",
+                        f"[yellow]Sending request to GLM5 ({task_description})... (Attempt {retries + 1}/{config.MAX_API_RETRIES})[/yellow]",
                         border_style="dim",
                     )
                 )
 
-                # --- Non-Streaming Response ---
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    transient=True,
-                ) as progress:
-                    progress.add_task(description="[cyan]DeepSeek is thinking...", total=None)
+                # --- Streaming Response ---
+                assert self.client is not None
 
-                    response = self.client.chat.completions.create(
-                        model=config.MODEL_NAME,
-                        messages=[{"role": "user", "content": prompt_content}],
+                completion = self.client.chat.completions.create(
+                    model=config.MODEL_NAME,
+                    messages=[{"role": "user", "content": prompt_content}],
+                    temperature=1,
+                    top_p=1,
+                    max_tokens=16384,
+                    # Removed extra_body to fix function calling 404 error
+                    # extra_body={
+                    #     "chat_template_kwargs": {"enable_thinking": True, "clear_thinking": False}
+                    # },
+                    stream=True,
+                )
+
+                self.console.print(f"[cyan]>>> GLM5 Response ({task_description}):[/cyan]")
+
+                for chunk in completion:
+                    if not getattr(chunk, "choices", None):
+                        continue
+                    if len(chunk.choices) == 0 or getattr(chunk.choices[0], "delta", None) is None:
+                        continue
+                    delta = chunk.choices[0].delta
+                    reasoning = getattr(delta, "reasoning_content", None)
+                    if reasoning:
+                        print(f"{_REASONING_COLOR}{reasoning}{_RESET_COLOR}", end="", flush=True)
+                    if getattr(delta, "content", None) is not None:
+                        content_piece = str(delta.content)
+                        print(content_piece, end="", flush=True)
+                        full_response += content_piece
+
+                print()  # Newline after response completes
+
+                if not full_response:
+                    self.console.print(
+                        "[yellow]Response completed but contains no text content.[/yellow]"
                     )
-
-                    if response.choices[0].message.content:
-                        full_response = response.choices[0].message.content
-                        self.console.print(
-                            f"[cyan]>>> DeepSeek Response ({task_description}):[/cyan]"
-                        )
-                        self.console.print(
-                            f"[dim]{full_response[:1000]}{'...' if len(full_response) > 1000 else ''}[/dim]"
-                        )
-                    else:
-                        self.console.print(
-                            "[yellow]Response completed but contains no text content.[/yellow]"
-                        )
-                        return None
+                    return None
 
                 self.console.print(
                     Panel(
-                        "[green]✓ DeepSeek response received successfully.[/green]",
+                        "[green]✓ GLM5 response received successfully.[/green]",
                         border_style="dim",
                     )
                 )
