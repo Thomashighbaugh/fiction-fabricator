@@ -11,7 +11,7 @@ dependencies = [
     "google-generativeai==0.8.5",
     "lxml==6.0.1",
     "openai==2.11.0",
-    "python-dotenv==1.1.1",
+    "python-dotenv==1.2.2",
     "rich==14.1.0",
 ]
 
